@@ -34,10 +34,12 @@ jobs:
           echo "Version $VER"
           make RACK_DIR=sdk/Rack-SDK SLUG=GenraTest VERSION=$VER -j4 dist
 
-      - name: Test the MATH core (without Rack)
+      - name: Test the cores (without Rack)
         run: |
           gcc -std=gnu11 -O2 -w test/mathcore_test.c -o mt.exe -lm && cp res/mathcore.dll . 
           ./mt.exe ./mathcore.dll
+          gcc -std=gnu11 -O2 -w test/kurbelcore_test.c -o kt.exe -lm && cp res/kurbelcore.dll .
+          ./kt.exe ./kurbelcore.dll
 
       - name: Check the package
         run: |
@@ -46,6 +48,8 @@ jobs:
           test -f $D/plugin.dll
           test -f $D/res/mathcore.dll
           test -f $D/res/Math.svg
+          test -f $D/res/kurbelcore.dll
+          test -f $D/res/Kurbel.svg
           test -f $D/res/knob/small.svg
           objdump -p $D/plugin.dll | grep "DLL Name"
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi

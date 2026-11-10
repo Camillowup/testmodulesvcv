@@ -1,6 +1,7 @@
 build/
 dist/
 /jiant/
+/estampie/
 res/*core.so
 res/*core.dylib
 res/*core.dll

@@ -1,9 +1,10 @@
-# GENRA Test: new instruments of the GENRA family to try out (here: MATH). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
 SOURCES += $(wildcard src/*.cpp)
 SOURCES += $(wildcard src/math/*.cpp)
+SOURCES += $(wildcard src/kurbel/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -34,7 +35,7 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -44,6 +45,19 @@ $(JIANT_STAMP): jiant.tar.gz
 res/mathcore.$(CORE_EXT): mathcore/mathcore.c mathcore/mathcore.h $(JIANT_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(CORE_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the KURBEL core
+# ESTAMPIE's firmware (estampie.tar.gz, a snapshot: estampie/SNAPSHOT.txt) with kurbelcore/kurbelcore.c on top, built
+# the same way (its own includes instead of JIANT's).
+KURBEL_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Iestampie/build/gen -Iestampie/firmware/src,$(CORE_FLAGS))
+ESTAMPIE_STAMP := estampie/.unpacked
+$(ESTAMPIE_STAMP): estampie.tar.gz
+	tar xzf estampie.tar.gz
+	touch $@
+
+res/kurbelcore.$(CORE_EXT): kurbelcore/kurbelcore.c kurbelcore/kurbelcore.h $(ESTAMPIE_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(KURBEL_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

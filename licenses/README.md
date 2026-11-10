@@ -1,6 +1,6 @@
 # Third-party material in GENRA Test
 
-GENRA Test as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
+GENRA Test (MATH, KURBEL) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
 text in `../LICENSE`). It contains the following parts by other authors. Each keeps its own licence; the texts are in
 this folder. All of them are compatible with distributing the plugin under GPL-3.0.
 
@@ -11,4 +11,7 @@ this folder. All of them are compatible with distributing the plugin under GPL-3
 | CMU Pronouncing Dictionary (word list in the firmware) | Carnegie Mellon University | BSD-2-Clause | JIANT firmware build | `BSD-2-Clause-CMUdict.txt` |
 | Fukiai icon font, fm1-clk320-probe (parts of the JIANT firmware tree) | Hügelton Instruments; curist | MIT | JIANT firmware build | `MIT-Fukiai.txt`, `MIT-fm1-clk320.txt` |
 | Chakra Petch, IBM Plex Mono, Michroma (rasterised into the JIANT firmware) | their project authors | SIL OFL 1.1 | JIANT firmware build | `OFL-ChakraPetch.txt`, `OFL-IBMPlexMono.txt`, `OFL-Michroma.txt` |
+| ESTAMPIE (a Felucca fork with GHOULBOX's hurdy-gurdy): the GURDY engine and the rest of its firmware | ESTAMPIE's authors (github.com/ocean/estampie); GHOULBOX (Jason Persinger); Leo Kuroshita, Hügelton Instruments (Felucca) | GPL-3.0-only | KURBEL (`kurbelcore/`, `estampie.tar.gz`) | `../LICENSE`, `ESTAMPIE-LICENSING.md` |
+| Felucca-Engines (TRIO: KURBEL's shawm, and ANALOG, LOFI, WHEEL, NOISE in the firmware tree) | Leo Kuroshita, Hügelton Instruments | MIT | KURBEL core | `estampie/MIT-Felucca-Engines.txt` |
+| Further parts of the ESTAMPIE tree (DaisySP, Rings, msfa, fonts rasterised into the firmware, felucca-bsp) | see `ESTAMPIE-LICENSING.md` | MIT, Apache-2.0, SIL OFL 1.1, MPL-2.0 | KURBEL core | `estampie/` |
 | GENRA's shared sources (`../genra/`: knobs, Follow GENRA, link hub, JIANT UI) | Bastian Ofner (GENRA) | GPL-3.0-only | the whole plugin | `../LICENSE` |

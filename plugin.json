@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -22,6 +22,16 @@
         "Polyphonic",
         "Oscillator",
         "Noise"
+      ]
+    },
+    {
+      "slug": "Kurbel",
+      "name": "KURBEL",
+      "description": "ESTAMPIE's hurdy-gurdy (GHOULBOX's GURDY: melody string, drones, buzzing trompette, a crank you turn by knob and CV) and its shawm, with medieval temperaments",
+      "tags": [
+        "Synth voice",
+        "Physical modeling",
+        "Drone"
       ]
     }
   ]

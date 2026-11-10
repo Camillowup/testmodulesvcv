@@ -6,3 +6,4 @@
 #include "../genra/plugin.hpp"
 
 extern Model* modelMath;
+extern Model* modelKurbel;
