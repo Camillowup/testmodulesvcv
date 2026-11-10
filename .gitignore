@@ -1,6 +1,6 @@
 build/
 dist/
-jiant/
+/jiant/
 res/*core.so
 res/*core.dylib
 res/*core.dll
@@ -9,3 +9,4 @@ plugin.dll
 plugin.dylib
 *.exe
 docs/*.svg
+__pycache__/
