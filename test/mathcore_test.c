@@ -1,5 +1,6 @@
 /* Host test of the MATH core: presets, parameters, sound in KEYS and THRU, MOTION SYNC. */
 #ifdef _WIN32
+#define NOMINMAX
 #include <windows.h>
 #else
 #include <dlfcn.h>
