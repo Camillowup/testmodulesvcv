@@ -12,4 +12,5 @@ void init(Plugin* p) {
 	pluginInstance = p;
 	p->addModel(modelMath);
 	p->addModel(modelKurbel);
+	p->addModel(modelSwarm);
 }

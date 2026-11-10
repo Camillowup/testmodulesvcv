@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -32,6 +32,16 @@
         "Synth voice",
         "Physical modeling",
         "Drone"
+      ]
+    },
+    {
+      "slug": "Swarm",
+      "name": "SWARM",
+      "description": "The JIANT FM firmware's SWARM: a drone made of the devices around, here virtual ones (no radio): their addresses, makers, bytes and clocks become notes, timbres, FM and rhythm; VOICES, BUSY, MOVE, NEAR, ARRIVE and NEW; THRU or played (KEYS), drawn live",
+      "tags": [
+        "Synth voice",
+        "Drone",
+        "Random"
       ]
     }
   ]

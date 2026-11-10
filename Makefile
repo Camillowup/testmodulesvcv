@@ -1,10 +1,11 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
 SOURCES += $(wildcard src/*.cpp)
 SOURCES += $(wildcard src/math/*.cpp)
 SOURCES += $(wildcard src/kurbel/*.cpp)
+SOURCES += $(wildcard src/swarm/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -35,7 +36,7 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -43,6 +44,12 @@ $(JIANT_STAMP): jiant.tar.gz
 	touch $@
 
 res/mathcore.$(CORE_EXT): mathcore/mathcore.c mathcore/mathcore.h $(JIANT_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(CORE_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the SWARM core
+# The same JIANT snapshot with swarmcore/swarmcore.c on top (SWARM: eng_input.c, with virtual devices instead of a radio).
+res/swarmcore.$(CORE_EXT): swarmcore/swarmcore.c swarmcore/swarmcore.h $(JIANT_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(CORE_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
 

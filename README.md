@@ -4,7 +4,7 @@ Testplugin für neue Instrumente der GENRA-Familie, bevor sie in **GENRA Instrum
 Rack unter der Marke **Genra**, neben GENRA und GENRA Instruments, und funktioniert mit beiden zusammen (Follow GENRA,
 MIX ohne Kabel).
 
-Zurzeit drin: **MATH** und **KURBEL**.
+Zurzeit drin: **MATH**, **KURBEL** und **SWARM**.
 
 ## Installieren
 
@@ -76,18 +76,47 @@ für vollen Druck), **BUZZ** (Schnarren), **BODY**, **WOBL** (Unruhe des Rads). 
 **CLOCK · RESET** (Tempo der Stösse; RESET startet die Stösse eines gehaltenen Tons neu), **CRANK** (CV, zum Regler
 addiert: 1 V = 24 rpm), **BUZZ** (Trigger: ein Stoss, bei COUP CRANK), L/R. Ohne Kabel: Rechtsklick › Follow GENRA.
 
+**Kurbeln ohne Gate:** Kommt kein Gate an (kein Kabel, kein Follow) und COUP steht auf CRANK, spielt KURBEL von
+selbst, solange gekurbelt wird: Bordune und Melodiesaite auf dem DRONE-Ton (C3 …), mit V/OCT auf dessen Ton.
+Abschaltbar per Rechtsklick › *Crank plays without a gate*.
+
+## SWARM
+
+![SWARM](docs/Swarm.png)
+
+Der Schwarm aus der JIANT-Firmware: Jedes Gerät in der Nähe ist eine Stimme. Hier ohne echtes Bluetooth: die Geräte
+sind **virtuell** und schicken der unveränderten Engine erfundene Funkpakete. Ihre Adresse ist der Ton, der
+Hersteller die Klangfamilie (Glas/Glocken, Rohrblatt, Holz), die Datenbytes der FM-Modulator, der Sendeabstand der
+Rhythmus (die Schwankung ein Vibrato), die Signalstärke die Nähe, der Funkkanal die Seite im Stereobild. Dazu spielt
+eine Lead-Stimme eine Melodie im Tempo; sie folgt den Änderungen der Nähe.
+
+**Display:** links der Schwarm, wie die Firmware ihn zeichnet (jedes Gerät ein Punkt, Linien zum lautesten, unten
+FAR … NEAR). Rechts Preset, PLAY, Anzahl der Geräte, Tonart, die Nähe als Balken, Tempo.
+
+**Kopf:** ◀ PRE / PRE ▶ (SWARM, SWARM PLUCK, SWARM CHOIR), **NEW** (ein neuer Schwarm: alle Geräte neu),
+**PLAY** THRU (summt ständig) oder KEYS (spielbar: das Gate ist der Ton, seine Spannung die Lautstärke, kurze
+Rampe gegen Klicks), **VOICES** (1–8 Geräte), **LEVEL**.
+
+**ENGINE** (je mit CV): PLUCK, FM, IMAGE, DRIFT, OCTAVE, CHAOS. **AIR:** BUSY (wie oft sie senden), MOVE (sie laufen
+herum, kommen und gehen), NEAR (wie nah sie sind). **FX:** DIST, CHORUS, DELAY, REVERB.
+
+**Buchsen unten:** V/OCT (transponiert, C4 = Originallage) · GATE · VEL, CLOCK · RESET (das Raster der Lead-Stimme),
+**NEAR** (CV, zum Regler addiert), **ARRIVE** (Trigger: ein neues Gerät kommt), **NEW** (Trigger: neuer Schwarm), L/R.
+Rechtsklick: Follow GENRA, Clock-Eingang, Root und Scale der Geräte-Töne, Preset. Der Schwarm wird im Patch gespeichert.
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
-| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`) |
+| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`) |
 | `genra/` | gemeinsame Teile aus dem GENRA-Repo, unverändert kopiert: Knöpfe, Follow GENRA, Link-Hub, JIANT-UI |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
 | `kurbelcore/` | der KURBEL-Kern (`res/kurbelcore.dll`), ebenso |
+| `swarmcore/` | der SWARM-Kern (`res/swarmcore.dll`, aus demselben JIANT-Schnappschuss), mit den virtuellen Geräten |
 | `estampie.tar.gz` | Schnappschuss der ESTAMPIE-Quellen (Commit 6c4f0c7; siehe `estampie/SNAPSHOT.txt`), beim Bauen entpackt |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss) |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung) |
 
 Gebaut wird über GitHub Actions (Windows). Für später ist alles so angelegt, dass jedes Modul ohne Umbau nach
 GENRA Instruments wandern kann (eigener Ordner, eindeutige Namen, Follow über den Link-Hub).

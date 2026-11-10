@@ -57,6 +57,7 @@ struct Kurbel : Module, follow::Host {
 	int preset = 0;
 	int wheelPreset = 0;                          // the last WHEEL sound (back to it from REED)
 	int clockMode = 0;
+	bool crankAlone = true;                       // COUP CRANK without a gate: turning the crank plays (drones + melody)
 	bool fromPatch = false;
 	std::atomic<int> presetReq{-1};
 
@@ -226,6 +227,7 @@ struct Kurbel : Module, follow::Host {
 		Module::onReset(e);
 		fromPatch = false;
 		clockMode = 0;
+		crankAlone = true;
 		presetReq = 0;
 	}
 
@@ -234,6 +236,7 @@ struct Kurbel : Module, follow::Host {
 		json_object_set_new(r, "preset", json_integer(preset));
 		json_object_set_new(r, "wheelPreset", json_integer(wheelPreset));
 		json_object_set_new(r, "clockMode", json_integer(clockMode));
+		json_object_set_new(r, "crankAlone", json_boolean(crankAlone));
 		fol.toJson(r);
 		return r;
 	}
@@ -245,6 +248,8 @@ struct Kurbel : Module, follow::Host {
 			wheelPreset = (int) json_integer_value(j);
 		if (json_t* j = json_object_get(r, "clockMode"))
 			clockMode = clamp((int) json_integer_value(j), 0, 3);
+		if (json_t* j = json_object_get(r, "crankAlone"))
+			crankAlone = json_boolean_value(j);
 		fromPatch = true;
 		if (core.api) {
 			int n = std::max(1, (int) core.api->npresets());
@@ -314,11 +319,17 @@ struct Kurbel : Module, follow::Host {
 	/** One melody string: the first channel of V/OCT and GATE; a new pitch under a held gate slides (legato). */
 	void processNotes(const jku_api* a) {
 		bool on = false;
+		int nn = clamp((int) std::round(inputs[VOCT_INPUT].getVoltage() * 12.f) + 60, 0, 127);
 		if (inputs[GATE_INPUT].isConnected()) {
 			float g = inputs[GATE_INPUT].getVoltage();
 			on = gate ? g > 0.5f : g >= 1.f;
+		} else if (crankAlone && engineNow == JKU_WHEEL && params[COUP_PARAM].getValue() > 4.5f) {
+			// no gate: the crank turning plays, as on a hurdy-gurdy: the drones and the melody string, on the DRONE's
+			// note (C3 ..) or on V/OCT's
+			on = rpmNow() >= (gate ? 3.f : 6.f);
+			if (!inputs[VOCT_INPUT].isConnected())
+				nn = 48 + clamp((int) std::round(params[DRONE_PARAM].getValue()), 0, 11);
 		}
-		int nn = clamp((int) std::round(inputs[VOCT_INPUT].getVoltage() * 12.f) + 60, 0, 127);
 		if (on && !gate) {
 			int vel = 100;
 			if (inputs[VEL_INPUT].isConnected())
@@ -706,6 +717,7 @@ struct KurbelWidget : ModuleWidget {
 		menu->addChild(createIndexSubmenuItem("Clock input", {CLOCK_MODES[0], CLOCK_MODES[1], CLOCK_MODES[2], CLOCK_MODES[3]},
 		                                      [=]() { return (size_t) m->clockMode; },
 		                                      [=](size_t i) { m->clockMode = (int) i; }));
+		menu->addChild(createBoolPtrMenuItem("Crank plays without a gate (COUP CRANK)", "", &m->crankAlone));
 		if (!m->core.loaded())
 			return;
 		std::vector<std::string> names;

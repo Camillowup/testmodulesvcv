@@ -27,7 +27,7 @@ H = 380
 
 BG, PLATE, LINE, TXT, DIM = "#17181d", "#212329", "#34363f", "#d9dbe2", "#8a8d99"
 # keep in step with the modules (src/<name>/<Name>.cpp: <NAME>_RGB)
-COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c"}
+COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c", "Swarm": "#13b8a6"}
 
 # component radii (px)
 R_SMALL, R_TRIM, R_JACK, R_BEZEL = 11.3, 8.9, 11.8, 10.6
@@ -175,7 +175,7 @@ class Panel:
         return "\n".join(L)
 
 
-def io_row(p, ins, outs=("L", "R")):
+def io_row(p, ins, outs=("L", "R"), rest_dx=34, rest_gap=12):
     """Inputs on the left (plain jacks), the mix out on the right (on tiles), labels below."""
     p.plate(14, 316, 236, 44)
     # the GENRA strip (tools/panellib.py look, in px: 1 mm = 2.9528): V/OCT, GATE, VEL on a tray in the module colour
@@ -197,7 +197,7 @@ def io_row(p, ins, outs=("L", "R")):
             p.jack(name, xs + SL * (i + 0.5), 332, lab, 353.5)
         xs += len(sync) * SL
     for i, (name, lab) in enumerate(rest):
-        p.jack(name, xs + 12 + 34 * (i + 0.5), 332, lab, 353.5)
+        p.jack(name, xs + rest_gap + rest_dx * (i + 0.5), 332, lab, 353.5)
     p.plate(256, 316, 120, 44)
     for i, lab in enumerate(outs):
         p.jack(f"OUT_{lab}", 292 + i * 48, 332, lab, 353.5, out=True)

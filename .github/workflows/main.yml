@@ -40,6 +40,8 @@ jobs:
           ./mt.exe ./mathcore.dll
           gcc -std=gnu11 -O2 -w test/kurbelcore_test.c -o kt.exe -lm && cp res/kurbelcore.dll .
           ./kt.exe ./kurbelcore.dll
+          gcc -std=gnu11 -O2 -w test/swarmcore_test.c -o st.exe -lm && cp res/swarmcore.dll .
+          ./st.exe ./swarmcore.dll
 
       - name: Check the package
         run: |
@@ -50,6 +52,8 @@ jobs:
           test -f $D/res/Math.svg
           test -f $D/res/kurbelcore.dll
           test -f $D/res/Kurbel.svg
+          test -f $D/res/swarmcore.dll
+          test -f $D/res/Swarm.svg
           test -f $D/res/knob/small.svg
           objdump -p $D/plugin.dll | grep "DLL Name"
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
