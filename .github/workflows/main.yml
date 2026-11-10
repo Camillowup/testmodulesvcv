@@ -1,0 +1,56 @@
+name: Build GENRA Test
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Download Rack SDK
+        shell: pwsh
+        run: |
+          Invoke-WebRequest -Uri https://vcvrack.com/downloads/Rack-SDK-latest-win-x64.zip -OutFile sdk.zip
+          Expand-Archive sdk.zip -DestinationPath sdk
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: false
+          suppress-deprecation-warnings: msystem-mingw64
+          install: >-
+            make zip tar zstd sed
+            mingw-w64-x86_64-gcc
+
+      - name: Build plugin GENRA Test
+        run: |
+          VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin.json)
+          echo "Version $VER"
+          make RACK_DIR=sdk/Rack-SDK SLUG=GenraTest VERSION=$VER -j4 dist
+
+      - name: Test the MATH core (without Rack)
+        run: |
+          gcc -std=gnu11 -O2 -w test/mathcore_test.c -o mt.exe -lm && cp res/mathcore.dll . 
+          ./mt.exe ./mathcore.dll
+
+      - name: Check the package
+        run: |
+          D=dist/GenraTest
+          ls -la $D $D/res
+          test -f $D/plugin.dll
+          test -f $D/res/mathcore.dll
+          test -f $D/res/Math.svg
+          test -f $D/res/knob/small.svg
+          objdump -p $D/plugin.dll | grep "DLL Name"
+          if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genra-test-windows
+          path: dist/*.vcvplugin

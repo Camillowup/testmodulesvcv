@@ -1,0 +1,28 @@
+{
+  "slug": "GenraTest",
+  "name": "GENRA Test",
+  "version": "2.0.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "Math",
+      "name": "MATH",
+      "description": "The JIANT FM firmware's MATH engine: bytebeat and floatbeat formulas played as an instrument (KEYS) or running on by themselves (THRU), MOTION SYNC to the clock, with its being drawn live",
+      "tags": [
+        "Synth voice",
+        "Polyphonic",
+        "Oscillator",
+        "Noise"
+      ]
+    }
+  ]
+}
