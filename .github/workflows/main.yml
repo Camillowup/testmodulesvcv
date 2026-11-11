@@ -61,6 +61,8 @@ jobs:
           ./ct.exe ./cantacore.dll
           gcc -std=gnu11 -O2 -w test/miaoucore_test.c miaoucore/miaoucore.c -o mct.exe -lm
           ./mct.exe
+          gcc -std=gnu11 -O2 -w test/sauruscore_test.c -o sat.exe -lm && cp res/sauruscore.dll .
+          ./sat.exe ./sauruscore.dll
 
       - name: Check the package
         run: |
@@ -78,6 +80,8 @@ jobs:
           test -f $D/res/cantacore.dll
           test -f $D/res/Canta.svg
           test -f $D/res/Miaou.svg
+          test -f $D/res/sauruscore.dll
+          test -f $D/res/Saurus.svg
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/espeak-ng-data/de_dict
           test -d "$D/res/espeak-ng-data/voices/!v"
@@ -133,7 +137,7 @@ jobs:
           D=dist/GenraTest
           ls -la $D $D/res
           test -f $D/plugin.dylib
-          for c in mathcore kurbelcore swarmcore liedcore cantacore; do test -f $D/res/$c.dylib; done
+          for c in mathcore kurbelcore swarmcore liedcore cantacore sauruscore; do test -f $D/res/$c.dylib; done
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/knob/small.svg
           for f in $D/plugin.dylib $D/res/*core.dylib; do
@@ -174,7 +178,7 @@ jobs:
           name: GENRA Test ${{ env.RELVER }}
           files: files/*.vcvplugin
           body: |
-            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Appears under the
+            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, SAURUS). Appears under the
             brand "Genra" in Rack's browser; the modules follow GENRA without cables when the GENRA plugin is installed.
 
             Files: `win-x64` = Windows, `mac-arm64` = Mac with Apple chip (M1 and later), `mac-x64` = Intel Mac.

@@ -1,6 +1,6 @@
 # Third-party material in GENRA Test
 
-GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
+GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
 text in `../LICENSE`). It contains the following parts by other authors. Each keeps its own licence; the texts are in
 this folder. All of them are compatible with distributing the plugin under GPL-3.0.
 

@@ -4,7 +4,7 @@ Testplugin für neue Instrumente der GENRA-Familie, bevor sie in **GENRA Instrum
 Rack unter der Marke **Genra**, neben GENRA und GENRA Instruments, und funktioniert mit beiden zusammen (Follow GENRA,
 MIX ohne Kabel).
 
-Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA** und **MIAOU**.
+Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA**, **MIAOU** und **SAURUS**.
 
 ## Installieren
 
@@ -236,12 +236,43 @@ angezerrt, 8 Bit; 0 = sauber). Mitte bzw. Standard = wie in MIAOU. **FX:** CHORU
 
 **Buchsen unten:** V/OCT · GATE · VEL (GENRA-Leiste, polyphon), **PAW** (Gate: miaut, solange es anliegt), **SOUND**
 (CV, 2 V pro Klang, zum Schalter addiert), L/R (nur L gesteckt: Mono). Ohne Kabel: Rechtsklick › Follow GENRA.
+## SAURUS
+
+![SAURUS](docs/panels/Saurus.png)
+
+Die Kreaturenrufe aus der FM-1-Firmware **PALEOTONE** (die SAURUS-Engine, 26 HP): eine brummende Kehle durch drei
+Formanten, von einem kleinen Vogel bis zum Sauropoden. Jeder Ton ist ein Ruf: Tonhöhe, Maul und Lautstärke folgen der
+Form des Rufs über LEN.
+
+**Display:** links eine von acht eigenen Pixel-Kreaturen (T-REX, RAPTOR, LONGNECK, CRESTED, PTEROSAUR, FRILLED,
+TOAD, GIANT APE), je nach Preset; sie reisst das Maul auf, solange der Ruf laut ist. Beim KEYS-Kit zeigt sie die
+Kreatur der zuletzt gespielten Taste. Rechts Preset, Kreatur · Ruf · Stimme und die Form des Rufs (Tonhöhe grün,
+Maul gestrichelt), mit einem Strich, wo der Ruf gerade ist.
+
+**Kopf:**
+- **◀ PRESET ▶**: 21 Werks-Klänge (Brachio Call, Tyrant Roar, Raptor Bark … Compy Pack, dazu CALL KIT). Auch per
+  Rechtsklick › Preset.
+- **CALL** (Taster mit Licht): ein Ruf, solange gedrückt (auf V/OCT, ohne Kabel C3; beim Kit die Kreaturen der
+  Reihe nach).
+- **TYPE**: die Form des Rufs: HOLD (wie gespielt), BELLOW, ROAR, BARK, HOOT, TRILL, CHIRP, MOAN, HISS, SNORT,
+  **KEYS** (das Kit: ab C2 jede Taste eine der 20 Kreaturen, mit ihren eigenen Einstellungen; die Regler verschieben
+  sie alle, Mitte = wie sie ist).
+- **VOICE**: POLY, MONO, LEGATO. **LEVEL**.
+
+**THROAT** (je mit CV, ±5 V = ± halber Bereich): **SIZE** (Grösse des Tiers: tiefe Kehle), **SWOOP** (wie weit die
+Tonhöhe im Ruf wandert), **LEN** (Länge des Rufs), **GROWL** (Knurren, Rauheit), **BRTH** (Atem), **MOUTH** (wie
+weit das Maul aufgeht), **WILD** (jeder Ruf etwas anders). **ENVELOPE** ATK DEC SUS REL, **FX** DIST, CHORUS,
+DELAY, REVERB.
+
+**Buchsen unten:** V/OCT · GATE · VEL (GENRA-Leiste, polyfon), **CALL** (Trigger: ein Ruf in der Länge von LEN),
+**TYPE** (CV, zum Schalter addiert: 1 V je Rufform), L/R (nur L gesteckt: Mono). Ohne Kabel: Rechtsklick › Follow
+GENRA; solange SAURUS einem GENRA folgt, läuft das Delay in dessen Tempo (sonst 120 BPM). Kein CLOCK/RESET.
 
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
-| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, MIAOU: `src/miaou/`) |
+| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, MIAOU: `src/miaou/`, SAURUS: `src/saurus/`) |
 | `genra/`, `res/knob/` | **nicht im Repo:** die gemeinsamen Teile (Knöpfe, Follow GENRA, Link-Hub, JIANT-UI) kommen vor jedem Build frisch aus dem GENRA-Repo (`src/` und `res/knob/` von Camillowup/Genra-for-Vcv, Branch main); von Hand: `make genra-src` |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
@@ -255,6 +286,10 @@ angezerrt, 8 Bit; 0 = sauber). Mitte bzw. Standard = wie in MIAOU. **FX:** CHORU
 | `miaoucore/` | der MIAOU-Kern: MIAOUs Klänge (`toy.c`) mit ihren Stimmen in einer Struktur, direkt ins Plugin gebaut (keine eigene Bibliothek nötig) |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
 | `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz) |
+| `sauruscore/` | der SAURUS-Kern (`res/sauruscore.dll`): PALEOTONEs Firmware mit der SAURUS-Engine, eine private Kopie pro Modul |
+| `paleotone.tar.gz` | Schnappschuss der PALEOTONE-Quellen, nur was der Host-Build braucht (siehe `paleotone/SNAPSHOT.txt`), beim Bauen entpackt |
+| `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; SAURUS: alle 21 Presets, Rufformen) |
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
@@ -265,7 +300,8 @@ Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steh
 
 ## Lizenz
 
-GPL-3.0-only (`LICENSE`). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
+GPL-3.0-only (`LICENSE`). SAURUS ist die Kreaturen-Engine aus PALEOTONE (github.com/fantasmoslam/Paleotone, auf SLOOP
+und Felucca, GPL-3.0-only); die Pixel-Kreaturen sind eigene Grafiken. CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
 die Sängerinnen sind eigene Grafiken, von MIKU-FMs Grafik (Hatsune Miku, Piapro Character License) ist nichts übernommen. LIED spricht mit eSpeak NG (GPL-3.0-or-later). KURBEL ist die Drehleier aus ESTAMPIE (GHOULBOX' GURDY-Engine), die Schalmei Feluccas
 TRIO-Engine (MIT). MATH ist die Engine aus JIANT FM von Juan Ignacio Antonucci (Juan Jiant), einem Fork von
 Felucca (Leo Kuroshita, Hügelton Instruments), ebenfalls GPL-3.0-only. MIAOU spielt die Klänge aus MIAOU

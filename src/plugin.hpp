@@ -11,3 +11,4 @@ extern Model* modelSwarm;
 extern Model* modelLied;
 extern Model* modelCanta;
 extern Model* modelMiaou;
+extern Model* modelSaurus;
