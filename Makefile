@@ -46,7 +46,8 @@ ifdef ARCH_LIN
 endif
 ifdef ARCH_MAC
 	CORE_EXT := dylib
-	CORE_FLAGS += -fPIC -fvisibility=hidden -dynamiclib
+	# the firmwares put some buffers into FM1 linker sections, which Mach-O does not take: mathcore/compat/mac_section.h
+	CORE_FLAGS += -fPIC -fvisibility=hidden -dynamiclib -include mathcore/compat/mac_section.h
 	CORE_LIBS := -lm
 endif
 ifdef ARCH_WIN

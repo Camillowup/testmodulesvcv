@@ -8,9 +8,11 @@ Zurzeit drin: **MATH**, **KURBEL**, **SWARM** und **LIED**.
 
 ## Installieren
 
-1. Unter **Actions** den letzten erfolgreichen Lauf öffnen und das Artefakt **genra-test-windows** herunterladen.
-2. Die `.vcvplugin`-Datei daraus in den Ordner `plugins-win-x64` im Rack-Benutzerordner legen
-   (Rack › Help › Open user folder) und Rack neu starten.
+1. Unter **Releases** die Datei für dein System herunterladen: `win-x64` = Windows, `mac-arm64` = Mac mit Apple-Chip,
+   `mac-x64` = Intel-Mac (Mac noch ungetestet). Neuere Testbuilds: unter **Actions** den letzten erfolgreichen Lauf
+   öffnen, Artefakt **genra-test-windows** bzw. **genra-test-mac-…**.
+2. Die `.vcvplugin`-Datei in den Plugin-Ordner im Rack-Benutzerordner legen (Rack › Help › Open user folder) und Rack
+   neu starten.
 
 ## MATH
 
@@ -178,7 +180,8 @@ und Hall. Text und Einstellungen werden im Patch gespeichert.
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
-Gebaut wird über GitHub Actions (Windows). Für später ist alles so angelegt, dass jedes Modul ohne Umbau nach
+Gebaut wird über GitHub Actions (Windows und Mac, bei jedem Push). Ein Push auf den Branch `release` veröffentlicht
+den Release (nur auf ausdrücklichen Wunsch). Für später ist alles so angelegt, dass jedes Modul ohne Umbau nach
 GENRA Instruments wandern kann (eigener Ordner, eindeutige Namen, Follow über den Link-Hub). **Regel:** Wandert ein
 Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steht es in Rack doppelt).
 

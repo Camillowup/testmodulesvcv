@@ -4,6 +4,9 @@ on:
   push:
   workflow_dispatch:
 
+permissions:
+  contents: write   # a push to the branch "release" publishes GitHub release v<version> with the plugin
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -79,3 +82,96 @@ jobs:
         with:
           name: genra-test-windows
           path: dist/*.vcvplugin
+
+  # macOS, both chips (Apple silicon arm64, Intel x64) on GitHub's Apple-silicon runner; x64 by cross-compiling with
+  # clang -arch x86_64 against the x64 SDK (as the GENRA repo does). Not tested on a Mac yet.
+  mac:
+    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, x64]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch GENRA's shared parts (knobs, Follow GENRA, link hub)
+        run: |
+          git clone -q --depth 1 https://github.com/Camillowup/Genra-for-Vcv .genra-repo
+          cp -r .genra-repo/src genra
+          mkdir -p res && cp -r .genra-repo/res/knob res/knob
+          rm -rf .genra-repo
+
+      - name: Download Rack SDK
+        run: |
+          curl -sSL -o sdk.zip https://vcvrack.com/downloads/Rack-SDK-latest-mac-${{ matrix.arch }}.zip
+          mkdir sdk && cd sdk && unzip -q ../sdk.zip
+
+      - name: Compiler
+        run: |
+          if [ "${{ matrix.arch }}" = "x64" ]; then
+            echo "CC=clang -arch x86_64" >> $GITHUB_ENV
+            echo "CXX=clang++ -arch x86_64" >> $GITHUB_ENV
+          fi
+          brew install zstd || true
+
+      - name: Build plugin GENRA Test
+        run: |
+          VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin.json)
+          echo "Version $VER"
+          make RACK_DIR=$GITHUB_WORKSPACE/sdk/Rack-SDK SLUG=GenraTest VERSION=$VER -j4 dist
+
+      - name: Check the package
+        run: |
+          WANT=$([ "${{ matrix.arch }}" = "x64" ] && echo x86_64 || echo arm64)
+          D=dist/GenraTest
+          ls -la $D $D/res
+          test -f $D/plugin.dylib
+          for c in mathcore kurbelcore swarmcore liedcore; do test -f $D/res/$c.dylib; done
+          test -f $D/res/espeak-ng-data/phondata
+          test -f $D/res/knob/small.svg
+          for f in $D/plugin.dylib $D/res/*core.dylib; do
+            echo "$f: $(lipo -archs $f)"
+            lipo -archs "$f" | grep -qw "$WANT" || { echo "$f is not $WANT"; exit 1; }
+          done
+          ls dist/*.vcvplugin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genra-test-mac-${{ matrix.arch }}
+          path: dist/*.vcvplugin
+
+  # a push to the branch "release" publishes GitHub release v<version> with the Windows and Mac files
+  release:
+    if: github.ref == 'refs/heads/release'
+    needs: [windows, mac]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+
+      - name: Read the release version
+        run: |
+          VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin.json)
+          echo "RELVER=$VER" >> $GITHUB_ENV
+          ls -la files
+
+      - name: Publish the release (tag v-version with the plugin)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ env.RELVER }}
+          target_commitish: ${{ github.sha }}
+          name: GENRA Test ${{ env.RELVER }}
+          files: files/*.vcvplugin
+          body: |
+            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED). Appears under the
+            brand "Genra" in Rack's browser; the modules follow GENRA without cables when the GENRA plugin is installed.
+
+            Files: `win-x64` = Windows, `mac-arm64` = Mac with Apple chip (M1 and later), `mac-x64` = Intel Mac.
+            The Mac builds are new and not tested on a Mac yet.
+
+            Install: download the `.vcvplugin` file for your system and put it into your Rack user folder's plugins
+            folder (Rack › Help › Open user folder), then restart Rack.
