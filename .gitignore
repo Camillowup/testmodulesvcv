@@ -12,3 +12,7 @@ plugin.dylib
 docs/*.svg
 __pycache__/
 /espeak/
+# GENRA's shared parts, fetched from the GENRA repo before each build (make genra-src)
+/genra/
+/res/knob/
+/.genra-repo/

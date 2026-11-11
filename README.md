@@ -87,7 +87,7 @@ es leiser bis still; vorher brauchte es je nach WHL deutlich mehr.
 
 ## SWARM
 
-![SWARM](docs/Swarm.png)
+![SWARM](docs/panels/Swarm.png)
 
 Der Schwarm aus der JIANT-Firmware: Jedes Gerät in der Nähe ist eine Stimme. Hier ohne echtes Bluetooth: die Geräte
 sind **virtuell** und schicken der unveränderten Engine erfundene Funkpakete. Ihre Adresse ist der Ton, der
@@ -111,7 +111,7 @@ Rechtsklick: Follow GENRA, Clock-Eingang, Root und Scale der Geräte-Töne, Pres
 
 ## LIED
 
-![LIED](docs/Lied.png)
+![LIED](docs/panels/Lied.png)
 
 Ein Textsänger (25 HP): Du tippst bis zu vier Zeilen Liedtext direkt aufs Panel, **eSpeak NG** spricht sie, und LIED
 singt sie Silbe für Silbe auf die Töne von V/OCT. Jedes Gate singt die nächste Silbe, der Vokal hält, solange das Gate
@@ -165,7 +165,7 @@ und Hall. Text und Einstellungen werden im Patch gespeichert.
 | Ordner | Inhalt |
 | --- | --- |
 | `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`) |
-| `genra/` | gemeinsame Teile aus dem GENRA-Repo, unverändert kopiert: Knöpfe, Follow GENRA, Link-Hub, JIANT-UI |
+| `genra/`, `res/knob/` | **nicht im Repo:** die gemeinsamen Teile (Knöpfe, Follow GENRA, Link-Hub, JIANT-UI) kommen vor jedem Build frisch aus dem GENRA-Repo (`src/` und `res/knob/` von Camillowup/Genra-for-Vcv, Branch main); von Hand: `make genra-src` |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
 | `kurbelcore/` | der KURBEL-Kern (`res/kurbelcore.dll`), ebenso |
@@ -175,10 +175,12 @@ und Hall. Text und Einstellungen werden im Patch gespeichert.
 | `espeak.tar.gz` | Schnappschuss der eSpeak-NG-1.52.0-Quellen (siehe `espeak/SNAPSHOT.txt`), beim Bauen entpackt; die übersetzten Sprachdaten liegen in `res/espeak-ng-data` |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
 | `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe) |
+| `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
 Gebaut wird über GitHub Actions (Windows). Für später ist alles so angelegt, dass jedes Modul ohne Umbau nach
-GENRA Instruments wandern kann (eigener Ordner, eindeutige Namen, Follow über den Link-Hub).
+GENRA Instruments wandern kann (eigener Ordner, eindeutige Namen, Follow über den Link-Hub). **Regel:** Wandert ein
+Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steht es in Rack doppelt).
 
 ## Lizenz
 

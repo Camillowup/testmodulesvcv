@@ -19,6 +19,14 @@ jobs:
           Invoke-WebRequest -Uri https://vcvrack.com/downloads/Rack-SDK-latest-win-x64.zip -OutFile sdk.zip
           Expand-Archive sdk.zip -DestinationPath sdk
 
+      - name: Fetch GENRA's shared parts (knobs, Follow GENRA, link hub)
+        shell: bash
+        run: |
+          git clone -q --depth 1 https://github.com/Camillowup/Genra-for-Vcv .genra-repo
+          cp -r .genra-repo/src genra
+          mkdir -p res && cp -r .genra-repo/res/knob res/knob
+          rm -rf .genra-repo
+
       - uses: msys2/setup-msys2@v2
         with:
           msystem: MINGW64

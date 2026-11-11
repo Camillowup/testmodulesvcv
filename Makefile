@@ -14,6 +14,25 @@ DISTRIBUTABLES += licenses
 
 include $(RACK_DIR)/arch.mk
 
+# ---------------------------------------------------------------- GENRA's shared parts
+# The knobs, Follow GENRA, the link hub and the JIANT UI are not copied into this repo: they come fresh from the GENRA
+# repo (github.com/Camillowup/Genra-for-Vcv, branch main) before every build, so GENRA Test always speaks the same link
+# version as the GENRA plugins. `make genra-src` fetches them (GitHub Actions does it before building):
+#   genra/     <- GENRA's src/        res/knob/  <- GENRA's res/knob/
+GENRA_REPO ?= https://github.com/Camillowup/Genra-for-Vcv
+GENRA_BRANCH ?= main
+genra-src:
+	rm -rf .genra-repo genra res/knob
+	git clone -q --depth 1 -b $(GENRA_BRANCH) $(GENRA_REPO) .genra-repo
+	cp -r .genra-repo/src genra
+	mkdir -p res && cp -r .genra-repo/res/knob res/knob
+	rm -rf .genra-repo
+ifeq ($(filter genra-src clean,$(MAKECMDGOALS)),)
+ifeq ($(wildcard genra/Follow.hpp),)
+$(error GENRA's shared parts are missing: run "make genra-src" first)
+endif
+endif
+
 # ---------------------------------------------------------------- the MATH core
 # The JIANT FM firmware (jiant.tar.gz, a snapshot: jiant/SNAPSHOT.txt) with mathcore/mathcore.c on top, built as its
 # own small shared library. Plain C with no Rack dependency; every module instance loads a private copy of the
