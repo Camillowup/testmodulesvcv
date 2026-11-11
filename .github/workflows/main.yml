@@ -59,6 +59,8 @@ jobs:
           ./lst.exe ./liedcore.dll res/espeak-ng-data
           gcc -std=gnu11 -O2 -w test/cantacore_test.c -o ct.exe -lm && cp res/cantacore.dll .
           ./ct.exe ./cantacore.dll
+          gcc -std=gnu11 -O2 -w test/miaoucore_test.c miaoucore/miaoucore.c -o mct.exe -lm
+          ./mct.exe
 
       - name: Check the package
         run: |
@@ -75,6 +77,7 @@ jobs:
           test -f $D/res/Lied.svg
           test -f $D/res/cantacore.dll
           test -f $D/res/Canta.svg
+          test -f $D/res/Miaou.svg
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/espeak-ng-data/de_dict
           test -d "$D/res/espeak-ng-data/voices/!v"

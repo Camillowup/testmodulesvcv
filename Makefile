@@ -1,4 +1,4 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -8,6 +8,9 @@ SOURCES += $(wildcard src/kurbel/*.cpp)
 SOURCES += $(wildcard src/swarm/*.cpp)
 SOURCES += $(wildcard src/lied/*.cpp)
 SOURCES += $(wildcard src/canta/*.cpp)
+SOURCES += $(wildcard src/miaou/*.cpp)
+# MIAOU's engine (miaoucore/: MIAOU's toy.c with its voices in a struct) is plain C, built into the plugin itself
+SOURCES += miaoucore/miaoucore.c
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
