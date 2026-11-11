@@ -157,7 +157,8 @@ jobs:
 
   # a push to the branch "release" publishes GitHub release v<version> with the Windows and Mac files
   release:
-    if: github.ref == 'refs/heads/release'
+    # publishes as soon as Windows built; Mac files that did not build (no runner) can be added to the release later
+    if: always() && github.ref == 'refs/heads/release' && needs.windows.result == 'success'
     needs: [windows, mac]
     runs-on: ubuntu-latest
     steps:
