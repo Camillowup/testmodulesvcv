@@ -10,7 +10,8 @@ Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA**, **MIAOU**, *
 
 1. Unter **Releases** die Datei für dein System herunterladen: `win-x64` = Windows, `mac-arm64` = Mac mit Apple-Chip,
    `mac-x64` = Intel-Mac (Mac noch ungetestet). Neuere Testbuilds: unter **Actions** den letzten erfolgreichen Lauf
-   öffnen, Artefakt **genra-test-windows** bzw. **genra-test-mac-…**.
+   öffnen, Artefakt **genra-test-windows** (Mac-Testbuilds nur über Actions › Run workflow:
+   **genra-test-mac-…**).
 2. Die `.vcvplugin`-Datei in den Plugin-Ordner im Rack-Benutzerordner legen (Rack › Help › Open user folder) und Rack
    neu starten.
 
@@ -325,17 +326,14 @@ und **A4** (430–445 Hz).
 | `fumi.tar.gz` | Schnappschuss von FuMi-1s `firmware/src/dsp` (Commit 6a20fa3; siehe `fumi/SNAPSHOT.txt`), nur mit den sechs eigenen Klängen |
 | `canta.tar.gz` | Schnappschuss nur des Stimmen-Codes von MIKU-FM (Commit 781760c; siehe `canta/SNAPSHOT.txt`), beim Bauen entpackt; keine Grafiken |
 | `miaoucore/` | der MIAOU-Kern: MIAOUs Klänge (`toy.c`) mit ihren Stimmen in einer Struktur, direkt ins Plugin gebaut (keine eigene Bibliothek nötig) |
-| `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz) |
 | `sauruscore/` | der SAURUS-Kern (`res/sauruscore.dll`): PALEOTONEs Firmware mit der SAURUS-Engine, eine private Kopie pro Modul |
 | `paleotone.tar.gz` | Schnappschuss der PALEOTONE-Quellen, nur was der Host-Build braucht (siehe `paleotone/SNAPSHOT.txt`), beim Bauen entpackt |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; SAURUS: alle 21 Presets, Rufformen) |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; FUMI: alle Klänge, Stimmung, Einrasten, 本数, Triller, Verzierungen) |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz; SAURUS: alle 21 Presets, Rufformen; FUMI: alle Klänge, Stimmung, Einrasten, 本数, Triller, Verzierungen) |
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
-Gebaut wird über GitHub Actions (Windows und Mac, bei jedem Push). Ein Push auf den Branch `release` veröffentlicht
+Gebaut wird über GitHub Actions (Windows bei jedem Push, Mac nur beim Release oder von Hand über Actions › Run workflow). Ein Push auf den Branch `release` veröffentlicht
 den Release (nur auf ausdrücklichen Wunsch). Für später ist alles so angelegt, dass jedes Modul ohne Umbau nach
 GENRA Instruments wandern kann (eigener Ordner, eindeutige Namen, Follow über den Link-Hub). **Regel:** Wandert ein
 Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steht es in Rack doppelt).

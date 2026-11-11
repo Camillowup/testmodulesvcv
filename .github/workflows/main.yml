@@ -101,6 +101,9 @@ jobs:
   # macOS, both chips (Apple silicon arm64, Intel x64) on GitHub's Apple-silicon runner; x64 by cross-compiling with
   # clang -arch x86_64 against the x64 SDK (as the GENRA repo does). Not tested on a Mac yet.
   mac:
+    # Mac only for a release (branch release) or by hand (Actions › Run workflow): GitHub has few Mac runners, and
+    # building every push on dev, main and release at once left the Mac jobs waiting until they were cancelled
+    if: github.ref == 'refs/heads/release' || github.event_name == 'workflow_dispatch'
     runs-on: macos-latest
     strategy:
       fail-fast: false
