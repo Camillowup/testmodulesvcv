@@ -3,35 +3,36 @@
 #pragma once
 namespace slayout {
 namespace swarm {
-static const float W = 390.f;
-static const float SCREEN[4] = {19.0f, 34.0f, 151.6f, 98.0f};
-static const float INFO[4] = {184.6f, 34.0f, 186.4f, 98.0f};
-static const float PREV[2] = {32.0f, 154.0f};
-static const float NEXT[2] = {62.0f, 154.0f};
-static const float NEW[2] = {94.0f, 154.0f};
-static const float PLAY[3] = {141.0f, 160.5f, 38.0f};
-static const float VOICES[2] = {236.0f, 155.0f};
-static const float VOICES_TEXT[4] = {252.0f, 147.0f, 30.0f, 16.0f};
-static const float LEVEL[2] = {352.0f, 155.0f};
-static const float E[6][2] = {{44.2f, 211.0f}, {104.5f, 211.0f}, {164.8f, 211.0f}, {225.2f, 211.0f}, {285.5f, 211.0f}, {345.8f, 211.0f}};
-static const float E_TEXT[6][4] = {{14.0f, 224.5f, 60.3f, 15.0f}, {74.3f, 224.5f, 60.3f, 15.0f}, {134.7f, 224.5f, 60.3f, 15.0f}, {195.0f, 224.5f, 60.3f, 15.0f}, {255.3f, 224.5f, 60.3f, 15.0f}, {315.7f, 224.5f, 60.3f, 15.0f}};
-static const float E_IN[6][2] = {{44.2f, 253.5f}, {104.5f, 253.5f}, {164.8f, 253.5f}, {225.2f, 253.5f}, {285.5f, 253.5f}, {345.8f, 253.5f}};
-static const float BUSY[2] = {43.7f, 294.0f};
-static const float MOVE[2] = {103.0f, 294.0f};
-static const float NEAR[2] = {162.3f, 294.0f};
-static const float DIST[2] = {220.2f, 294.0f};
-static const float CHOR[2] = {264.8f, 294.0f};
-static const float DLY[2] = {309.2f, 294.0f};
-static const float REV[2] = {353.8f, 294.0f};
-static const float VOCT[2] = {35.9f, 332.0f};
-static const float GATE[2] = {63.6f, 332.0f};
-static const float VEL[2] = {91.4f, 332.0f};
-static const float CLOCK[2] = {125.7f, 332.0f};
-static const float RESET[2] = {153.4f, 332.0f};
-static const float NEAR_IN[2] = {184.3f, 332.0f};
-static const float ARRIVE_IN[2] = {210.3f, 332.0f};
-static const float NEW_IN[2] = {236.3f, 332.0f};
-static const float OUT_L[2] = {292.0f, 332.0f};
-static const float OUT_R[2] = {340.0f, 332.0f};
+static const float W = 345.f;
+static const int HP = 23;
+static const float PRESETF[4] = {184.1f, 10.0f, 91.5f, 15.9f};
+static const float DISPLAY[4] = {8.9f, 31.0f, 327.3f, 47.2f};
+static const float SCREEN[4] = {13.3f, 35.4f, 76.8f, 38.4f};
+static const float INFO[4] = {98.9f, 35.4f, 229.8f, 38.4f};
+static const float E[6][2] = {{42.3f, 130.2f}, {86.6f, 125.5f}, {125.8f, 125.5f}, {165.0f, 125.5f}, {86.6f, 166.5f}, {125.8f, 166.5f}};
+static const float E_TEXT[6][4] = {{23.1f, 153.2f, 38.4f, 7.1f}, {67.4f, 144.7f, 38.4f, 7.1f}, {106.6f, 144.7f, 38.4f, 7.1f}, {145.8f, 144.7f, 38.4f, 7.1f}, {67.4f, 182.9f, 38.4f, 7.1f}, {106.6f, 182.9f, 38.4f, 7.1f}};
+static const float NEW[2] = {228.1f, 122.5f};
+static const float VOICES[2] = {267.8f, 125.5f};
+static const float LEVEL[2] = {307.4f, 125.5f};
+static const float PLAY[3] = {252.3f, 156.8f, 31.0f};
+static const float BUSY[2] = {38.7f, 239.2f};
+static const float MOVE[2] = {80.8f, 239.2f};
+static const float NEAR[2] = {122.8f, 239.2f};
+static const float DIST[2] = {187.5f, 239.2f};
+static const float CHOR[2] = {227.4f, 239.2f};
+static const float DLY[2] = {267.4f, 239.2f};
+static const float REV[2] = {307.3f, 239.2f};
+static const float VOCT[2] = {31.6f, 321.3f};
+static const float GATE[2] = {59.4f, 321.3f};
+static const float VEL[2] = {87.1f, 321.3f};
+static const float CLOCK[2] = {121.7f, 321.3f};
+static const float RESET[2] = {149.4f, 321.3f};
+static const float NEAR_IN[2] = {184.0f, 321.3f};
+static const float ARRIVE_IN[2] = {211.7f, 321.3f};
+static const float NEW_IN[2] = {239.5f, 321.3f};
+static const float E_IN[6][2] = {{274.0f, 321.3f}, {301.8f, 321.3f}, {47.8f, 356.4f}, {75.6f, 356.4f}, {103.3f, 356.4f}, {131.1f, 356.4f}};
+static const float E_INL[6][4] = {{260.1f, 333.1f, 27.8f, 6.5f}, {287.9f, 333.1f, 27.8f, 6.5f}, {34.0f, 368.2f, 27.8f, 6.5f}, {61.7f, 368.2f, 27.8f, 6.5f}, {89.5f, 368.2f, 27.8f, 6.5f}, {117.2f, 368.2f, 27.8f, 6.5f}};
+static const float OUT_L[2] = {262.3f, 356.4f};
+static const float OUT_R[2] = {294.8f, 356.4f};
 }  // namespace swarm
 }  // namespace slayout

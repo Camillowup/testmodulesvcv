@@ -24,10 +24,14 @@ Die MATH-Engine aus der FM-1-Firmware **JIANT FM** von Juan Jiant: Bytebeat und 
 Formel der Zeit; daraus entstehen Klänge, Rhythmen und Melodien.
 
 **Display:** links das Wesen der Engine (die Zeichnung der Firmware), rechts Preset, Einstellungen, Tempo und die
-ersten Reglerwerte. Die Chips wählen **BYTE / FLOAT** und **CHIP** (4BIT, 4B/2, 8BIT bzw. FULL, 1BIT).
+ersten Reglerwerte.
 
-**Kopf:**
-- **◀ PRE / PRE ▶**: Werks-Presets (12). Auch per Rechtsklick › Preset.
+**Kopf:** das **Preset-Feld** (12 Werks-Presets; anklicken = Liste, Mausrad = blättern; auch per Rechtsklick › Preset).
+
+**ENGINE:** oben die Felder **WAVE** (BYTE / FLOAT) und **CHIP** (4BIT, 4B/2, 8BIT bzw. FULL, 1BIT); jedes Feld
+reagiert auch aufs Mausrad.
+
+**PLAY:**
 - **CALL**: bei KEYS spielt C4, bei THRU startet die Formel von vorn.
 - **PLAY**:
   - **KEYS**: gespielt wie ein normales Instrument. V/OCT ist die Tonhöhe, GATE an = Ton, mit der Hüllkurve.
@@ -59,11 +63,14 @@ Melodiesaite, zwei Bordun-Saiten (Grundton und Quinte), die schnarrende Trompett
 
 **Display:** links das Rad mit den Saiten. Das Rad dreht sich mit der Kurbel (bei COUP CRANK) bzw. gleichmässig,
 solange ein Ton klingt; die Melodiesaite leuchtet, die Trompette blitzt bei jedem Stoss. Rechts Preset, Einstellungen,
-Tempo bzw. Kurbel. Die Chips wählen **WHEEL / REED** (Drehleier / Schalmei) und die Stimmung **EQUAL, PYTH, MEAN,
-JUST** (gleichstufig, pythagoreisch, mitteltönig, rein; gezählt ab dem Bordun).
+Tempo bzw. Kurbel.
 
-**Kopf:**
-- **◀ PRE / PRE ▶ · CALL**: 8 Werks-Klänge (Hurdy Gurdy, Drone Wheel, Dance Gurdy, Trompette, Vielle, Bagpipe, Trotto Gurdy,
+**ENGINE:** oben die Felder **ENGINE** (WHEEL / REED: Drehleier / Schalmei) und **TEMP**, die Stimmung **EQUAL, PYTH,
+MEAN, JUST** (gleichstufig, pythagoreisch, mitteltönig, rein; gezählt ab dem Bordun). Alle Felder: anklicken = Liste,
+Mausrad = blättern.
+
+**Kopf und PLAY:**
+- **Preset-Feld** und **CALL**: 8 Werks-Klänge (Hurdy Gurdy, Drone Wheel, Dance Gurdy, Trompette, Vielle, Bagpipe, Trotto Gurdy,
   Shawm). Auch per Rechtsklick › Preset.
 - **RING** (Taster mit Licht): die Bordun-Saiten klingen durch die Pausen weiter, wie bei einer echten Drehleier.
 - **DRONE**: Tonart der Bordun-Saiten (C bis B), zugleich Grundton der Stimmung.
@@ -104,7 +111,7 @@ eine Lead-Stimme eine Melodie im Tempo; sie folgt den Änderungen der Nähe.
 **Display:** links der Schwarm, wie die Firmware ihn zeichnet (jedes Gerät ein Punkt, Linien zum lautesten, unten
 FAR … NEAR). Rechts Preset, PLAY, Anzahl der Geräte, Tonart, die Nähe als Balken, Tempo.
 
-**Kopf:** ◀ PRE / PRE ▶ (SWARM, SWARM PLUCK, SWARM CHOIR), **NEW** (ein neuer Schwarm: alle Geräte neu),
+**Kopf:** das Preset-Feld (SWARM, SWARM PLUCK, SWARM CHOIR; Mausrad = blättern). **PLAY:** **NEW** (ein neuer Schwarm: alle Geräte neu),
 **PLAY** THRU (summt ständig) oder KEYS (spielbar: das Gate ist der Ton, seine Spannung die Lautstärke, kurze
 Rampe gegen Klicks), **VOICES** (1–8 Geräte), **LEVEL**.
 
@@ -176,14 +183,16 @@ Jedes Gate singt die nächste Silbe des Liedtexts, ein neuer Ton bei gehaltenem 
 
 **Display:** links die Sängerin der Sprache (eigene Pixel-Figuren, nichts aus MIKU-FM): **KIKO** (JAPAN),
 **MOMO** (ANIMAL), **NANA** (SCAT), **SORA** (VOWEL). Sie öffnet den Mund je nach Vokal und blinzelt; mit **DANCE**
-macht sie auf jeden Schlag einen Schritt (mit CLOCK im Takt, sonst bei jedem Gate). Daneben das Silben-Rad: oben und
-gross in der Mitte die Silbe, die gerade klingt, rundherum die nächsten (bei ANIMAL und SCAT die letzten gebabbelten).
-Rechts Preset, Sprache · Charakter · Harmonie, die Chips:
-- **JAPAN** (der Text wie geschrieben), **ANIMAL** (Tierlaute-Gebabbel, solange das Gate offen ist, mit kleinen
-  Tonsprüngen), **SCAT** (da ba bi do … in Achteln von CLOCK), **VOWEL** (nur die Vokale des Texts).
-- **DEEP, LOW, MID, YOUNG, TINY**: die Grösse der Stimme (Formanten).
-- Darunter die **Textzeile**: die Silbe, die als nächste bzw. gerade klingt, leuchtet. **Anklicken** öffnet den
-  Editor (auch Rechtsklick › Edit the lyrics…), Enter übernimmt.
+macht sie auf jeden Schlag einen Schritt (mit CLOCK im Takt, sonst bei jedem Gate). Daneben gross die Silbe, die
+gerade klingt. In der Mitte Preset, Sprache · Charakter · Harmonie. Rechts die **Textzeile**: die Silbe, die als
+nächste bzw. gerade klingt, leuchtet. **Anklicken** öffnet den Editor (auch Rechtsklick › Edit the lyrics…), Enter
+übernimmt.
+
+**Lämpchen:**
+- In PLAY der Stil: **JAPAN** (der Text wie geschrieben), **ANIMAL** (Tierlaute-Gebabbel, solange das Gate offen
+  ist, mit kleinen Tonsprüngen), **SCAT** (da ba bi do … in Achteln von CLOCK), **VOWEL** (nur die Vokale des Texts),
+  dazu **DANCE** (an/aus).
+- In VOICE **DEEP, LOW, MID, YOUNG, TINY**: die Grösse der Stimme (Formanten).
 
 **Liedtext** (MIKU-FMs Schreibweise, in Romaji): Silben mit Bindestrich, Wörter mit Leerzeichen: `ka-ze ni no-ru`.
 `_` hält den Vokal weiter (ohne Konsonant), `/` ist eine Pause, `|` das Ende einer Phrase (Pausen werden beim Singen
@@ -192,7 +201,7 @@ po, sha, ja, rya); ein Fehler wird rot angezeigt, dann bleibt der alte Text. Nac
 los.
 
 **Kopf:**
-- **◀ PRE / PRE ▶**: 12 eigene Presets (KIKO, HANA, YUME, DUET, ROBO, SASAYAKI, MOMO, KUMA, NANA, BEBOP, SORA,
+- **Preset-Feld** (Mausrad = blättern): 12 eigene Presets (KIKO, HANA, YUME, DUET, ROBO, SASAYAKI, MOMO, KUMA, NANA, BEBOP, SORA,
   CHOIR), jedes mit Sprache, Klang und Liedtext. LEVEL und LYRICS/SYLLABLE bleiben. Rechtsklick › *Presets keep the
   lyrics*: der eigene Text bleibt auch beim Presetwechsel.
 - **CALL**: singt, solange gedrückt (auf V/OCT, ohne Kabel G4).
@@ -218,7 +227,7 @@ werden im Patch gespeichert.
 
 ![MIAOU](docs/panels/Miaou.png)
 
-Das Spielzeug-Keyboard aus der FM-1-Firmware **MIAOU** (26 HP): fünf Klänge, polyphon (bis 16 Stimmen über ein
+Das Spielzeug-Keyboard aus der FM-1-Firmware **MIAOU** (19 HP): fünf Klänge, polyphon (bis 16 Stimmen über ein
 Poly-Kabel). Nur die Klänge und der kleine Lautsprecher; Rhythmen, Kinderlieder, Recorder, Arpeggiator und Sequencer
 von MIAOU sind nicht dabei, das übernimmt GENRA.
 
@@ -228,8 +237,9 @@ PAW an/aus, der letzte Ton, der Lautsprecher und 27 Tasten (C3–D5), die beim S
 
 **Kopf:**
 - **PAW**: alle Tasten miauen (rastet ein, leuchtet); nochmal drücken = zurück zum Klang.
-- **SOUND**: **PIANO** (Chip-Klavier), **BELLS** (FM-Glocken), **ORGAN** (Rechteck-Orgel), **BANJO** (gezupfte Saite,
-  Karplus-Strong), **MEOW** (eine Stimme durch drei wandernde Formanten: m-i-a-ou). Lämpchen anklicken. **LEVEL**.
+- **SOUND** (das Feld oben, Mausrad = blättern): **PIANO** (Chip-Klavier), **BELLS** (FM-Glocken), **ORGAN**
+  (Rechteck-Orgel), **BANJO** (gezupfte Saite, Karplus-Strong), **MEOW** (eine Stimme durch drei wandernde Formanten:
+  m-i-a-ou). **LEVEL**.
 
 **TOY** (je mit CV, ±5 V = ± halber Bereich): **DECAY** (Ausklang und Loslassen, 25–400 %), **TONE** (Helligkeit:
 Filter von Klavier und Orgel, Glockenhelligkeit, Banjo-Anschlag), **MEOW** (Länge des Miaus, 0,2–1,55 s), **SWOOP**
@@ -244,7 +254,7 @@ angezerrt, 8 Bit; 0 = sauber). Mitte bzw. Standard = wie in MIAOU. **FX:** CHORU
 
 ![SAURUS](docs/panels/Saurus.png)
 
-Die Kreaturenrufe aus der FM-1-Firmware **PALEOTONE** (die SAURUS-Engine, 26 HP): eine brummende Kehle durch drei
+Die Kreaturenrufe aus der FM-1-Firmware **PALEOTONE** (die SAURUS-Engine, 22 HP): eine brummende Kehle durch drei
 Formanten, von einem kleinen Vogel bis zum Sauropoden. Jeder Ton ist ein Ruf: Tonhöhe, Maul und Lautstärke folgen der
 Form des Rufs über LEN.
 
@@ -254,7 +264,7 @@ Kreatur der zuletzt gespielten Taste. Rechts Preset, Kreatur · Ruf · Stimme un
 Maul gestrichelt), mit einem Strich, wo der Ruf gerade ist.
 
 **Kopf:**
-- **◀ PRESET ▶**: 21 Werks-Klänge (Brachio Call, Tyrant Roar, Raptor Bark … Compy Pack, dazu CALL KIT). Auch per
+- **Preset-Feld** (Mausrad = blättern): 21 Werks-Klänge (Brachio Call, Tyrant Roar, Raptor Bark … Compy Pack, dazu CALL KIT). Auch per
   Rechtsklick › Preset.
 - **CALL** (Taster mit Licht): ein Ruf, solange gedrückt (auf V/OCT, ohne Kabel C3; beim Kit die Kreaturen der
   Reihe nach).
@@ -275,7 +285,7 @@ GENRA; solange SAURUS einem GENRA folgt, läuft das Delay in dessen Tempo (sonst
 
 ![FUMI](docs/panels/Fumi.png)
 
-Die Shigin-Begleitung aus der FM-1-Firmware **FuMi-1** (26 HP), nach dem Suiko ST-50: Koto und verwandte Klänge auf
+Die Shigin-Begleitung aus der FM-1-Firmware **FuMi-1** (25 HP), nach dem Suiko ST-50: Koto und verwandte Klänge auf
 einer 6-Operator-FM-Engine, gestimmt wie das Vorbild. Der Looper von FuMi-1 ist nicht dabei, das übernimmt GENRA.
 
 **Klänge:** die sechs eigenen Instrumente von FuMi-1: **Koto Pluck** (爪音), **Koto Ring** (響), **Koto Warm** (名残),
@@ -287,8 +297,8 @@ Tonleiter**, die 16 Tasten des ST-50 (mi fa la ti do dreimal und ein hohes mi; d
 klingt leuchtet), die Zahl der Stimmen und welche Verzierungen an sind (颪: Oroshi gesetzt).
 
 **Kopf:**
-- **◀ PRESET ▶**: das Instrument (auch Rechtsklick › Instrument).
-- **KEY**: der 本数 (水4 … 水1, 1 … 12本; bei 1本 ist 三 = A3).
+- **Preset-Feld** (Mausrad = blättern): das Instrument (auch Rechtsklick › Instrument).
+- **KEY** (Feld): der 本数 (S4 … S1 = 水4 … 水1, dann 1 … 12本; bei 1本 ist 三 = A3).
 - **TUNING**: **EQUAL** (gleichstufig), **SUIKO** (die reine Stimmung des ST-50, aus Aufnahmen gemessen: fa −20,8,
   do −16 Cent), **KOTO** (reine Quinten), **USER** (gleichstufig, mit Fine verschoben).
 - **SCALE**: **IN** (mi fa la ti do), **YŌ** (fa und do einen Halbton höher), **MIN'YŌ** (einen Ganzton höher).

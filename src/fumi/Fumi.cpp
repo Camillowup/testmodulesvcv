@@ -7,6 +7,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "FumiCore.hpp"
 #include "FumiLayout.hpp"
 #include "FumiGlyphs.hpp"
@@ -516,7 +517,7 @@ struct ScreenWidget : Widget {
 		std::string ja = a ? a->patch_ja((uint32_t) p) : "\xe7\x88\xaa\xe9\x9f\xb3";
 		std::string rd = reading(a ? a->patch_name((uint32_t) p) : "Koto Pluck");
 		float w = box.size.x, h = box.size.y;
-		float size = 46.f;
+		float size = std::min(46.f, h * 0.6f);
 		float tw = mixedText(vg, nullptr, 0, 0, ja, size, ACCENT, false);
 		if (tw > w - 12.f) {
 			size *= (w - 12.f) / tw;
@@ -525,8 +526,8 @@ struct ScreenWidget : Widget {
 		NVGcolor glow = ACCENT;
 		glow.a = module && module->shownVoices > 0 ? 1.f : 0.8f;
 		mixedText(vg, nullptr, (w - tw) / 2, h * 0.58f, ja, size, glow);
-		float rs = 9.f, rw = mixedText(vg, nullptr, 0, 0, rd, rs, jiant::DIM, false);
-		mixedText(vg, nullptr, (w - rw) / 2, h * 0.86f, rd, rs, jiant::DIM);
+		float rs = 6.5f, rw = mixedText(vg, nullptr, 0, 0, rd, rs, jiant::DIM, false);
+		mixedText(vg, nullptr, (w - rw) / 2, h - 3.f, rd, rs, jiant::DIM);
 	}
 };
 
@@ -545,9 +546,10 @@ struct InfoWidget : Widget {
 		std::string name = a ? a->patch_name((uint32_t) p) : "Koto Pluck";
 		for (char& c : name)
 			c = (char) std::toupper((unsigned char) c);
-		jiant::text(vg, bold, 0, 20, name, 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npatches() : 6u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
+		float h = box.size.y;
+		jiant::text(vg, bold, 0, 7.f, string::f("KOTO %d / %u", p + 1, a ? a->npatches() : 6u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, 0, 19.f, name, 11.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
 		int hon = 4, tune = 1, scale = 0;
 		if (module) {
 			hon = clamp((int) std::round(module->params[Fumi::HON_PARAM].getValue()), 0, 15);
@@ -557,67 +559,29 @@ struct InfoWidget : Widget {
 		int san = module ? (int) module->shownSan : 57;
 		std::string line = string::f("%s \xc2\xb7 \xe4\xb8\x89 = %s%d \xc2\xb7 %s \xc2\xb7 %s", HON_FIELD[hon],
 		                             NOTE_NAMES[((san % 12) + 12) % 12], san / 12 - 1, TUNE_NAMES[tune], SCALE_NAMES[scale]);
-		mixedText(vg, mono, 0, 33, line, 7.f, jiant::DIM);
-		// the keys
+		mixedText(vg, bold, 0, 27.f, line, 5.4f, ACCENT);
+		// voices and the ornaments on, top right
+		uint32_t voices = module ? (uint32_t) module->shownVoices : 2u;
+		uint32_t orn = module ? (uint32_t) module->shownOrn : 7u;
+		std::string o = string::f("VOICES %u/8", voices);
+		if (orn & 1u)
+			o += " \xc2\xb7 VIB";
+		if (orn & 2u)
+			o += " \xc2\xb7 TRILL";
+		if (orn & 4u)
+			o += " \xe9\xa2\xaa";
+		float ow = mixedText(vg, bold, 0, 0, o, 5.2f, jiant::DIM, false);
+		mixedText(vg, bold, w - ow, 7.f, o, 5.2f, jiant::DIM);
+		// the sixteen keys
 		uint32_t lit = module ? (uint32_t) module->litKeys : (1u << 7);
-		float kw = w / 16.f;
+		float kw = w / 16.f, ky = 31.f, kh = h - ky;
 		for (int i = 0; i < 16; i++) {
 			bool on = lit & (1u << i), tonic = i % 5 == 0;
-			jiant::roundRect(vg, i * kw, 42, kw - 1.6f, 24, 1.6f,
+			jiant::roundRect(vg, i * kw, ky, kw - 1.4f, kh, 1.2f,
 			                 on ? ACCENT : tonic ? nvgRGB(0x2d, 0x31, 0x60) : nvgRGB(0x22, 0x23, 0x2a));
-			jiant::text(vg, mono, i * kw + (kw - 1.6f) / 2, 62, DEG_NAMES[scale][i % 5], 4.6f,
+			jiant::text(vg, mono, i * kw + (kw - 1.4f) / 2, h - 3.f, DEG_NAMES[scale][i % 5], 4.4f,
 			            on ? jiant::WHITE : jiant::DIM, NVG_ALIGN_CENTER, 0.f);
 		}
-		uint32_t voices = module ? (uint32_t) module->shownVoices : 2u;
-		jiant::text(vg, mono, 0, 84, string::f("VOICES %u/8", voices), 7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
-		uint32_t orn = module ? (uint32_t) module->shownOrn : 7u;
-		std::string o;
-		if (orn & 1u)
-			o += "VIB";
-		if (orn & 2u)
-			o += std::string(o.empty() ? "" : " \xc2\xb7 ") + "TRILL";
-		if (orn & 4u)
-			o += std::string(o.empty() ? "" : " ") + "\xe9\xa2\xaa";
-		float ow = mixedText(vg, mono, 0, 0, o, 7.f, ACCENT, false);
-		mixedText(vg, mono, w - ow, 84, o, 7.f, ACCENT);
-	}
-};
-
-/** A choice of a switch parameter as a field with its value and ▾ (Japanese allowed); a click opens the list. */
-struct SelectField : app::ParamWidget {
-	std::vector<std::string> names, menuNames;
-	void onButton(const ButtonEvent& e) override {
-		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			if (engine::ParamQuantity* pq = getParamQuantity()) {
-				ui::Menu* menu = createMenu();
-				menu->addChild(createMenuLabel(pq->getLabel()));
-				const std::vector<std::string>& mn = menuNames.empty() ? names : menuNames;
-				for (size_t i = 0; i < mn.size(); i++)
-					menu->addChild(createCheckMenuItem(mn[i], "", [=]() { return (int) std::round(pq->getValue()) == (int) i; },
-					                                   [=]() { pq->setValue((float) i); }));
-			}
-			e.consume(this);
-			return;
-		}
-		ParamWidget::onButton(e);
-	}
-	void draw(const DrawArgs& args) override {}
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 1) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			int v = pq ? (int) std::round(pq->getValue()) : 0;
-			jiant::roundRect(args.vg, 0, 0, box.size.x, box.size.y, 2.2f, jiant::FIELD);
-			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0.4f, 0.4f, box.size.x - 0.8f, box.size.y - 0.8f, 2.2f);
-			nvgStrokeColor(args.vg, jiant::EDGE);
-			nvgStrokeWidth(args.vg, 0.8f);
-			nvgStroke(args.vg);
-			std::string s = (v >= 0 && v < (int) names.size() ? names[v] : "?") + " \xe2\x96\xbe";
-			auto f = jiant::boldFont();
-			float tw = mixedText(args.vg, f, 0, 0, s, 6.4f, jiant::TXT, false);
-			mixedText(args.vg, f, (box.size.x - tw) / 2, box.size.y / 2 + 2.3f, s, 6.4f, jiant::TXT);
-		}
-		ParamWidget::drawLayer(args, layer);
 	}
 };
 
@@ -637,37 +601,57 @@ struct FumiWidget : ModuleWidget {
 		info->box = jiant::area(L::INFO);
 		addChild(info);
 
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Fumi::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Fumi::NEXT_PARAM));
-		SelectField* hon = createParam<SelectField>(Vec(L::KEY_SEL[0], L::KEY_SEL[1]), module, Fumi::HON_PARAM);
-		hon->box.size = Vec(L::KEY_SEL[2], L::KEY_SEL[3]);
-		hon->names.assign(HON_FIELD, HON_FIELD + 16);
-		hon->menuNames = {"S4 (mizu 4)", "S3 (mizu 3)", "S2 (mizu 2)", "S1 (mizu 1)", "1 (san = A3)", "2", "3", "4", "5",
-		                  "6", "7", "8", "9", "10", "11", "12"};
-		addParam(hon);
-		SelectField* tune = createParam<SelectField>(Vec(L::TUNE_SEL[0], L::TUNE_SEL[1]), module, Fumi::TUNE_PARAM);
-		tune->box.size = Vec(L::TUNE_SEL[2], L::TUNE_SEL[3]);
-		tune->names.assign(TUNE_NAMES, TUNE_NAMES + 4);
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.api ? (int) module->core.api->npatches() : 1; };
+		pf->name = [=](int i) -> std::string {
+			std::string n = module && module->core.api ? module->core.api->patch_name((uint32_t) i) : "Koto Pluck";
+			for (char& c : n)
+				c = (char) std::toupper((unsigned char) c);
+			return n;
+		};
+		pf->current = [=]() { return module ? (int) module->shownPatch : 0; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->patchReq = i;
+		};
+		addChild(pf);
+
+		genra_look::ParamField* tune = createParam<genra_look::ParamField>(Vec(L::TUNEF[0], L::TUNEF[1]), module, Fumi::TUNE_PARAM);
+		tune->box.size = Vec(L::TUNEF[2], L::TUNEF[3]);
+		tune->count = 4;
+		tune->nameOf = [](int i) -> std::string { return TUNE_NAMES[clamp(i, 0, 3)]; };
+		tune->title = "Tuning";
+		tune->undo = "change tuning";
 		addParam(tune);
-		SelectField* scale = createParam<SelectField>(Vec(L::SCALE_SEL[0], L::SCALE_SEL[1]), module, Fumi::SCALE_PARAM);
-		scale->box.size = Vec(L::SCALE_SEL[2], L::SCALE_SEL[3]);
-		scale->names.assign(SCALE_NAMES, SCALE_NAMES + 3);
-		addParam(scale);
+		genra_look::ParamField* hon = createParam<genra_look::ParamField>(Vec(L::KEYF[0], L::KEYF[1]), module, Fumi::HON_PARAM);
+		hon->box.size = Vec(L::KEYF[2], L::KEYF[3]);
+		hon->count = 16;
+		hon->nameOf = [](int i) -> std::string { return HON_ASCII[clamp(i, 0, 15)]; };
+		hon->infoOf = [](int i) -> std::string { return i < 4 ? "mizu" : i == 4 ? "san = A3" : ""; };
+		hon->title = "Key (honsuu)";
+		hon->undo = "change key";
+		addParam(hon);
+		jiant::LampRow* sc = createParam<jiant::LampRow>(Vec(0, 0), module, Fumi::SCALE_PARAM);
+		sc->place(L::SCALE, 3);
+		sc->accent = ACCENT;
+		addParam(sc);
 		jiant::LampRow* vs = createParam<jiant::LampRow>(Vec(0, 0), module, Fumi::VOICE_PARAM);
 		vs->place(L::VOICE, 2);
 		vs->accent = ACCENT;
 		addParam(vs);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Fumi::LEVEL_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Fumi::LEVEL_PARAM));
 
 		for (int k = 0; k < NS; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::S[k]), module, Fumi::S_PARAM + k));
+			Vec c = jiant::at(L::S[k]);
+			if (k == 0)
+				addParam(createParamCentered<GLargeKnob>(c, module, Fumi::S_PARAM + k));
+			else if (k < 4)
+				addParam(createParamCentered<GKnob>(c, module, Fumi::S_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Fumi::S_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::S_IN[k]), module, Fumi::S_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::S_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string { return SOUND_LAB[k]; };
-			t->value = [=]() -> std::string { return module && module->core.loaded() ? module->values[k].data() : ""; };
-			addChild(t);
 		}
 		for (int k = 0; k < NH; k++) {
 			if (k < 2)

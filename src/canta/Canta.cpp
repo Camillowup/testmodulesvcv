@@ -8,6 +8,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "CantaCore.hpp"
 #include "CantaLayout.hpp"
 #include "CantaSprites.hpp"
@@ -592,27 +593,20 @@ struct ScreenWidget : Widget {
 			bob = 1.f;
 		}
 		bob = std::max(0.f, bob - dt * 5.f);
-		float k = 4.f, sx = 4.f, sy = 7.f;
+		float k = box.size.y / 23.f, sx = 3.f, sy = (box.size.y - 21.f * k) / 2;
 		if (dance) {
-			sx += (lastBeats & 1) ? 2.f : -2.f;
-			sy -= bob * 4.f;
+			sx += (lastBeats & 1) ? k * 0.5f : -k * 0.5f;
+			sy -= bob * k;
 		}
 		drawSinger(vg, lang, sx, sy, k, mouth, blink);
 		if (dance && bob > 0.2f) {   // a little note over her head on the beat
 			NVGcolor c = ACCENT;
 			c.a = bob;
-			jiant::text(vg, jiant::boldFont(), sx + 64.f, sy + 8.f, "\xe2\x99\xaa", 10.f, c, NVG_ALIGN_CENTER, 0.f);
+			jiant::text(vg, jiant::boldFont(), sx + 16.f * k, sy + 3.f * k, "\xe2\x99\xaa", 8.f, c, NVG_ALIGN_CENTER, 0.f);
 		}
 
-		// the syllable wheel
-		float cx = 114.f, cy = box.size.y / 2, r = 31.f;
-		NVGcolor ring = ACCENT;
-		ring.a = 0.35f;
-		nvgBeginPath(vg);
-		nvgCircle(vg, cx, cy, r);
-		nvgStrokeColor(vg, ring);
-		nvgStrokeWidth(vg, 1.f);
-		nvgStroke(vg);
+		// the syllable sung now, right of the singer
+		float cx = 3.f + 16.f * k + (box.size.x - 3.f - 16.f * k) / 2, cy = box.size.y / 2;
 		auto bold = jiant::boldFont();
 		std::vector<std::string> around;
 		std::string centre;
@@ -643,18 +637,9 @@ struct ScreenWidget : Widget {
 			if (centre == "_")
 				centre = a->mora_name((uint32_t) (int) module->sungMora);
 		}
-		for (size_t i = 0; i < around.size(); i++) {
-			float ang = -M_PI_2_F + i * 2.f * 3.14159265f / around.size();
-			bool top = i == 0;
-			NVGcolor c = top ? ACCENT : jiant::DIM;
-			if (top && !sounding)
-				c.a = 0.6f;
-			jiant::text(vg, bold, cx + std::cos(ang) * r, cy + std::sin(ang) * r + 2.5f, around[i], top ? 8.f : 6.f, c,
-			            NVG_ALIGN_CENTER, 0.2f);
-		}
 		NVGcolor cc = jiant::WHITE;
 		cc.a = sounding ? 1.f : 0.35f;
-		jiant::text(vg, bold, cx, cy + 5.f, upper(centre), 14.f, cc, NVG_ALIGN_CENTER, 0.6f);
+		jiant::text(vg, bold, cx, cy + 4.f, upper(centre), 11.f, cc, NVG_ALIGN_CENTER, 0.4f);
 	}
 
 	static constexpr float M_PI_2_F = 1.5707963f;
@@ -671,9 +656,10 @@ struct InfoWidget : Widget {
 		float w = box.size.x;
 		const jca_api* a = module && module->core.loaded() ? module->core.api : nullptr;
 		int p = module ? (int) module->shownPreset : 0;
-		jiant::text(vg, bold, 0, 18, a ? a->preset_name((uint32_t) p) : "KIKO", 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 18, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npresets() : 12u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
+		float h = box.size.y;
+		jiant::text(vg, bold, 0, 7.f, string::f("CHARACTER %d / %u", p + 1, a ? a->npresets() : 12u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, 0, h * 0.62f, a ? a->preset_name((uint32_t) p) : "KIKO", 12.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
 		static const char* LANGS[4] = {"JAPANESE", "ANIMAL", "SCAT", "VOWELS"};
 		int lang = module ? clamp((int) std::round(module->params[Canta::LANG_PARAM].getValue()), 0, 3) : 0;
 		int chr = module ? clamp((int) std::round(module->params[Canta::CHR_PARAM].getValue()), 0, 4) : 2;
@@ -683,7 +669,11 @@ struct InfoWidget : Widget {
 			s += string::f(" \xc2\xb7 HARMONY %s", HARM_NAMES[harm]);
 		if (module && lang == 2)
 			s += string::f(" \xc2\xb7 %d BPM", (int) std::round((float) module->shownBpm));
-		jiant::text(vg, mono, 0, 29, s, 7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		if (module && module->params[Canta::DANCE_PARAM].getValue() > 0.5f)
+			s += " \xc2\xb7 DANCE";
+		jiant::text(vg, bold, 0, h - 1.f, s, 5.2f, ACCENT, NVG_ALIGN_LEFT, 0.8f);
+		(void) mono;
+		(void) w;
 	}
 };
 
@@ -757,7 +747,7 @@ struct LyricsLine : OpaqueWidget {
 			head = "LYRICS \xc2\xb7 FIXED: THE SYLLABLE ONLY";
 		else if (lang == 1 || lang == 2)
 			head = "LYRICS \xc2\xb7 NOT SUNG IN ANIMAL / SCAT";
-		jiant::text(vg, mono, 4, 9.5f, head, 5.4f, err >= 0 ? jiant::ERR : jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		jiant::text(vg, mono, 4, 10.5f, head, 5.2f, err >= 0 ? jiant::ERR : jiant::DIM, NVG_ALIGN_LEFT, 0.f);
 		if (!mono || mono->handle < 0)
 			return;
 		// the units, from a little before the one sung now so it is in view
@@ -795,7 +785,7 @@ struct LyricsLine : OpaqueWidget {
 		x = 4.f - off;
 		for (auto& tk : tok) {
 			bool on = tk.second == cur && tk.second >= 0 && !fixed && lang != 1 && lang != 2;
-			jiant::text(vg, mono, x, 21.5f, tk.first, 7.5f, on ? ACCENT : (tk.second < 0 && tk.first != " " ? jiant::DIM : jiant::TXT),
+			jiant::text(vg, mono, x, box.size.y * 0.5f + 12.f, tk.first, 7.5f, on ? ACCENT : (tk.second < 0 && tk.first != " " ? jiant::DIM : jiant::TXT),
 			            NVG_ALIGN_LEFT, 0.f);
 			x += adv * tk.first.size();
 		}
@@ -803,61 +793,45 @@ struct LyricsLine : OpaqueWidget {
 	}
 };
 
-/** DANCE: one chip, lit while on. */
-struct DanceChip : app::ParamWidget {
+/** DANCE: the fifth lamp of the style row, lit while on; a click toggles it. */
+struct DanceLamp : app::ParamWidget {
+	void place(const float* p, int index) {
+		box.pos = Vec(p[0] + p[2] * index - p[2] / 2, p[1] - 8);
+		box.size = Vec(p[2], 16);
+	}
+	bool on() {
+		engine::ParamQuantity* pq = getParamQuantity();
+		return pq && pq->getValue() > 0.5f;
+	}
 	void onButton(const ButtonEvent& e) override {
 		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
 			if (engine::ParamQuantity* pq = getParamQuantity())
-				pq->setValue(pq->getValue() > 0.5f ? 0.f : 1.f);
+				pq->setValue(on() ? 0.f : 1.f);
 			e.consume(this);
 			return;
 		}
 		ParamWidget::onButton(e);
 	}
-	void draw(const DrawArgs& args) override {}
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 1) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			jiant::chip(args.vg, 0, 0, box.size.x, box.size.y, "DANCE", pq && pq->getValue() > 0.5f, ACCENT);
-		}
-		ParamWidget::drawLayer(args, layer);
+	void draw(const DrawArgs& args) override {
+		nvgBeginPath(args.vg);
+		nvgCircle(args.vg, box.size.x / 2, box.size.y / 2, 3.6f);
+		nvgFillColor(args.vg, on() ? ACCENT : nvgRGB(0x3d, 0x3f, 0x48));
+		nvgFill(args.vg);
 	}
-};
-
-/** A choice of a switch parameter as a field with its value and ▾; a click opens the list (from KURBEL). */
-struct SelectField : app::ParamWidget {
-	std::function<std::string(int)> name;
-	int first = 0, last = 0;
-	int columns = 1;
-	void onButton(const ButtonEvent& e) override {
-		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			if (pq) {
-				ui::Menu* menu = createMenu();
-				menu->addChild(createMenuLabel(pq->getLabel()));
-				for (int i = first; i <= last; i++) {
-					menu->addChild(createCheckMenuItem(name(i), "", [=]() { return (int) std::round(pq->getValue()) == i; },
-					                                   [=]() { pq->setValue((float) i); }));
-				}
-			}
-			e.consume(this);
-			return;
-		}
-		ParamWidget::onButton(e);
-	}
-	void draw(const DrawArgs& args) override {}
 	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 1) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			int v = pq ? (int) std::round(pq->getValue()) : first;
-			jiant::roundRect(args.vg, 0, 0, box.size.x, box.size.y, 2.2f, jiant::FIELD);
+		if (layer == 1 && on()) {
+			float cx = box.size.x / 2, cy = box.size.y / 2;
+			NVGcolor glow = ACCENT, none = ACCENT;
+			glow.a = 0.35f;
+			none.a = 0.f;
 			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0.4f, 0.4f, box.size.x - 0.8f, box.size.y - 0.8f, 2.2f);
-			nvgStrokeColor(args.vg, jiant::EDGE);
-			nvgStrokeWidth(args.vg, 0.8f);
-			nvgStroke(args.vg);
-			jiant::text(args.vg, jiant::boldFont(), box.size.x / 2, box.size.y / 2 + 2.3f, name(v) + " \xe2\x96\xbe", 6.4f,
-			            jiant::TXT, NVG_ALIGN_CENTER, 0.4f);
+			nvgCircle(args.vg, cx, cy, 8.f);
+			nvgFillPaint(args.vg, nvgRadialGradient(args.vg, cx, cy, 2.f, 8.f, glow, none));
+			nvgFill(args.vg);
+			nvgBeginPath(args.vg);
+			nvgCircle(args.vg, cx, cy, 3.6f);
+			nvgFillColor(args.vg, ACCENT);
+			nvgFill(args.vg);
 		}
 		ParamWidget::drawLayer(args, layer);
 	}
@@ -881,68 +855,82 @@ struct CantaWidget : ModuleWidget {
 		info->module = module;
 		info->box = jiant::area(L::INFO);
 		addChild(info);
-		float ix = L::INFO[0], iy = L::INFO[1], iw = L::INFO[2];
-		jiant::ChipRow* lang = createParam<jiant::ChipRow>(Vec(ix, iy + 35), module, Canta::LANG_PARAM);
-		lang->box.size = Vec(141, 12);
-		lang->names = {"JAPAN", "ANIMAL", "SCAT", "VOWEL"};
-		lang->accent = ACCENT;
-		addParam(lang);
-		DanceChip* dance = createParam<DanceChip>(Vec(ix + 146, iy + 35), module, Canta::DANCE_PARAM);
-		dance->box.size = Vec(iw - 146, 12);
-		addParam(dance);
-		jiant::ChipRow* chr = createParam<jiant::ChipRow>(Vec(ix, iy + 51), module, Canta::CHR_PARAM);
-		chr->box.size = Vec(iw, 12);
-		chr->names = {"DEEP", "LOW", "MID", "YOUNG", "TINY"};
-		chr->accent = ACCENT;
-		addParam(chr);
+		// the lyrics: right in the display
+		float iw = L::INFO[2] * 0.48f;
 		LyricsLine* line = new LyricsLine;
 		line->module = module;
-		line->box = Rect(ix, iy + 67, iw, 27);
+		line->box = Rect(L::INFO[0] + L::INFO[2] - iw, L::INFO[1], iw, L::INFO[3]);
 		addChild(line);
 
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Canta::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT_BTN), module, Canta::NEXT_PARAM));
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.loaded() ? (int) module->core.api->npresets() : 1; };
+		pf->name = [=](int i) -> std::string {
+			return module && module->core.loaded() ? module->core.api->preset_name((uint32_t) i) : "KIKO SONG";
+		};
+		pf->current = [=]() { return module ? (int) module->shownPreset : 0; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->presetReq = i;
+		};
+		addChild(pf);
+
 		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<CANTA_RGB>>>(
 		    jiant::at(L::CALL), module, Canta::CALL_PARAM, Canta::CALL_LIGHT));
-		SelectField* lyr = createParam<SelectField>(Vec(L::LYR_SEL[0], L::LYR_SEL[1]), module, Canta::LYRICS_PARAM);
-		lyr->box.size = Vec(L::LYR_SEL[2], L::LYR_SEL[3]);
-		lyr->first = 0;
-		lyr->last = 1;
-		lyr->name = [](int i) -> std::string { return i ? "FIXED" : "FOLLOW"; };
+		genra_look::ParamField* lyr = createParam<genra_look::ParamField>(Vec(L::LYRF[0], L::LYRF[1]), module, Canta::LYRICS_PARAM);
+		lyr->box.size = Vec(L::LYRF[2], L::LYRF[3]);
+		lyr->count = 2;
+		lyr->nameOf = [](int i) -> std::string { return i ? "FIXED" : "FOLLOW"; };
+		lyr->infoOf = [](int i) -> std::string { return i ? "the SYLLABLE only" : "the next syllable each gate"; };
+		lyr->title = "Lyrics";
+		lyr->undo = "change lyrics mode";
 		addParam(lyr);
-		SelectField* syl = createParam<SelectField>(Vec(L::SYL_SEL[0], L::SYL_SEL[1]), module, Canta::SYL_PARAM);
-		syl->box.size = Vec(L::SYL_SEL[2], L::SYL_SEL[3]);
-		syl->first = 1;
-		syl->last = 72;
-		syl->name = [=](int i) -> std::string {
+		genra_look::ParamField* syl = createParam<genra_look::ParamField>(Vec(L::SYLF[0], L::SYLF[1]), module, Canta::SYL_PARAM);
+		syl->box.size = Vec(L::SYLF[2], L::SYLF[3]);
+		syl->count = 72;
+		syl->nameOf = [=](int i) -> std::string {
 			if (module && module->core.loaded())
-				return module->core.api->mora_name((uint32_t) clamp(i, 1, 72));
+				return module->core.api->mora_name((uint32_t) clamp(i + 1, 1, 72));
 			return MORA_FALLBACK;
 		};
+		syl->title = "Syllable (FIXED)";
+		syl->undo = "change syllable";
 		addParam(syl);
-		SelectField* harm = createParam<SelectField>(Vec(L::HARM_SEL[0], L::HARM_SEL[1]), module, Canta::HARM_PARAM);
-		harm->box.size = Vec(L::HARM_SEL[2], L::HARM_SEL[3]);
-		harm->first = 0;
-		harm->last = 6;
-		harm->name = [](int i) -> std::string { return HARM_NAMES[clamp(i, 0, 6)]; };
+		genra_look::ParamField* harm = createParam<genra_look::ParamField>(Vec(L::HARMF[0], L::HARMF[1]), module, Canta::HARM_PARAM);
+		harm->box.size = Vec(L::HARMF[2], L::HARMF[3]);
+		harm->count = 7;
+		harm->nameOf = [](int i) -> std::string { return HARM_NAMES[clamp(i, 0, 6)]; };
+		harm->title = "Harmony";
+		harm->undo = "change harmony";
 		addParam(harm);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::MIX), module, Canta::MIX_PARAM));
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Canta::LEVEL_PARAM));
+		jiant::LampRow* lang = createParam<jiant::LampRow>(Vec(0, 0), module, Canta::LANG_PARAM);
+		lang->place(L::LANG, 4);
+		lang->accent = ACCENT;
+		addParam(lang);
+		DanceLamp* dance = createParam<DanceLamp>(Vec(0, 0), module, Canta::DANCE_PARAM);
+		dance->place(L::LANG, 4);
+		addParam(dance);
+		jiant::LampRow* chr = createParam<jiant::LampRow>(Vec(0, 0), module, Canta::CHR_PARAM);
+		chr->place(L::CHR, 5);
+		chr->accent = ACCENT;
+		addParam(chr);
+		addParam(createParamCentered<GKnob>(jiant::at(L::MIX), module, Canta::MIX_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Canta::LEVEL_PARAM));
 
-		static const char* LAB[NV] = {"BREATH", "BRIGHT", "GLIDE", "TENSE", "FRY", "WHISPR", "FORMNT", "HUMAN"};
 		for (int k = 0; k < NV; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::V[k]), module, Canta::K_PARAM + k));
+			Vec c = jiant::at(L::V[k]);
+			if (k == 6)
+				addParam(createParamCentered<GLargeKnob>(c, module, Canta::K_PARAM + k));
+			else if (k < 3)
+				addParam(createParamCentered<GKnob>(c, module, Canta::K_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Canta::K_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::V_IN[k]), module, Canta::V_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::V_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string { return LAB[k]; };
-			t->value = [=]() -> std::string { return module && module->core.loaded() ? module->values[k].data() : ""; };
-			addChild(t);
 		}
 		const float* small[8] = {L::ATK, L::REL, L::SCOOP, L::VIB, L::CHOR, L::DLY, L::REV, L::DRV};
 		for (int i = 0; i < 8; i++)
-			addParam(createParamCentered<GTrimpot>(jiant::at(small[i]), module, Canta::K_PARAM + NV + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(small[i]), module, Canta::K_PARAM + NV + i));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Canta::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Canta::GATE_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VEL), module, Canta::VEL_INPUT));

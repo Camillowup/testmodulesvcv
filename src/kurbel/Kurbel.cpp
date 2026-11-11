@@ -7,6 +7,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "KurbelCore.hpp"
 #include "KurbelLayout.hpp"
 #include <atomic>
@@ -499,11 +500,11 @@ struct ScreenWidget : Widget {
 			}
 		}
 		flash = std::max(0.f, flash - dt * 4.f);
-		float h = box.size.y, cx = 44.f, cy = h / 2, r = 34.f;
+		float h = box.size.y, r = h * 0.3f, cx = r + 9.f, cy = h / 2;
 		NVGcolor dimc = ACCENT;
 		dimc.a = 0.35f;
 		// the strings
-		const float ys[4] = {-18.f, -6.f, 6.f, 18.f};
+		const float ys[4] = {-r * 0.53f, -r * 0.18f, r * 0.18f, r * 0.53f};
 		for (int i = 0; i < 4; i++) {
 			NVGcolor c = ACCENT;
 			c.a = i == 1 ? (on ? 1.f : 0.45f) : (i == 3 ? 0.5f + 0.5f * flash : 0.5f);
@@ -556,88 +557,34 @@ struct InfoWidget : Widget {
 		if (layer != 1)
 			return;
 		NVGcontext* vg = args.vg;
-		auto bold = jiant::boldFont(), mono = jiant::monoFont();
-		float w = box.size.x;
+		auto bold = jiant::boldFont();
+		float w = box.size.x, h = box.size.y;
 		const jku_api* a = module ? module->core.api : nullptr;
 		int p = module ? (int) module->shownPreset : 0;
 		bool reed = module && module->params[Kurbel::ENGINE_PARAM].getValue() > 0.5f;
 		int drone = module ? clamp((int) std::round(module->params[Kurbel::DRONE_PARAM].getValue()), 0, 11) : 2;
-		int temp = module ? clamp((int) std::round(module->params[Kurbel::TEMP_PARAM].getValue()), 0, 3) : 0;
+		int temp = module ? clamp((int) std::round(module->params[Kurbel::TEMP_PARAM].getValue()), 0, 3) : 1;
 		int coup = module ? clamp((int) std::round(module->params[Kurbel::COUP_PARAM].getValue()), 0, 5) : 2;
 		bool ring = module && module->params[Kurbel::RING_PARAM].getValue() > 0.5f;
-		jiant::text(vg, bold, 0, 20, a ? a->preset_name((uint32_t) p) : "HURDY GURDY", 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npresets() : 8u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
-		jiant::text(vg, mono, 0, 33, string::f("%s \xc2\xb7 DRONE %s \xc2\xb7 %s%s", reed ? "REED" : "WHEEL",
-		                                       DRONE_NAMES[drone], TEMP_NAMES[temp], ring ? " \xc2\xb7 RING" : ""),
-		            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		jiant::text(vg, bold, 0, 7.f, string::f("PRESET %d / %u", p + 1, a ? a->npresets() : 8u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
 		if (module) {
-			std::string s = reed ? string::f("TEMPO %d BPM", (int) std::round((float) module->shownBpm))
-			              : coup == 5 ? string::f("CRANK %d rpm \xc2\xb7 STROKE ON A RUCK", (int) std::round((float) module->shownRpm))
-			                          : string::f("TEMPO %d BPM \xc2\xb7 STROKES %s", (int) std::round((float) module->shownBpm),
-			                                      COUP_NAMES[coup]);
-			jiant::text(vg, mono, 0, 71, s, 7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+			std::string t = reed ? string::f("%d BPM", (int) std::round((float) module->shownBpm))
+			              : coup == 5 ? string::f("CRANK %d RPM", (int) std::round((float) module->shownRpm))
+			                          : string::f("%d BPM \xc2\xb7 %s", (int) std::round((float) module->shownBpm), COUP_NAMES[coup]);
+			jiant::text(vg, bold, w, 7.f, t, 5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 1.f);
 		}
+		jiant::text(vg, bold, 0, h * 0.62f, a ? a->preset_name((uint32_t) p) : "HURDY GURDY", 13.f, jiant::WHITE,
+		            NVG_ALIGN_LEFT, 0.6f);
+		jiant::text(vg, bold, 0, h - 1.f, string::f("%s \xc2\xb7 DRONE %s \xc2\xb7 %s%s", reed ? "REED" : "WHEEL",
+		                                           DRONE_NAMES[drone], TEMP_NAMES[temp], ring ? " \xc2\xb7 RING" : ""),
+		            5.2f, ACCENT, NVG_ALIGN_LEFT, 1.f);
 		if (module && module->core.loaded()) {
 			std::string s;
 			for (int k = 0; k < 3; k++)
-				s += string::f("%s %s  ", module->labels[k].data(), module->values[k].data());
-			jiant::text(vg, mono, 0, 92, s, 6.6f, ACCENT, NVG_ALIGN_LEFT, 0.f);
+				s += string::f("%s%s %s", k ? "  " : "", module->labels[k].data(), module->values[k].data());
+			jiant::text(vg, bold, w, h - 1.f, s, 5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 0.6f);
 		}
-	}
-};
-
-/** A choice of a switch parameter as a field with its value and ▾; a click opens the list. */
-struct SelectField : app::ParamWidget {
-	std::vector<std::string> names;
-	std::function<bool()> enabled;
-	void onButton(const ButtonEvent& e) override {
-		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			if (pq && (!enabled || enabled())) {
-				ui::Menu* menu = createMenu();
-				menu->addChild(createMenuLabel(pq->getLabel()));
-				for (size_t i = 0; i < names.size(); i++) {
-					menu->addChild(createCheckMenuItem(names[i], "",
-					                                   [=]() { return (int) std::round(pq->getValue()) == (int) i; },
-					                                   [=]() { pq->setValue((float) i); }));
-				}
-			}
-			e.consume(this);
-			return;
-		}
-		ParamWidget::onButton(e);
-	}
-	void draw(const DrawArgs& args) override {}
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 1) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			int v = pq ? (int) std::round(pq->getValue()) : 0;
-			bool en = !enabled || enabled();
-			jiant::roundRect(args.vg, 0, 0, box.size.x, box.size.y, 2.2f, jiant::FIELD);
-			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0.4f, 0.4f, box.size.x - 0.8f, box.size.y - 0.8f, 2.2f);
-			nvgStrokeColor(args.vg, jiant::EDGE);
-			nvgStrokeWidth(args.vg, 0.8f);
-			nvgStroke(args.vg);
-			std::string s = (v >= 0 && v < (int) names.size() ? names[v] : "?") + " \xe2\x96\xbe";
-			jiant::text(args.vg, jiant::boldFont(), box.size.x / 2, box.size.y / 2 + 2.3f, s, 6.4f,
-			            en ? jiant::TXT : jiant::DIM, NVG_ALIGN_CENTER, 0.4f);
-		}
-		ParamWidget::drawLayer(args, layer);
-	}
-};
-
-/** The crank's speed as a number, next to its knob. */
-struct RpmText : TransparentWidget {
-	Kurbel* module = nullptr;
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1)
-			return;
-		float rpm = module ? (float) module->shownRpm : 90.f;
-		jiant::text(args.vg, jiant::monoFont(), box.size.x / 2, 8, string::f("%d", (int) std::round(rpm)), 8.f, ACCENT,
-		            NVG_ALIGN_CENTER, 0.f);
-		jiant::text(args.vg, jiant::monoFont(), box.size.x / 2, 15, "rpm", 5.5f, jiant::DIM, NVG_ALIGN_CENTER, 0.f);
 	}
 };
 
@@ -657,59 +604,87 @@ struct KurbelWidget : ModuleWidget {
 		info->module = module;
 		info->box = jiant::area(L::INFO);
 		addChild(info);
-		jiant::ChipRow* eng = createParam<jiant::ChipRow>(Vec(L::INFO[0], L::INFO[1] + 41), module, Kurbel::ENGINE_PARAM);
-		eng->box.size = Vec(83, 14);
-		eng->names = {"WHEEL", "REED"};
-		eng->accent = ACCENT;
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.api ? (int) module->core.api->npresets() : 1; };
+		pf->name = [=](int i) -> std::string {
+			return module && module->core.api ? module->core.api->preset_name((uint32_t) i) : "HURDY GURDY";
+		};
+		pf->current = [=]() { return module ? (int) module->shownPreset : 0; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->presetReq = i;
+		};
+		addChild(pf);
+		static const char* ENG_NAMES[2] = {"WHEEL", "REED"};
+		genra_look::ParamField* eng = createParam<genra_look::ParamField>(Vec(L::ENGF[0], L::ENGF[1]), module, Kurbel::ENGINE_PARAM);
+		eng->box.size = Vec(L::ENGF[2], L::ENGF[3]);
+		eng->count = 2;
+		eng->nameOf = [](int i) -> std::string { return ENG_NAMES[clamp(i, 0, 2 - 1)]; };
+		eng->title = "Engine";
+		eng->undo = "change engine";
 		addParam(eng);
-		jiant::ChipRow* tmp = createParam<jiant::ChipRow>(Vec(L::INFO[0] + 88, L::INFO[1] + 41), module, Kurbel::TEMP_PARAM);
-		tmp->box.size = Vec(L::INFO[2] - 88, 14);
-		tmp->names = {"EQUAL", "PYTH", "MEAN", "JUST"};
-		tmp->accent = ACCENT;
+		genra_look::ParamField* tmp = createParam<genra_look::ParamField>(Vec(L::TEMPF[0], L::TEMPF[1]), module, Kurbel::TEMP_PARAM);
+		tmp->box.size = Vec(L::TEMPF[2], L::TEMPF[3]);
+		tmp->count = 4;
+		tmp->nameOf = [](int i) -> std::string { return TEMP_NAMES[clamp(i, 0, 4 - 1)]; };
+		tmp->title = "Temperament";
+		tmp->undo = "change temperament";
 		addParam(tmp);
-
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Kurbel::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Kurbel::NEXT_PARAM));
+		genra_look::ParamField* drone = createParam<genra_look::ParamField>(Vec(L::DRONEF[0], L::DRONEF[1]), module, Kurbel::DRONE_PARAM);
+		drone->box.size = Vec(L::DRONEF[2], L::DRONEF[3]);
+		drone->count = 12;
+		drone->nameOf = [](int i) -> std::string { return DRONE_NAMES[clamp(i, 0, 12 - 1)]; };
+		drone->title = "Drone";
+		drone->undo = "change drone";
+		addParam(drone);
+		genra_look::ParamField* coup = createParam<genra_look::ParamField>(Vec(L::COUPF[0], L::COUPF[1]), module, Kurbel::COUP_PARAM);
+		coup->box.size = Vec(L::COUPF[2], L::COUPF[3]);
+		coup->count = 6;
+		coup->nameOf = [](int i) -> std::string { return COUP_NAMES[clamp(i, 0, 6 - 1)]; };
+		coup->title = "Coup (WHEEL)";
+		coup->undo = "change coup";
+		addParam(coup);
 		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<KURBEL_RGB>>>(
 		    jiant::at(L::CALL), module, Kurbel::CALL_PARAM, Kurbel::CALL_LIGHT));
 		addParam(createLightParamCentered<VCVLightLatch<jiant::AccentLight<KURBEL_RGB>>>(
 		    jiant::at(L::RING), module, Kurbel::RING_PARAM, Kurbel::RING_LIGHT));
-		SelectField* drone = createParam<SelectField>(Vec(L::DRONE_SEL[0], L::DRONE_SEL[1]), module, Kurbel::DRONE_PARAM);
-		drone->box.size = Vec(L::DRONE_SEL[2], L::DRONE_SEL[3]);
-		drone->names.assign(DRONE_NAMES, DRONE_NAMES + 12);
-		addParam(drone);
-		SelectField* coup = createParam<SelectField>(Vec(L::COUP_SEL[0], L::COUP_SEL[1]), module, Kurbel::COUP_PARAM);
-		coup->box.size = Vec(L::COUP_SEL[2], L::COUP_SEL[3]);
-		coup->names.assign(COUP_NAMES, COUP_NAMES + 6);
-		coup->enabled = [=]() { return !module || module->params[Kurbel::ENGINE_PARAM].getValue() < 0.5f; };
-		addParam(coup);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::CRANK), module, Kurbel::CRANK_PARAM));
-		RpmText* rpm = new RpmText;
-		rpm->module = module;
-		rpm->box = jiant::area(L::CRANK_TEXT);
-		addChild(rpm);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Kurbel::LEVEL_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::CRANK), module, Kurbel::CRANK_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Kurbel::LEVEL_PARAM));
 
-		static const char* defLab[NE] = {"DLVL", "5TH", "WHL", "BUZZ", "BODY", "WOBL"};
+		static const char* defLab[NE] = {"D LVL", "5TH", "WHEEL", "BUZZ", "BODY", "WOBBLE"};
 		for (int k = 0; k < NE; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::E[k]), module, Kurbel::E_PARAM + k));
+			Vec c = jiant::at(L::E[k]);
+			if (k == 2)
+				addParam(createParamCentered<GLargeKnob>(c, module, Kurbel::E_PARAM + k));
+			else if (k < 4)
+				addParam(createParamCentered<GKnob>(c, module, Kurbel::E_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Kurbel::E_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::E_IN[k]), module, Kurbel::E_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::E_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string {
+			auto label = [=]() -> std::string {
 				if (module && module->labels[k][0])
 					return module->labels[k].data();
 				return defLab[k];
 			};
-			t->value = [=]() -> std::string { return module && module->core.loaded() ? module->values[k].data() : ""; };
+			genra_look::PanelText* t = new genra_look::PanelText;
+			t->box = jiant::area(L::E_TEXT[k]);
+			t->text = label;
 			addChild(t);
+			genra_look::PanelText* j = new genra_look::PanelText;
+			j->box = jiant::area(L::E_INL[k]);
+			j->text = label;
+			j->color = jiant::DIM;
+			j->size = 4.4f;
+			j->spacing = 0.7f;
+			addChild(j);
 		}
 		const float* env[4] = {L::ATK, L::DEC, L::SUS, L::REL};
 		const float* fx[4] = {L::DIST, L::CHOR, L::DLY, L::REV};
 		for (int i = 0; i < 4; i++) {
-			addParam(createParamCentered<GTrimpot>(jiant::at(env[i]), module, Kurbel::ATK_PARAM + i));
-			addParam(createParamCentered<GTrimpot>(jiant::at(fx[i]), module, Kurbel::DIST_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(env[i]), module, Kurbel::ATK_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(fx[i]), module, Kurbel::DIST_PARAM + i));
 		}
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Kurbel::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Kurbel::GATE_INPUT));

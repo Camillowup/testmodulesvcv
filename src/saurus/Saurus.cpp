@@ -7,6 +7,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "SaurusCore.hpp"
 #include "SaurusLayout.hpp"
 #include <atomic>
@@ -460,7 +461,7 @@ struct ScreenWidget : Widget {
 		int c = module ? module->creature() : C_TREX;
 		bool open = module && module->sounding && module->shownLevel > 0.06f;
 		const std::vector<const char*>& sp = SPRITES[c];
-		const float P = 5.5f;
+		const float P = std::min(box.size.x / 16.f, box.size.y / (float) sp.size());
 		float ox = (box.size.x - 16 * P) / 2, oy = (box.size.y - sp.size() * P) / 2;
 		for (size_t y = 0; y < sp.size(); y++)
 			for (int x = 0; x < 16 && sp[y][x]; x++) {
@@ -477,7 +478,7 @@ struct ScreenWidget : Widget {
 	}
 };
 
-/** Right of the creature: the preset, creature · call · voice, the call's shape (pitch and mouth over LEN). */
+/** Right of the creature: the preset, creature · call · voice, the values, the call's shape (pitch and mouth over LEN). */
 struct InfoWidget : Widget {
 	Saurus* module = nullptr;
 	void drawLayer(const DrawArgs& args, int layer) override {
@@ -485,28 +486,39 @@ struct InfoWidget : Widget {
 			return;
 		NVGcontext* vg = args.vg;
 		auto bold = jiant::boldFont(), mono = jiant::monoFont();
-		float w = box.size.x;
+		float w = box.size.x, h = box.size.y;
 		const jsa_api* a = module ? module->core.api : nullptr;
 		int p = module ? (int) module->shownPreset : 1;
 		int type = module ? (int) module->shownType : 2;
 		int voice = module ? clamp((int) std::round(module->params[Saurus::VOICE_PARAM].getValue()), 0, 2) : 1;
-		jiant::text(vg, bold, 0, 20, a ? a->preset_name((uint32_t) p) : "TYRANT ROAR", 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npresets() : 21u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
 		int cr = module ? module->creature() : C_TREX;
-		jiant::text(vg, mono, 0, 33, string::f("%s \xc2\xb7 %s \xc2\xb7 %s", CREATURE_NAMES[cr], CALL_NAMES[type],
-		                                       VOICE_NAMES[voice]),
-		            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
-		// the call's shape
-		float gx = 0, gy = 40, gw = w, gh = 52;
+		float gw = w * 0.42f, gx = w - gw, gy = 0, gh = h;  // the call's shape, right
+		float tw = gx - 6;
+		jiant::text(vg, bold, 0, 7.f, string::f("CALL %d / %u", p + 1, a ? a->npresets() : 21u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, 0, h * 0.5f, a ? a->preset_name((uint32_t) p) : "TYRANT ROAR", 11.f, jiant::WHITE,
+		            NVG_ALIGN_LEFT, 0.5f);
+		jiant::text(vg, bold, 0, h * 0.5f + 10.f, string::f("%s \xc2\xb7 %s \xc2\xb7 %s", CREATURE_NAMES[cr], CALL_NAMES[type],
+		                                                  VOICE_NAMES[voice]),
+		            5.2f, ACCENT, NVG_ALIGN_LEFT, 0.8f);
+		if (module && module->core.loaded()) {
+			static const char* lab[3] = {"SIZE", "SWOOP", "LEN"};
+			std::string s;
+			for (int k = 0; k < 3; k++)
+				s += string::f("%s%s %s", k ? "  " : "", lab[k], module->values[JSA_SIZE + k].data());
+			nvgSave(vg);
+			nvgScissor(vg, 0, 0, tw, h);
+			jiant::text(vg, bold, 0, h - 1.f, s, 5.f, jiant::DIM, NVG_ALIGN_LEFT, 0.5f);
+			nvgRestore(vg);
+		}
 		jiant::roundRect(vg, gx, gy, gw, gh, 2.2f, jiant::FIELD);
 		int32_t pc[5], mc[5];
 		if (!a || !a->call_curve((uint32_t) type, 0, pc) || !a->call_curve((uint32_t) type, 1, mc)) {
-			jiant::text(vg, mono, gx + 6, gy + 20, "KIT: A CREATURE A KEY", 6.6f, ACCENT, NVG_ALIGN_LEFT, 0.f);
-			jiant::text(vg, mono, gx + 6, gy + 32, "C2 BRACHIO .. G3 COMPY, AGAIN", 6.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+			jiant::text(vg, mono, gx + 5, gy + gh / 2 - 2, "KIT: A CREATURE A KEY", 5.6f, ACCENT, NVG_ALIGN_LEFT, 0.f);
+			jiant::text(vg, mono, gx + 5, gy + gh / 2 + 8, "C2 BRACHIO .. G3 COMPY", 5.2f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
 			return;
 		}
-		float x0 = gx + 8, xw = gw - 50, mid = gy + gh / 2;
+		float x0 = gx + 6, xw = gw - 34, mid = gy + gh / 2;
 		auto curve = [&](const int32_t* v, float scale, float off, NVGcolor col, float sw) {
 			nvgBeginPath(vg);
 			for (int i = 0; i < 5; i++) {
@@ -522,63 +534,22 @@ struct InfoWidget : Widget {
 		};
 		NVGcolor mcol = jiant::TXT;
 		mcol.a = 0.5f;
-		curve(mc, 1.2f, 10.f, mcol, 1.f);
-		curve(pc, 1.1f, 0.f, ACCENT, 1.6f);
-		jiant::text(vg, mono, gx + gw - 4, gy + 14, "pitch", 6.f, ACCENT, NVG_ALIGN_RIGHT, 0.f);
-		jiant::text(vg, mono, gx + gw - 4, gy + 30, "mouth", 6.f, jiant::DIM, NVG_ALIGN_RIGHT, 0.f);
-		// where the call is now
+		curve(mc, 0.9f, 8.f, mcol, 1.f);
+		curve(pc, 0.85f, 0.f, ACCENT, 1.5f);
+		jiant::text(vg, mono, gx + gw - 3, gy + 11, "pitch", 5.4f, ACCENT, NVG_ALIGN_RIGHT, 0.f);
+		jiant::text(vg, mono, gx + gw - 3, gy + 23, "mouth", 5.4f, jiant::DIM, NVG_ALIGN_RIGHT, 0.f);
 		if (module && module->sounding) {
 			float q = clamp((float) module->callAge / module->lenSeconds(), 0.f, 1.f);
 			float x = x0 + q * xw;
 			nvgBeginPath(vg);
-			nvgMoveTo(vg, x, gy + 4);
-			nvgLineTo(vg, x, gy + gh - 4);
+			nvgMoveTo(vg, x, gy + 3);
+			nvgLineTo(vg, x, gy + gh - 3);
 			NVGcolor c = ACCENT;
 			c.a = 0.6f;
 			nvgStrokeColor(vg, c);
 			nvgStrokeWidth(vg, 1.f);
 			nvgStroke(vg);
 		}
-	}
-};
-
-/** A choice of a switch parameter as a field with its value and ▾; a click opens the list. */
-struct SelectField : app::ParamWidget {
-	std::vector<std::string> names;
-	Saurus* module = nullptr;
-	void onButton(const ButtonEvent& e) override {
-		if (e.action == GLFW_PRESS && e.button == GLFW_MOUSE_BUTTON_LEFT) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			if (pq) {
-				ui::Menu* menu = createMenu();
-				menu->addChild(createMenuLabel(pq->getLabel()));
-				for (size_t i = 0; i < names.size(); i++) {
-					menu->addChild(createCheckMenuItem(names[i], "",
-					                                   [=]() { return (int) std::round(pq->getValue()) == (int) i; },
-					                                   [=]() { pq->setValue((float) i); }));
-				}
-			}
-			e.consume(this);
-			return;
-		}
-		ParamWidget::onButton(e);
-	}
-	void draw(const DrawArgs& args) override {}
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer == 1) {
-			engine::ParamQuantity* pq = getParamQuantity();
-			int v = module ? (int) module->shownType : (pq ? (int) std::round(pq->getValue()) : 0);
-			jiant::roundRect(args.vg, 0, 0, box.size.x, box.size.y, 2.2f, jiant::FIELD);
-			nvgBeginPath(args.vg);
-			nvgRoundedRect(args.vg, 0.4f, 0.4f, box.size.x - 0.8f, box.size.y - 0.8f, 2.2f);
-			nvgStrokeColor(args.vg, jiant::EDGE);
-			nvgStrokeWidth(args.vg, 0.8f);
-			nvgStroke(args.vg);
-			std::string s = (v >= 0 && v < (int) names.size() ? names[v] : "?") + " \xe2\x96\xbe";
-			jiant::text(args.vg, jiant::boldFont(), box.size.x / 2, box.size.y / 2 + 2.3f, s, 6.4f, jiant::TXT,
-			            NVG_ALIGN_CENTER, 0.4f);
-		}
-		ParamWidget::drawLayer(args, layer);
 	}
 };
 
@@ -598,39 +569,51 @@ struct SaurusWidget : ModuleWidget {
 		info->box = jiant::area(L::INFO);
 		addChild(info);
 
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Saurus::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Saurus::NEXT_PARAM));
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.api ? (int) module->core.api->npresets() : 1; };
+		pf->name = [=](int i) -> std::string {
+			return module && module->core.api ? module->core.api->preset_name((uint32_t) i) : "TYRANT ROAR";
+		};
+		pf->current = [=]() { return module ? (int) module->shownPreset : 1; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->presetReq = i;
+		};
+		addChild(pf);
+
 		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<SAURUS_RGB>>>(
 		    jiant::at(L::CALL), module, Saurus::CALL_PARAM, Saurus::CALL_LIGHT));
-		SelectField* type = createParam<SelectField>(Vec(L::TYPE_SEL[0], L::TYPE_SEL[1]), module, Saurus::TYPE_PARAM);
-		type->box.size = Vec(L::TYPE_SEL[2], L::TYPE_SEL[3]);
-		type->names.assign(CALL_NAMES, CALL_NAMES + JSA_NCALL);
-		type->module = module;
+		genra_look::ParamField* type = createParam<genra_look::ParamField>(Vec(L::TYPEF[0], L::TYPEF[1]), module, Saurus::TYPE_PARAM);
+		type->box.size = Vec(L::TYPEF[2], L::TYPEF[3]);
+		type->count = JSA_NCALL;
+		type->nameOf = [](int i) -> std::string { return CALL_NAMES[clamp(i, 0, (int) JSA_NCALL - 1)]; };
+		type->infoOf = [](int) -> std::string { return "TYPE"; };
+		type->title = "Call type";
+		type->undo = "change call type";
 		addParam(type);
 		jiant::LampRow* vs = createParam<jiant::LampRow>(Vec(0, 0), module, Saurus::VOICE_PARAM);
 		vs->place(L::VOICE, 3);
 		vs->accent = ACCENT;
 		addParam(vs);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Saurus::LEVEL_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Saurus::LEVEL_PARAM));
 
-		static const char* lab[NE] = {"SIZE", "SWOOP", "LEN", "GROWL", "BRTH", "MOUTH", "WILD"};
 		for (int k = 0; k < NE; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::E[k]), module, Saurus::E_PARAM + k));
+			Vec c = jiant::at(L::E[k]);
+			if (k == 3)
+				addParam(createParamCentered<GLargeKnob>(c, module, Saurus::E_PARAM + k));
+			else if (k < 3)
+				addParam(createParamCentered<GKnob>(c, module, Saurus::E_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Saurus::E_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::E_IN[k]), module, Saurus::E_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::E_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string { return lab[k]; };
-			t->value = [=]() -> std::string {
-				return module && module->core.loaded() ? module->values[JSA_SIZE + k].data() : "";
-			};
-			addChild(t);
 		}
 		const float* env[4] = {L::ATK, L::DEC, L::SUS, L::REL};
 		const float* fx[4] = {L::DIST, L::CHOR, L::DLY, L::REV};
 		for (int i = 0; i < 4; i++) {
-			addParam(createParamCentered<GTrimpot>(jiant::at(env[i]), module, Saurus::ATK_PARAM + i));
-			addParam(createParamCentered<GTrimpot>(jiant::at(fx[i]), module, Saurus::DIST_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(env[i]), module, Saurus::ATK_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(fx[i]), module, Saurus::DIST_PARAM + i));
 		}
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Saurus::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Saurus::GATE_INPUT));

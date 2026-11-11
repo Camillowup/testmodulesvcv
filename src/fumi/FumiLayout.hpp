@@ -3,27 +3,27 @@
 #pragma once
 namespace flayout {
 namespace fumi {
-static const float W = 390.f;
-static const float SCREEN[4] = {19.0f, 34.0f, 151.6f, 98.0f};
-static const float INFO[4] = {184.6f, 34.0f, 186.4f, 98.0f};
-static const float PREV[2] = {28.0f, 154.0f};
-static const float NEXT[2] = {56.0f, 154.0f};
-static const float KEY_SEL[4] = {82.0f, 155.0f, 40.0f, 17.0f};
-static const float TUNE_SEL[4] = {134.0f, 155.0f, 50.0f, 17.0f};
-static const float SCALE_SEL[4] = {196.0f, 155.0f, 44.0f, 17.0f};
-static const float VOICE[3] = {272.0f, 160.5f, 30.0f};
-static const float LEVEL[2] = {351.0f, 155.0f};
-static const float S[7][2] = {{39.9f, 211.0f}, {91.6f, 211.0f}, {143.3f, 211.0f}, {195.0f, 211.0f}, {246.7f, 211.0f}, {298.4f, 211.0f}, {350.1f, 211.0f}};
-static const float S_TEXT[7][4] = {{14.0f, 224.5f, 51.7f, 15.0f}, {65.7f, 224.5f, 51.7f, 15.0f}, {117.4f, 224.5f, 51.7f, 15.0f}, {169.1f, 224.5f, 51.7f, 15.0f}, {220.9f, 224.5f, 51.7f, 15.0f}, {272.6f, 224.5f, 51.7f, 15.0f}, {324.3f, 224.5f, 51.7f, 15.0f}};
-static const float S_IN[7][2] = {{39.9f, 253.5f}, {91.6f, 253.5f}, {143.3f, 253.5f}, {195.0f, 253.5f}, {246.7f, 253.5f}, {298.4f, 253.5f}, {350.1f, 253.5f}};
-static const float H[7][2] = {{27.9f, 294.0f}, {79.6f, 294.0f}, {131.3f, 294.0f}, {183.0f, 294.0f}, {234.7f, 294.0f}, {286.4f, 294.0f}, {338.1f, 294.0f}};
-static const float H_IN[7][2] = {{51.9f, 294.0f}, {103.6f, 294.0f}, {155.3f, 294.0f}, {207.0f, 294.0f}, {258.7f, 294.0f}, {310.4f, 294.0f}, {362.1f, 294.0f}};
-static const float VOCT[2] = {35.9f, 332.0f};
-static const float GATE[2] = {63.6f, 332.0f};
-static const float VEL[2] = {91.4f, 332.0f};
-static const float BEND_IN[2] = {140.8f, 332.0f};
-static const float KEY_IN[2] = {174.8f, 332.0f};
-static const float OUT_L[2] = {292.0f, 332.0f};
-static const float OUT_R[2] = {340.0f, 332.0f};
+static const float W = 375.f;
+static const int HP = 25;
+static const float PRESETF[4] = {193.4f, 10.0f, 112.2f, 15.9f};
+static const float DISPLAY[4] = {8.9f, 31.0f, 357.3f, 53.1f};
+static const float SCREEN[4] = {13.3f, 35.4f, 70.9f, 44.3f};
+static const float INFO[4] = {93.0f, 35.4f, 265.7f, 44.3f};
+static const float S[7][2] = {{42.4f, 136.1f}, {86.9f, 131.4f}, {126.3f, 131.4f}, {165.7f, 131.4f}, {86.9f, 172.4f}, {126.3f, 172.4f}, {165.7f, 172.4f}};
+static const float TUNEF[4] = {209.1f, 109.3f, 71.2f, 15.9f};
+static const float KEYF[4] = {286.1f, 109.3f, 71.2f, 15.9f};
+static const float LEVEL[2] = {283.2f, 153.5f};
+static const float SCALE[3] = {252.2f, 184.8f, 31.0f};
+static const float VOICE[3] = {267.7f, 211.4f, 31.0f};
+static const float H[7][2] = {{42.0f, 279.6f}, {90.5f, 279.6f}, {139.0f, 279.6f}, {187.5f, 279.6f}, {236.0f, 279.6f}, {284.5f, 279.6f}, {333.0f, 279.6f}};
+static const float VOCT[2] = {31.6f, 321.3f};
+static const float GATE[2] = {59.4f, 321.3f};
+static const float VEL[2] = {87.1f, 321.3f};
+static const float BEND_IN[2] = {121.7f, 321.3f};
+static const float KEY_IN[2] = {149.4f, 321.3f};
+static const float S_IN[7][2] = {{184.0f, 321.3f}, {211.7f, 321.3f}, {239.5f, 321.3f}, {267.2f, 321.3f}, {295.0f, 321.3f}, {322.7f, 321.3f}, {47.8f, 356.4f}};
+static const float H_IN[7][2] = {{82.4f, 356.4f}, {110.1f, 356.4f}, {137.9f, 356.4f}, {165.6f, 356.4f}, {193.4f, 356.4f}, {221.2f, 356.4f}, {248.9f, 356.4f}};
+static const float OUT_L[2] = {292.3f, 356.4f};
+static const float OUT_R[2] = {324.8f, 356.4f};
 }  // namespace fumi
 }  // namespace flayout

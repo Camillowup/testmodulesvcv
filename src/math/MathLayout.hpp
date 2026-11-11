@@ -3,32 +3,36 @@
 #pragma once
 namespace mlayout {
 namespace math {
-static const float W = 390.f;
-static const float SCREEN[4] = {19.0f, 34.0f, 151.6f, 98.0f};
-static const float INFO[4] = {184.6f, 34.0f, 186.4f, 98.0f};
-static const float PREV[2] = {32.0f, 154.0f};
-static const float NEXT[2] = {62.0f, 154.0f};
-static const float CALL[2] = {94.0f, 154.0f};
-static const float PLAY[3] = {141.0f, 160.5f, 38.0f};
-static const float VOICE[3] = {228.0f, 160.5f, 38.0f};
-static const float LEVEL[2] = {352.0f, 155.0f};
-static const float E[6][2] = {{44.2f, 211.0f}, {104.5f, 211.0f}, {164.8f, 211.0f}, {225.2f, 211.0f}, {285.5f, 211.0f}, {345.8f, 211.0f}};
-static const float E_TEXT[6][4] = {{14.0f, 224.5f, 60.3f, 15.0f}, {74.3f, 224.5f, 60.3f, 15.0f}, {134.7f, 224.5f, 60.3f, 15.0f}, {195.0f, 224.5f, 60.3f, 15.0f}, {255.3f, 224.5f, 60.3f, 15.0f}, {315.7f, 224.5f, 60.3f, 15.0f}};
-static const float E_IN[6][2] = {{44.2f, 253.5f}, {104.5f, 253.5f}, {164.8f, 253.5f}, {225.2f, 253.5f}, {285.5f, 253.5f}, {345.8f, 253.5f}};
-static const float ATK[2] = {36.2f, 294.0f};
-static const float DEC[2] = {80.8f, 294.0f};
-static const float SUS[2] = {125.2f, 294.0f};
-static const float REL[2] = {169.8f, 294.0f};
-static const float DIST[2] = {220.2f, 294.0f};
-static const float CHOR[2] = {264.8f, 294.0f};
-static const float DLY[2] = {309.2f, 294.0f};
-static const float REV[2] = {353.8f, 294.0f};
-static const float VOCT[2] = {35.9f, 332.0f};
-static const float GATE[2] = {63.6f, 332.0f};
-static const float VEL[2] = {91.4f, 332.0f};
-static const float CLOCK[2] = {125.7f, 332.0f};
-static const float RESET[2] = {153.4f, 332.0f};
-static const float OUT_L[2] = {292.0f, 332.0f};
-static const float OUT_R[2] = {340.0f, 332.0f};
+static const float W = 330.f;
+static const int HP = 22;
+static const float PRESETF[4] = {169.1f, 10.0f, 91.5f, 15.9f};
+static const float DISPLAY[4] = {8.9f, 31.0f, 312.3f, 41.3f};
+static const float SCREEN[4] = {13.3f, 35.4f, 59.1f, 32.5f};
+static const float INFO[4] = {81.2f, 35.4f, 232.6f, 32.5f};
+static const float WAVEF[4] = {17.7f, 97.4f, 82.9f, 15.9f};
+static const float CHIPF[4] = {106.5f, 97.4f, 82.9f, 15.9f};
+static const float E[6][2] = {{42.9f, 146.5f}, {88.4f, 141.7f}, {128.8f, 141.7f}, {169.2f, 141.7f}, {88.4f, 182.8f}, {128.8f, 182.8f}};
+static const float E_TEXT[6][4] = {{23.7f, 169.5f, 38.4f, 7.1f}, {69.2f, 160.9f, 38.4f, 7.1f}, {109.6f, 160.9f, 38.4f, 7.1f}, {150.0f, 160.9f, 38.4f, 7.1f}, {69.2f, 199.1f, 38.4f, 7.1f}, {109.6f, 199.1f, 38.4f, 7.1f}};
+static const float CALL[2] = {237.8f, 116.6f};
+static const float LEVEL[2] = {287.5f, 119.6f};
+static const float PLAY[3] = {247.1f, 150.9f, 31.0f};
+static const float VOICE[3] = {231.6f, 177.5f, 31.0f};
+static const float ATK[2] = {34.7f, 255.4f};
+static const float DEC[2] = {68.5f, 255.4f};
+static const float SUS[2] = {102.4f, 255.4f};
+static const float REL[2] = {136.3f, 255.4f};
+static const float DIST[2] = {193.7f, 255.4f};
+static const float CHOR[2] = {227.6f, 255.4f};
+static const float DLY[2] = {261.5f, 255.4f};
+static const float REV[2] = {295.3f, 255.4f};
+static const float VOCT[2] = {31.6f, 321.3f};
+static const float GATE[2] = {59.4f, 321.3f};
+static const float VEL[2] = {87.1f, 321.3f};
+static const float CLOCK[2] = {121.7f, 321.3f};
+static const float RESET[2] = {149.4f, 321.3f};
+static const float E_IN[6][2] = {{184.0f, 321.3f}, {211.7f, 321.3f}, {239.5f, 321.3f}, {267.2f, 321.3f}, {295.0f, 321.3f}, {47.8f, 356.4f}};
+static const float E_INL[6][4] = {{170.1f, 333.1f, 27.8f, 6.5f}, {197.8f, 333.1f, 27.8f, 6.5f}, {225.6f, 333.1f, 27.8f, 6.5f}, {253.3f, 333.1f, 27.8f, 6.5f}, {281.1f, 333.1f, 27.8f, 6.5f}, {34.0f, 368.2f, 27.8f, 6.5f}};
+static const float OUT_L[2] = {247.3f, 356.4f};
+static const float OUT_R[2] = {279.8f, 356.4f};
 }  // namespace math
 }  // namespace mlayout

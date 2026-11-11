@@ -3,24 +3,25 @@
 #pragma once
 namespace mlayout {
 namespace miaou {
-static const float W = 390.f;
-static const float SCREEN[4] = {19.0f, 34.0f, 96.0f, 98.0f};
-static const float INFO[4] = {128.0f, 34.0f, 243.0f, 98.0f};
-static const float PAW[2] = {34.0f, 155.0f};
-static const float SOUND[3] = {86.0f, 160.5f, 52.0f};
-static const float LEVEL[2] = {350.0f, 155.0f};
-static const float T[7][2] = {{39.9f, 211.0f}, {91.6f, 211.0f}, {143.3f, 211.0f}, {195.0f, 211.0f}, {246.7f, 211.0f}, {298.4f, 211.0f}, {350.1f, 211.0f}};
-static const float T_TEXT[7][4] = {{14.0f, 224.5f, 51.7f, 15.0f}, {65.7f, 224.5f, 51.7f, 15.0f}, {117.4f, 224.5f, 51.7f, 15.0f}, {169.1f, 224.5f, 51.7f, 15.0f}, {220.9f, 224.5f, 51.7f, 15.0f}, {272.6f, 224.5f, 51.7f, 15.0f}, {324.3f, 224.5f, 51.7f, 15.0f}};
-static const float T_IN[7][2] = {{39.9f, 253.5f}, {91.6f, 253.5f}, {143.3f, 253.5f}, {195.0f, 253.5f}, {246.7f, 253.5f}, {298.4f, 253.5f}, {350.1f, 253.5f}};
-static const float CHOR[2] = {74.3f, 294.0f};
-static const float DLY[2] = {195.0f, 294.0f};
-static const float REV[2] = {315.7f, 294.0f};
-static const float VOCT[2] = {35.9f, 332.0f};
-static const float GATE[2] = {63.6f, 332.0f};
-static const float VEL[2] = {91.4f, 332.0f};
-static const float PAW_IN[2] = {140.8f, 332.0f};
-static const float SOUND_IN[2] = {174.8f, 332.0f};
-static const float OUT_L[2] = {292.0f, 332.0f};
-static const float OUT_R[2] = {340.0f, 332.0f};
+static const float W = 285.f;
+static const int HP = 19;
+static const float PRESETF[4] = {124.1f, 10.0f, 91.5f, 15.9f};
+static const float DISPLAY[4] = {8.9f, 31.0f, 267.3f, 59.1f};
+static const float SCREEN[4] = {13.3f, 35.4f, 65.0f, 50.2f};
+static const float INFO[4] = {87.1f, 35.4f, 181.7f, 50.2f};
+static const float T[7][2] = {{89.5f, 137.3f}, {130.7f, 137.3f}, {43.3f, 142.0f}, {171.8f, 137.3f}, {89.5f, 178.3f}, {130.7f, 178.3f}, {171.8f, 178.3f}};
+static const float PAW[2] = {241.7f, 134.4f};
+static const float LEVEL[2] = {241.7f, 175.7f};
+static const float CHOR[2] = {59.3f, 253.9f};
+static const float DLY[2] = {142.5f, 253.9f};
+static const float REV[2] = {225.7f, 253.9f};
+static const float VOCT[2] = {31.6f, 321.3f};
+static const float GATE[2] = {59.4f, 321.3f};
+static const float VEL[2] = {87.1f, 321.3f};
+static const float PAW_IN[2] = {121.7f, 321.3f};
+static const float SOUND_IN[2] = {149.4f, 321.3f};
+static const float T_IN[7][2] = {{184.0f, 321.3f}, {211.7f, 321.3f}, {239.5f, 321.3f}, {47.8f, 356.4f}, {75.6f, 356.4f}, {103.3f, 356.4f}, {131.1f, 356.4f}};
+static const float OUT_L[2] = {202.3f, 356.4f};
+static const float OUT_R[2] = {234.8f, 356.4f};
 }  // namespace miaou
 }  // namespace mlayout

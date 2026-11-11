@@ -3,32 +3,32 @@
 #pragma once
 namespace slayout {
 namespace saurus {
-static const float W = 390.f;
-static const float SCREEN[4] = {19.0f, 34.0f, 151.6f, 98.0f};
-static const float INFO[4] = {184.6f, 34.0f, 186.4f, 98.0f};
-static const float PREV[2] = {27.0f, 154.0f};
-static const float NEXT[2] = {56.0f, 154.0f};
-static const float CALL[2] = {88.0f, 154.0f};
-static const float TYPE_SEL[4] = {114.0f, 155.0f, 62.0f, 17.0f};
-static const float VOICE[3] = {212.0f, 160.5f, 42.0f};
-static const float LEVEL[2] = {350.0f, 155.0f};
-static const float E[7][2] = {{39.9f, 211.0f}, {91.6f, 211.0f}, {143.3f, 211.0f}, {195.0f, 211.0f}, {246.7f, 211.0f}, {298.4f, 211.0f}, {350.1f, 211.0f}};
-static const float E_TEXT[7][4] = {{14.0f, 224.5f, 51.7f, 15.0f}, {65.7f, 224.5f, 51.7f, 15.0f}, {117.4f, 224.5f, 51.7f, 15.0f}, {169.1f, 224.5f, 51.7f, 15.0f}, {220.9f, 224.5f, 51.7f, 15.0f}, {272.6f, 224.5f, 51.7f, 15.0f}, {324.3f, 224.5f, 51.7f, 15.0f}};
-static const float E_IN[7][2] = {{39.9f, 253.5f}, {91.6f, 253.5f}, {143.3f, 253.5f}, {195.0f, 253.5f}, {246.7f, 253.5f}, {298.4f, 253.5f}, {350.1f, 253.5f}};
-static const float ATK[2] = {36.2f, 294.0f};
-static const float DEC[2] = {80.8f, 294.0f};
-static const float SUS[2] = {125.2f, 294.0f};
-static const float REL[2] = {169.8f, 294.0f};
-static const float DIST[2] = {220.2f, 294.0f};
-static const float CHOR[2] = {264.8f, 294.0f};
-static const float DLY[2] = {309.2f, 294.0f};
-static const float REV[2] = {353.8f, 294.0f};
-static const float VOCT[2] = {35.9f, 332.0f};
-static const float GATE[2] = {63.6f, 332.0f};
-static const float VEL[2] = {91.4f, 332.0f};
-static const float CALL_IN[2] = {140.8f, 332.0f};
-static const float TYPE_IN[2] = {174.8f, 332.0f};
-static const float OUT_L[2] = {292.0f, 332.0f};
-static const float OUT_R[2] = {340.0f, 332.0f};
+static const float W = 330.f;
+static const int HP = 22;
+static const float PRESETF[4] = {169.1f, 10.0f, 91.5f, 15.9f};
+static const float DISPLAY[4] = {8.9f, 31.0f, 312.3f, 59.1f};
+static const float SCREEN[4] = {13.3f, 35.4f, 65.0f, 50.2f};
+static const float INFO[4] = {87.1f, 35.4f, 226.7f, 50.2f};
+static const float E[7][2] = {{87.6f, 137.3f}, {127.5f, 137.3f}, {167.4f, 137.3f}, {42.7f, 142.0f}, {87.6f, 178.3f}, {127.5f, 178.3f}, {167.4f, 178.3f}};
+static const float TYPEF[4] = {210.9f, 115.2f, 101.4f, 15.9f};
+static const float CALL[2] = {236.3f, 156.5f};
+static const float LEVEL[2] = {286.9f, 159.4f};
+static const float VOICE[3] = {230.6f, 190.7f, 31.0f};
+static const float ATK[2] = {34.7f, 259.0f};
+static const float DEC[2] = {68.5f, 259.0f};
+static const float SUS[2] = {102.4f, 259.0f};
+static const float REL[2] = {136.3f, 259.0f};
+static const float DIST[2] = {193.7f, 259.0f};
+static const float CHOR[2] = {227.6f, 259.0f};
+static const float DLY[2] = {261.5f, 259.0f};
+static const float REV[2] = {295.3f, 259.0f};
+static const float VOCT[2] = {31.6f, 321.3f};
+static const float GATE[2] = {59.4f, 321.3f};
+static const float VEL[2] = {87.1f, 321.3f};
+static const float CALL_IN[2] = {121.7f, 321.3f};
+static const float TYPE_IN[2] = {149.4f, 321.3f};
+static const float E_IN[7][2] = {{184.0f, 321.3f}, {211.7f, 321.3f}, {239.5f, 321.3f}, {267.2f, 321.3f}, {295.0f, 321.3f}, {47.8f, 356.4f}, {75.6f, 356.4f}};
+static const float OUT_L[2] = {247.3f, 356.4f};
+static const float OUT_R[2] = {279.8f, 356.4f};
 }  // namespace saurus
 }  // namespace slayout

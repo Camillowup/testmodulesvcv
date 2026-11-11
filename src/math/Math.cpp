@@ -7,6 +7,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "MathCore.hpp"
 #include "MathLayout.hpp"
 #include <atomic>
@@ -505,15 +506,16 @@ struct ScreenWidget : Widget {
 	}
 };
 
-/** Right of the being: the preset, WAVE · CHIP · PLAY · VOICE, the clock, the first three knobs' values. */
+/** The display right of the being: the preset and its place, WAVE · CHIP · PLAY · VOICE, the clock, the first
+ * knobs' values (their names follow WAVE). */
 struct InfoWidget : Widget {
 	Math* module = nullptr;
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer != 1)
 			return;
 		NVGcontext* vg = args.vg;
-		auto bold = jiant::boldFont(), mono = jiant::monoFont();
-		float w = box.size.x;
+		auto bold = jiant::boldFont();
+		float w = box.size.x, h = box.size.y;
 		const jma_api* a = module ? module->core.api : nullptr;
 		int p = module ? (int) module->shownPreset : 0;
 		bool flt = module && module->params[Math::WAVE_PARAM].getValue() > 0.5f;
@@ -521,35 +523,24 @@ struct InfoWidget : Widget {
 		int play = module && module->params[Math::PLAY_PARAM].getValue() > 0.5f ? 1 : 0;
 		int vo = module ? clamp((int) std::round(module->params[Math::VOICE_PARAM].getValue()), 0, 2) : 0;
 		static const char* CHIPS[2][4] = {{"4BIT", "4B/2", "8BIT", "1BIT"}, {"4BIT", "4B/2", "FULL", "1BIT"}};
-		jiant::text(vg, bold, 0, 20, a ? a->preset_name((uint32_t) p) : "BYTEBEAT", 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npresets() : 12u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
-		jiant::text(vg, mono, 0, 33, string::f("%s \xc2\xb7 %s \xc2\xb7 %s \xc2\xb7 %s", flt ? "FLOAT" : "BYTE",
-		                                       CHIPS[flt][chip], PLAY_NAMES[play], VOICE_NAMES[vo]),
-		            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
-		// (the WAVE and CHIP chips at y 41 are their own widgets)
+		jiant::text(vg, bold, 0, 7.f, string::f("PRESET %d / %u", p + 1, a ? a->npresets() : 12u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, 0, h * 0.62f, a ? a->preset_name((uint32_t) p) : "BYTE VAR", 13.f, jiant::WHITE,
+		            NVG_ALIGN_LEFT, 0.6f);
+		jiant::text(vg, bold, 0, h - 1.f, string::f("%s \xc2\xb7 %s \xc2\xb7 %s \xc2\xb7 %s", flt ? "FLOAT" : "BYTE",
+		                                           CHIPS[flt][chip], PLAY_NAMES[play], VOICE_NAMES[vo]),
+		            5.2f, ACCENT, NVG_ALIGN_LEFT, 1.f);
 		if (module) {
 			bool c = module->clocked;
-			jiant::text(vg, mono, 0, 71, string::f("TIME %s \xc2\xb7 %d BPM \xc2\xb7 Q %d", c ? "clock" : "free",
-			                                       (int) std::round((float) module->shownBpm), (int) module->shownQuarter),
-			            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+			jiant::text(vg, bold, w, 7.f, string::f("%d BPM%s", (int) std::round((float) module->shownBpm), c ? "" : " FREE"),
+			            5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 1.f);
 		}
 		if (module && module->core.loaded()) {
 			std::string s;
 			for (int k = 0; k < 3; k++)
-				s += string::f("%s %s  ", module->labels[k].data(), module->values[k].data());
-			jiant::text(vg, mono, 0, 92, s, 6.6f, ACCENT, NVG_ALIGN_LEFT, 0.f);
+				s += string::f("%s%s %s", k ? "  " : "", module->labels[k].data(), module->values[k].data());
+			jiant::text(vg, bold, w, h - 1.f, s, 5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 0.6f);
 		}
-	}
-};
-
-/** CHIP's chips: their names follow WAVE (8BIT for BYTE, FULL for FLOAT). */
-struct ChipChips : jiant::ChipRow {
-	void step() override {
-		ParamWidget::step();
-		Math* m = module ? dynamic_cast<Math*>(module) : nullptr;
-		bool flt = m && m->params[Math::WAVE_PARAM].getValue() > 0.5f;
-		names = {"4BIT", "4B/2", flt ? "FULL" : "8BIT", "1BIT"};
 	}
 };
 
@@ -569,19 +560,42 @@ struct MathWidget : ModuleWidget {
 		info->module = module;
 		info->box = jiant::area(L::INFO);
 		addChild(info);
-		jiant::ChipRow* waves = createParam<jiant::ChipRow>(Vec(L::INFO[0], L::INFO[1] + 41), module, Math::WAVE_PARAM);
-		waves->box.size = Vec(75, 14);
-		waves->names = {"BYTE", "FLOAT"};
-		waves->accent = ACCENT;
-		addParam(waves);
-		ChipChips* chips = createParam<ChipChips>(Vec(L::INFO[0] + 82, L::INFO[1] + 41), module, Math::CHIP_PARAM);
-		chips->box.size = Vec(L::INFO[2] - 82, 14);
-		chips->names = {"4BIT", "4B/2", "8BIT", "1BIT"};
-		chips->accent = ACCENT;
-		addParam(chips);
 
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Math::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Math::NEXT_PARAM));
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.api ? (int) module->core.api->npresets() : 1; };
+		pf->name = [=](int i) -> std::string {
+			return module && module->core.api ? module->core.api->preset_name((uint32_t) i) : "BYTE VAR";
+		};
+		pf->current = [=]() { return module ? (int) module->shownPreset : 1; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->presetReq = i;
+		};
+		addChild(pf);
+
+		genra_look::ParamField* wf = createParam<genra_look::ParamField>(Vec(L::WAVEF[0], L::WAVEF[1]), module, Math::WAVE_PARAM);
+		wf->box.size = Vec(L::WAVEF[2], L::WAVEF[3]);
+		wf->count = 2;
+		wf->nameOf = [](int i) -> std::string { return i ? "FLOAT" : "BYTE"; };
+		wf->infoOf = [](int) -> std::string { return "WAVE"; };
+		wf->title = "Wave";
+		wf->undo = "change wave";
+		addParam(wf);
+		genra_look::ParamField* cf = createParam<genra_look::ParamField>(Vec(L::CHIPF[0], L::CHIPF[1]), module, Math::CHIP_PARAM);
+		cf->box.size = Vec(L::CHIPF[2], L::CHIPF[3]);
+		cf->count = 4;
+		cf->nameOf = [=](int i) -> std::string {
+			bool flt = module && module->params[Math::WAVE_PARAM].getValue() > 0.5f;
+			static const char* N[2][4] = {{"4BIT", "4B/2", "8BIT", "1BIT"}, {"4BIT", "4B/2", "FULL", "1BIT"}};
+			return N[flt][clamp(i, 0, 3)];
+		};
+		cf->infoOf = [](int) -> std::string { return "CHIP"; };
+		cf->title = "Chip";
+		cf->undo = "change chip";
+		addParam(cf);
+
 		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<MATH_RGB>>>(
 		    jiant::at(L::CALL), module, Math::CALL_PARAM, Math::CALL_LIGHT));
 		jiant::LampRow* pl = createParam<jiant::LampRow>(Vec(0, 0), module, Math::PLAY_PARAM);
@@ -592,28 +606,40 @@ struct MathWidget : ModuleWidget {
 		vs->place(L::VOICE, 3);
 		vs->accent = ACCENT;
 		addParam(vs);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Math::LEVEL_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Math::LEVEL_PARAM));
 
 		static const char* defLab[NE] = {"ALGO", "VAR", "MOTION", "GRIT", "BEND", "LOOP"};
 		for (int k = 0; k < NE; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::E[k]), module, Math::E_PARAM + k));
+			Vec c = jiant::at(L::E[k]);
+			if (k == 0)
+				addParam(createParamCentered<GLargeKnob>(c, module, Math::E_PARAM + k));
+			else if (k < 4)
+				addParam(createParamCentered<GKnob>(c, module, Math::E_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Math::E_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::E_IN[k]), module, Math::E_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::E_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string {
+			auto label = [=]() -> std::string {
 				if (module && module->labels[k][0])
 					return module->labels[k].data();
 				return defLab[k];
 			};
-			t->value = [=]() -> std::string { return module && module->core.loaded() ? module->values[k].data() : ""; };
+			genra_look::PanelText* t = new genra_look::PanelText;
+			t->box = jiant::area(L::E_TEXT[k]);
+			t->text = label;
 			addChild(t);
+			genra_look::PanelText* j = new genra_look::PanelText;
+			j->box = jiant::area(L::E_INL[k]);
+			j->text = label;
+			j->color = jiant::DIM;
+			j->size = 4.4f;
+			j->spacing = 0.7f;
+			addChild(j);
 		}
 		const float* env[4] = {L::ATK, L::DEC, L::SUS, L::REL};
 		const float* fx[4] = {L::DIST, L::CHOR, L::DLY, L::REV};
 		for (int i = 0; i < 4; i++) {
-			addParam(createParamCentered<GTrimpot>(jiant::at(env[i]), module, Math::ATK_PARAM + i));
-			addParam(createParamCentered<GTrimpot>(jiant::at(fx[i]), module, Math::DIST_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(env[i]), module, Math::ATK_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(fx[i]), module, Math::DIST_PARAM + i));
 		}
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Math::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Math::GATE_INPUT));

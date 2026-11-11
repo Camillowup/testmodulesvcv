@@ -8,6 +8,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "../../genra/genrafx/GenraFxDsp.hpp"
 #include "../../miaoucore/miaoucore.h"
 #include "MiaouLayout.hpp"
@@ -351,7 +352,7 @@ struct CatWidget : Widget {
 		int look = module ? (int) module->shownLook : 0;
 		int px = look < -2 ? -1 : look > 2 ? 1 : 0;
 		int mouth = module ? (int) module->shownMouth : 0;
-		const float P = 5.5f;
+		const float P = std::min(box.size.x / 16.f, box.size.y / 13.f);
 		float ox = (box.size.x - 16 * P) / 2, oy = (box.size.y - 13 * P) / 2;
 		NVGcolor fur = ACCENT, ear = nvgRGB(0xff, 0xc6, 0xf5), nose = nvgRGB(0xff, 0x6f, 0xa8),
 		         wh = nvgRGBA(0xf2, 0xf3, 0xf7, 200), dark = nvgRGB(0x5a, 0x23, 0x50), pupil = nvgRGB(0x11, 0x11, 0x11);
@@ -396,27 +397,30 @@ struct InfoWidget : Widget {
 		float w = box.size.x;
 		int sound = module ? (int) module->shownSound : MC_PIANO;
 		bool paw = module && module->shownPaw;
-		jiant::text(vg, bold, 0, 20, SOUND_NAMES[clamp(sound, 0, MC_SOUNDS - 1)], 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, paw ? "PAW ON" : "PAW OFF", 6.5f, paw ? ACCENT : jiant::DIM, NVG_ALIGN_RIGHT, 0.8f);
+		float h = box.size.y;
+		jiant::text(vg, bold, 0, 7.f, string::f("SOUND %d / %d", clamp(sound, 0, MC_SOUNDS - 1) + 1, MC_SOUNDS), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, w, 7.f, paw ? "PAW ON" : "PAW OFF", 5.2f, paw ? ACCENT : jiant::DIM, NVG_ALIGN_RIGHT, 1.f);
+		jiant::text(vg, bold, 0, 20.f, SOUND_NAMES[clamp(sound, 0, MC_SOUNDS - 1)], 12.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
 		float sp = module ? module->params[Miaou::T_PARAM + MC_P_SPEAKER].getValue() : 0.4f;
 		if (module && module->inputs[Miaou::T_INPUT + MC_P_SPEAKER].isConnected())
 			sp = clamp(sp + module->inputs[Miaou::T_INPUT + MC_P_SPEAKER].getVoltage() / 10.f, 0.f, 1.f);
-		jiant::text(vg, mono, 0, 33,
+		jiant::text(vg, bold, 0, 28.f,
 		            string::f("POLY \xc2\xb7 %s \xc2\xb7 SPEAKER %d%%", noteName(module ? (int) module->shownNote : -1).c_str(),
 		                      (int) std::round(sp * 100.f)),
-		            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		            5.2f, ACCENT, NVG_ALIGN_LEFT, 0.8f);
 		uint32_t lit[4] = {};
 		if (module)
 			for (int i = 0; i < 4; i++)
 				lit[i] = module->shownLit[i];
-		float kw = w / 27.f;
+		float kw = w / 27.f, ky = 32.f, kh = h - ky;
 		for (int i = 0; i < 27; i++) {
 			int n = 48 + i;
 			bool on = (lit[n >> 5] >> (n & 31)) & 1u;
 			bool black = (n % 12 == 1 || n % 12 == 3 || n % 12 == 6 || n % 12 == 8 || n % 12 == 10);
-			jiant::roundRect(vg, i * kw, 42, kw - 1.4f, 38, 1.3f, on ? ACCENT : black ? nvgRGB(0x1c, 0x1d, 0x23) : nvgRGB(0x2a, 0x2b, 0x33));
+			jiant::roundRect(vg, i * kw, ky, kw - 1.2f, kh, 1.f, on ? ACCENT : black ? nvgRGB(0x1c, 0x1d, 0x23) : nvgRGB(0x2a, 0x2b, 0x33));
 		}
-		jiant::text(vg, mono, 0, 93, "C3 \xc2\xb7 \xc2\xb7 \xc2\xb7 D5", 6.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		(void) mono;
 	}
 };
 
@@ -436,32 +440,45 @@ struct MiaouWidget : ModuleWidget {
 		info->box = jiant::area(L::INFO);
 		addChild(info);
 
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = []() { return (int) MC_SOUNDS; };
+		pf->name = [](int i) -> std::string { return SOUND_NAMES[clamp(i, 0, MC_SOUNDS - 1)]; };
+		pf->current = [=]() { return module ? clamp((int) module->shownSound, 0, MC_SOUNDS - 1) : (int) MC_PIANO; };
+		pf->choose = [=](int i) {
+			if (!module)
+				return;
+			float old = module->params[Miaou::SOUND_PARAM].getValue();
+			if (old == (float) i)
+				return;
+			module->params[Miaou::SOUND_PARAM].setValue((float) i);
+			history::ParamChange* h = new history::ParamChange;
+			h->name = "change sound";
+			h->moduleId = module->id;
+			h->paramId = Miaou::SOUND_PARAM;
+			h->oldValue = old;
+			h->newValue = (float) i;
+			APP->history->push(h);
+		};
+		addChild(pf);
+
 		addParam(createLightParamCentered<VCVLightLatch<jiant::AccentLight<MIAOU_RGB>>>(jiant::at(L::PAW), module,
 		                                                                              Miaou::PAW_PARAM, Miaou::PAW_LIGHT));
-		jiant::LampRow* snd = createParam<jiant::LampRow>(Vec(0, 0), module, Miaou::SOUND_PARAM);
-		snd->place(L::SOUND, MC_SOUNDS);
-		snd->accent = ACCENT;
-		addParam(snd);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Miaou::LEVEL_PARAM));
-
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Miaou::LEVEL_PARAM));
 		for (int k = 0; k < NT; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::T[k]), module, Miaou::T_PARAM + k));
+			Vec c = jiant::at(L::T[k]);
+			if (k == 2)
+				addParam(createParamCentered<GLargeKnob>(c, module, Miaou::T_PARAM + k));
+			else if (k < 4)
+				addParam(createParamCentered<GKnob>(c, module, Miaou::T_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Miaou::T_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::T_IN[k]), module, Miaou::T_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::T_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string { return TOY_NAMES[k]; };
-			t->value = [=]() -> std::string {
-				float x = module ? module->params[Miaou::T_PARAM + k].getValue() : TOY_DEF[k];
-				if (module && module->inputs[Miaou::T_INPUT + k].isConnected())
-					x = clamp(x + module->inputs[Miaou::T_INPUT + k].getVoltage() / 10.f, 0.f, 1.f);
-				return toyValue(k, x);
-			};
-			addChild(t);
 		}
-		addParam(createParamCentered<GTrimpot>(jiant::at(L::CHOR), module, Miaou::CHOR_PARAM));
-		addParam(createParamCentered<GTrimpot>(jiant::at(L::DLY), module, Miaou::DLY_PARAM));
-		addParam(createParamCentered<GTrimpot>(jiant::at(L::REV), module, Miaou::REV_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::CHOR), module, Miaou::CHOR_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::DLY), module, Miaou::DLY_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::REV), module, Miaou::REV_PARAM));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Miaou::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Miaou::GATE_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VEL), module, Miaou::VEL_INPUT));

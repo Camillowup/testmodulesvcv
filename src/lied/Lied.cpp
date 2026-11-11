@@ -621,6 +621,27 @@ struct SelectField : app::ParamWidget {
 		}
 		ParamWidget::onButton(e);
 	}
+	/** The mouse wheel steps through the list (down: the next one). */
+	void onHoverScroll(const HoverScrollEvent& e) override {
+		engine::ParamQuantity* pq = getParamQuantity();
+		if (pq && !names.empty() && e.scrollDelta.y != 0.f) {
+			int v = (int) std::round(pq->getValue());
+			int nv = clamp(v + (e.scrollDelta.y < 0.f ? 1 : -1), 0, (int) names.size() - 1);
+			if (nv != v) {
+				pq->setValue((float) nv);
+				history::ParamChange* h = new history::ParamChange;
+				h->name = "change " + pq->getLabel();
+				h->moduleId = module->id;
+				h->paramId = paramId;
+				h->oldValue = (float) v;
+				h->newValue = (float) nv;
+				APP->history->push(h);
+			}
+			e.consume(this);
+			return;
+		}
+		ParamWidget::onHoverScroll(e);
+	}
 	void draw(const DrawArgs& args) override {}
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer == 1) {
@@ -651,6 +672,18 @@ struct PresetField : Widget {
 			return;
 		}
 		Widget::onButton(e);
+	}
+	/** The mouse wheel steps through the presets (down: the next one). */
+	void onHoverScroll(const HoverScrollEvent& e) override {
+		if (module && e.scrollDelta.y != 0.f) {
+			int p = (int) module->shownPreset;
+			int np = clamp(p + (e.scrollDelta.y < 0.f ? 1 : -1), 0, NPRESET - 1);
+			if (np != p)
+				module->applyPreset(np);
+			e.consume(this);
+			return;
+		}
+		Widget::onHoverScroll(e);
 	}
 	void drawLayer(const DrawArgs& args, int layer) override {
 		if (layer == 1) {

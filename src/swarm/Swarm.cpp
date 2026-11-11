@@ -8,6 +8,7 @@
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
+#include "../../genra/ui/Look.hpp"
 #include "SwarmCore.hpp"
 #include "SwarmLayout.hpp"
 #include <atomic>
@@ -435,51 +436,41 @@ struct InfoWidget : Widget {
 		if (layer != 1)
 			return;
 		NVGcontext* vg = args.vg;
-		auto bold = jiant::boldFont(), mono = jiant::monoFont();
-		float w = box.size.x;
+		auto bold = jiant::boldFont();
+		float w = box.size.x, h = box.size.y;
 		const jsw_api* a = module ? module->core.api : nullptr;
 		int p = module ? (int) module->shownPreset : 0;
 		int play = module && module->params[Swarm::PLAY_PARAM].getValue() > 0.5f ? 1 : 0;
-		jiant::text(vg, bold, 0, 20, a ? a->preset_name((uint32_t) p) : "SWARM", 15.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
-		jiant::text(vg, bold, w, 20, string::f("\xc2\xb7 %d/%u", p + 1, a ? a->npresets() : 3u), 6.5f, jiant::DIM,
-		            NVG_ALIGN_RIGHT, 0.8f);
 		std::string sc = module && module->core.loaded() ? module->values[JSW_SCALE].data() : "CHR";
 		std::string rt = module && module->core.loaded() ? module->values[JSW_ROOT].data() : "C";
 		int nd = module ? (int) module->shownDevices : 4;
-		jiant::text(vg, mono, 0, 33, string::f("%s \xc2\xb7 %d DEVICE%s \xc2\xb7 %s %s", PLAY_NAMES[play], nd,
-		                                       nd == 1 ? "" : "S", rt.c_str(), sc.c_str()),
-		            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+		jiant::text(vg, bold, 0, 7.f, string::f("PRESET %d / %u", p + 1, a ? a->npresets() : 3u), 5.2f, jiant::DIM,
+		            NVG_ALIGN_LEFT, 1.f);
+		jiant::text(vg, bold, 0, h * 0.5f, a ? a->preset_name((uint32_t) p) : "SWARM", 13.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.6f);
+		jiant::text(vg, bold, 0, h * 0.5f + 9.f, string::f("%s \xc2\xb7 %d DEVICE%s \xc2\xb7 %s %s", PLAY_NAMES[play], nd,
+		                                                  nd == 1 ? "" : "S", rt.c_str(), sc.c_str()),
+		            5.2f, ACCENT, NVG_ALIGN_LEFT, 1.f);
 		// FAR .. NEAR: the morph
 		int mq = module ? (int) module->shownNear : 64;
-		jiant::text(vg, mono, 0, 52, "FAR", 6.6f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
-		jiant::text(vg, mono, w, 52, "NEAR", 6.6f, jiant::DIM, NVG_ALIGN_RIGHT, 0.f);
-		float bx = 22.f, bw = w - 22.f - 26.f;
-		jiant::roundRect(vg, bx, 47.f, bw, 5.f, 2.f, nvgRGB(0x2a, 0x2c, 0x33));
-		jiant::roundRect(vg, bx, 47.f, bw * clamp(mq / 128.f, 0.f, 1.f), 5.f, 2.f, ACCENT);
+		float bx = 16.f, bw = w * 0.45f;
+		jiant::text(vg, bold, 0, h - 1.f, "FAR", 5.f, jiant::DIM, NVG_ALIGN_LEFT, 0.8f);
+		jiant::roundRect(vg, bx, h - 5.f, bw, 4.f, 2.f, nvgRGB(0x2a, 0x2c, 0x33));
+		jiant::roundRect(vg, bx, h - 5.f, bw * clamp(mq / 128.f, 0.f, 1.f), 4.f, 2.f, ACCENT);
+		jiant::text(vg, bold, bx + bw + 3.f, h - 1.f, "NEAR", 5.f, jiant::DIM, NVG_ALIGN_LEFT, 0.8f);
 		if (module) {
 			bool c = module->clocked;
-			std::string g = play ? string::f(" \xc2\xb7 GATE %d%%", (int) std::round(module->shownGate * 100.f)) : "";
-			jiant::text(vg, mono, 0, 71, string::f("TIME %s \xc2\xb7 %d BPM%s", c ? "clock" : "free",
-			                                       (int) std::round((float) module->shownBpm), g.c_str()),
-			            7.f, jiant::DIM, NVG_ALIGN_LEFT, 0.f);
+			jiant::text(vg, bold, w, 7.f, string::f("%d BPM%s", (int) std::round((float) module->shownBpm), c ? "" : " FREE"),
+			            5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 1.f);
+			if (play)
+				jiant::text(vg, bold, w, h * 0.5f, string::f("GATE %d%%", (int) std::round(module->shownGate * 100.f)), 5.2f,
+				            jiant::DIM, NVG_ALIGN_RIGHT, 1.f);
 		}
 		if (module && module->core.loaded()) {
 			std::string s;
 			for (int k = 0; k < 3; k++)
-				s += string::f("%s %s  ", module->labels[k].data(), module->values[k].data());
-			jiant::text(vg, mono, 0, 92, s, 6.6f, ACCENT, NVG_ALIGN_LEFT, 0.f);
+				s += string::f("%s%s %s", k ? "  " : "", module->labels[k].data(), module->values[k].data());
+			jiant::text(vg, bold, w, h - 1.f, s, 5.2f, jiant::DIM, NVG_ALIGN_RIGHT, 0.6f);
 		}
-	}
-};
-
-/** VOICES as a number beside its knob. */
-struct VoicesText : Widget {
-	Swarm* module = nullptr;
-	void drawLayer(const DrawArgs& args, int layer) override {
-		if (layer != 1)
-			return;
-		int v = module ? (int) std::round(module->params[Swarm::VOICES_PARAM].getValue()) : 4;
-		jiant::text(args.vg, jiant::boldFont(), 2, 12, string::f("%d", v), 11.f, jiant::WHITE, NVG_ALIGN_LEFT, 0.3f);
 	}
 };
 
@@ -500,42 +491,62 @@ struct SwarmWidget : ModuleWidget {
 		info->box = jiant::area(L::INFO);
 		addChild(info);
 
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Swarm::PREV_PARAM));
-		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Swarm::NEXT_PARAM));
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
+		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
+		pf->accent = ACCENT;
+		pf->count = [=]() { return module && module->core.api ? (int) module->core.api->npresets() : 1; };
+		pf->name = [=](int i) -> std::string {
+			return module && module->core.api ? module->core.api->preset_name((uint32_t) i) : "SWARM";
+		};
+		pf->current = [=]() { return module ? (int) module->shownPreset : 0; };
+		pf->choose = [=](int i) {
+			if (module)
+				module->presetReq = i;
+		};
+		addChild(pf);
+
 		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<SWARM_RGB>>>(
 		    jiant::at(L::NEW), module, Swarm::NEW_PARAM, Swarm::NEW_LIGHT));
 		jiant::LampRow* pl = createParam<jiant::LampRow>(Vec(0, 0), module, Swarm::PLAY_PARAM);
 		pl->place(L::PLAY, 2);
 		pl->accent = ACCENT;
 		addParam(pl);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::VOICES), module, Swarm::VOICES_PARAM));
-		VoicesText* vt = new VoicesText;
-		vt->module = module;
-		vt->box = jiant::area(L::VOICES_TEXT);
-		addChild(vt);
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::LEVEL), module, Swarm::LEVEL_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::VOICES), module, Swarm::VOICES_PARAM));
+		addParam(createParamCentered<GKnob>(jiant::at(L::LEVEL), module, Swarm::LEVEL_PARAM));
 
 		static const char* defLab[NE] = {"PLUCK", "FM", "IMAGE", "DRIFT", "OCTAVE", "CHAOS"};
 		for (int k = 0; k < NE; k++) {
-			addParam(createParamCentered<GSmallKnob>(jiant::at(L::E[k]), module, Swarm::E_PARAM + k));
+			Vec c = jiant::at(L::E[k]);
+			if (k == 0)
+				addParam(createParamCentered<GLargeKnob>(c, module, Swarm::E_PARAM + k));
+			else if (k < 4)
+				addParam(createParamCentered<GKnob>(c, module, Swarm::E_PARAM + k));
+			else
+				addParam(createParamCentered<GSmallKnob>(c, module, Swarm::E_PARAM + k));
 			addInput(createInputCentered<PJ301MPort>(jiant::at(L::E_IN[k]), module, Swarm::E_INPUT + k));
-			jiant::KnobText* t = new jiant::KnobText;
-			t->box = jiant::area(L::E_TEXT[k]);
-			t->accent = ACCENT;
-			t->label = [=]() -> std::string {
+			auto label = [=]() -> std::string {
 				if (module && module->labels[k][0])
 					return module->labels[k].data();
 				return defLab[k];
 			};
-			t->value = [=]() -> std::string { return module && module->core.loaded() ? module->values[k].data() : ""; };
+			genra_look::PanelText* t = new genra_look::PanelText;
+			t->box = jiant::area(L::E_TEXT[k]);
+			t->text = label;
 			addChild(t);
+			genra_look::PanelText* j = new genra_look::PanelText;
+			j->box = jiant::area(L::E_INL[k]);
+			j->text = label;
+			j->color = jiant::DIM;
+			j->size = 4.4f;
+			j->spacing = 0.7f;
+			addChild(j);
 		}
 		const float* air[3] = {L::BUSY, L::MOVE, L::NEAR};
 		for (int i = 0; i < 3; i++)
-			addParam(createParamCentered<GTrimpot>(jiant::at(air[i]), module, Swarm::BUSY_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(air[i]), module, Swarm::BUSY_PARAM + i));
 		const float* fx[4] = {L::DIST, L::CHOR, L::DLY, L::REV};
 		for (int i = 0; i < 4; i++)
-			addParam(createParamCentered<GTrimpot>(jiant::at(fx[i]), module, Swarm::DIST_PARAM + i));
+			addParam(createParamCentered<GSmallKnob>(jiant::at(fx[i]), module, Swarm::DIST_PARAM + i));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VOCT), module, Swarm::VOCT_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::GATE), module, Swarm::GATE_INPUT));
 		addInput(createInputCentered<PJ301MPort>(jiant::at(L::VEL), module, Swarm::VEL_INPUT));
