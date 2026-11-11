@@ -27,7 +27,7 @@ H = 380
 
 BG, PLATE, LINE, TXT, DIM = "#17181d", "#212329", "#34363f", "#d9dbe2", "#8a8d99"
 # keep in step with the modules (src/<name>/<Name>.cpp: <NAME>_RGB)
-COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c", "Swarm": "#13b8a6", "Canta": "#ff7a59"}
+COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c", "Swarm": "#13b8a6", "Canta": "#ff7a59", "Fumi": "#6f7cf5"}
 
 # component radii (px)
 R_SMALL, R_TRIM, R_JACK, R_BEZEL = 11.3, 8.9, 11.8, 10.6
@@ -124,6 +124,8 @@ class Panel:
         self.add("lightbutton" if light else "button", name, x, y)
         if label:
             self.text(x, ly or y + 19.5, label, 4.8)
+
+    def pair_label(self, x0, x1, y, word): self.text((x0 + x1) / 2, y, f"◀ {word} ▶", 4.8)
 
     def area(self, name, x, y, w, h):
         """A rectangle the module widget draws into."""

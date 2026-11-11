@@ -1,4 +1,4 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, FUMI). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -8,6 +8,7 @@ SOURCES += $(wildcard src/kurbel/*.cpp)
 SOURCES += $(wildcard src/swarm/*.cpp)
 SOURCES += $(wildcard src/lied/*.cpp)
 SOURCES += $(wildcard src/canta/*.cpp)
+SOURCES += $(wildcard src/fumi/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -58,7 +59,7 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT) res/fumicore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -143,6 +144,21 @@ CANTA_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Icanta,$(CORE_FLA
 res/cantacore.$(CORE_EXT): cantacore/cantacore.c cantacore/cantacore.h $(CANTA_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(CANTA_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(CANTA_SRC) $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the FUMI core
+# FuMi-1's instrument (fumi.tar.gz, a snapshot of its firmware/src/dsp: fumi/SNAPSHOT.txt; the patch table reduced to
+# FuMi-1's own six) with fumicore/fumicore.c on top, as its own small shared library; every instance loads a private
+# copy (the instrument's state is static). Plain C, no libm calls (fastmath.h).
+FUMI_STAMP := fumi/.unpacked
+$(FUMI_STAMP): fumi.tar.gz
+	tar xzf fumi.tar.gz
+	touch $@
+
+FUMI_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-DFM_HOST -Ifumicore -Ifumi/firmware/src -Ifumi/firmware/src/dsp,$(CORE_FLAGS))
+
+res/fumicore.$(CORE_EXT): fumicore/fumicore.c fumicore/fumicore.h $(FUMI_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(FUMI_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

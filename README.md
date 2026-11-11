@@ -4,7 +4,7 @@ Testplugin für neue Instrumente der GENRA-Familie, bevor sie in **GENRA Instrum
 Rack unter der Marke **Genra**, neben GENRA und GENRA Instruments, und funktioniert mit beiden zusammen (Follow GENRA,
 MIX ohne Kabel).
 
-Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED** und **CANTA**.
+Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA** und **FUMI**.
 
 ## Installieren
 
@@ -210,11 +210,51 @@ Follow GENRA. Rechtsklick auch: Clock-Eingang (16tel wie GENRA, 8tel, Viertel, 2
 gate sings the next syllable* (gebundene Silben bei Sequencern, die das Gate offen halten). Text und Einstellungen
 werden im Patch gespeichert.
 
+## FUMI
+
+![FUMI](docs/panels/Fumi.png)
+
+Die Shigin-Begleitung aus der FM-1-Firmware **FuMi-1** (26 HP), nach dem Suiko ST-50: Koto und verwandte Klänge auf
+einer 6-Operator-FM-Engine, gestimmt wie das Vorbild. Der Looper von FuMi-1 ist nicht dabei, das übernimmt GENRA.
+
+**Klänge:** die sechs eigenen Instrumente von FuMi-1: **Koto Pluck** (爪音), **Koto Ring** (響), **Koto Warm** (名残),
+**Harp** (箜篌), **Hyoshigi** (拍子木) und **Mokugyo** (木魚). Die 15 Community-DX7-Klänge von FuMi-1 (patches.fm) sind
+nicht dabei: Ihre Autoren nennen keine Lizenz, darum werden sie hier nicht weitergegeben.
+
+**Display:** links der japanische Name des Klangs gross mit Lesung, rechts Name, Nummer, **本数 · 三 · Stimmung ·
+Tonleiter**, die 16 Tasten des ST-50 (mi fa la ti do dreimal und ein hohes mi; die Grundtöne dunkel hervorgehoben, was
+klingt leuchtet), die Zahl der Stimmen und welche Verzierungen an sind (颪: Oroshi gesetzt).
+
+**Kopf:**
+- **◀ PRESET ▶**: das Instrument (auch Rechtsklick › Instrument).
+- **KEY**: der 本数 (水4 … 水1, 1 … 12本; bei 1本 ist 三 = A3).
+- **TUNING**: **EQUAL** (gleichstufig), **SUIKO** (die reine Stimmung des ST-50, aus Aufnahmen gemessen: fa −20,8,
+  do −16 Cent), **KOTO** (reine Quinten), **USER** (gleichstufig, mit Fine verschoben).
+- **SCALE**: **IN** (mi fa la ti do), **YŌ** (fa und do einen Halbton höher), **MIN'YŌ** (einen Ganzton höher).
+- **VOICE**: **MONO** (letzte Note, gleitend) oder **POLY** (8 Stimmen). **LEVEL**.
+
+**SOUND** (je mit CV, ±5 V = ± halber Bereich): **YOIN** (余韻, Nachklang nach dem Gate, 20 ms bis 8 s), **RATE**
+(Triller-Tempo), **VIB** (Vibrato-Tiefe), **FEEL** (Triller: 0 = gleichmässig wie eine Maschine, 100 = paarweise wie
+eine Hand), **ORO** (Oroshi: der Triller per Gate beginnt langsam und wird schneller), **CHAR** (Klangcharakter),
+**REV** (Plattenhall).
+
+**HANDS** (Taster und Gate-Buchse je Verzierung): **VIB** und **TRILL** rasten ein (Vibrato bzw. Triller dauernd an);
+ihr Gate schaltet die Verzierung, solange es anliegt (TRILL dann mit Oroshi). **DAMP** (alle Töne sofort aus),
+**HARD** (die nächsten Töne hart angeschlagen), **OSHI** (押し手: klingende Töne einen Ganzton hoch, solange
+gehalten), **HIKI** (引き色: jeder neue Ton sinkt nach dem Anschlag kurz ab), **ATO** (後押し: jeder neue Ton wird kurz
+nach dem Anschlag einen Halbton hochgedrückt) wirken, solange gedrückt bzw. das Gate anliegt.
+
+**Buchsen unten:** V/OCT · GATE · VEL (GENRA-Leiste, polyfon), **BEND** (über +1 V die federnde Biegung nach oben,
+unter −1 V nach unten), **KEY** (CV 1 V/Okt: jeder Halbton ein Schritt im 本数), L/R (nur L gesteckt: Mono). Ohne
+Kabel: Rechtsklick › Follow GENRA. V/OCT spielt chromatisch, die Stimmung (SUIKO, KOTO) gilt für jeden Ton;
+Rechtsklick › *Snap V/OCT to the scale* rastet auf die Töne der Tonleiter ein. Rechtsklick auch: **Fine** (±50 Cent)
+und **A4** (430–445 Hz).
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
-| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`) |
+| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, FUMI: `src/fumi/`) |
 | `genra/`, `res/knob/` | **nicht im Repo:** die gemeinsamen Teile (Knöpfe, Follow GENRA, Link-Hub, JIANT-UI) kommen vor jedem Build frisch aus dem GENRA-Repo (`src/` und `res/knob/` von Camillowup/Genra-for-Vcv, Branch main); von Hand: `make genra-src` |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
@@ -224,9 +264,11 @@ werden im Patch gespeichert.
 | `liedcore/` | der LIED-Kern (`res/liedcore.dll`): eSpeak NG als kleine C-Bibliothek, einmal pro Rack geladen |
 | `espeak.tar.gz` | Schnappschuss der eSpeak-NG-1.52.0-Quellen (siehe `espeak/SNAPSHOT.txt`), beim Bauen entpackt; die übersetzten Sprachdaten liegen in `res/espeak-ng-data` |
 | `cantacore/` | der CANTA-Kern (`res/cantacore.dll`): MIKU-FMs Stimme mit Sprachen, Harmonie und Presets, eine private Kopie pro Modul |
+| `fumicore/` | der FUMI-Kern (`res/fumicore.dll`): das Instrument von FuMi-1 (Stimmung, Triller, Verzierungen, FM), eine private Kopie pro Modul |
+| `fumi.tar.gz` | Schnappschuss von FuMi-1s `firmware/src/dsp` (Commit 6a20fa3; siehe `fumi/SNAPSHOT.txt`), nur mit den sechs eigenen Klängen |
 | `canta.tar.gz` | Schnappschuss nur des Stimmen-Codes von MIKU-FM (Commit 781760c; siehe `canta/SNAPSHOT.txt`), beim Bauen entpackt; keine Grafiken |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie) |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; FUMI: alle Klänge, Stimmung, Einrasten, 本数, Triller, Verzierungen) |
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
@@ -237,7 +279,9 @@ Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steh
 
 ## Lizenz
 
-GPL-3.0-only (`LICENSE`). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
+GPL-3.0-only (`LICENSE`). FUMI ist das Instrument aus FuMi-1 (github.com/cartesive/fumi-1, GPL-3.0-only; die
+FM-Engine msfa unter Apache-2.0), nur mit seinen sechs eigenen Klängen; die japanischen Zeichen im Display sind
+Umrisse aus Noto Sans CJK JP (SIL OFL 1.1). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
 die Sängerinnen sind eigene Grafiken, von MIKU-FMs Grafik (Hatsune Miku, Piapro Character License) ist nichts übernommen. LIED spricht mit eSpeak NG (GPL-3.0-or-later). KURBEL ist die Drehleier aus ESTAMPIE (GHOULBOX' GURDY-Engine), die Schalmei Feluccas
 TRIO-Engine (MIT). MATH ist die Engine aus JIANT FM von Juan Ignacio Antonucci (Juan Jiant), einem Fork von
 Felucca (Leo Kuroshita, Hügelton Instruments), ebenfalls GPL-3.0-only. Fremdteile und ihre Lizenzen: `licenses/`.
