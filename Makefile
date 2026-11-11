@@ -1,4 +1,4 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -7,6 +7,7 @@ SOURCES += $(wildcard src/math/*.cpp)
 SOURCES += $(wildcard src/kurbel/*.cpp)
 SOURCES += $(wildcard src/swarm/*.cpp)
 SOURCES += $(wildcard src/lied/*.cpp)
+SOURCES += $(wildcard src/canta/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -57,7 +58,7 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -125,6 +126,23 @@ endif
 res/liedcore.$(CORE_EXT): liedcore/liedcore.c liedcore/liedcore.h liedcore/config.h $(ESPEAK_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(LIED_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(LIED_SRC) $(LIED_LIBS)
+
+# ---------------------------------------------------------------- the CANTA core
+# MIKU-FM's singing voice (canta.tar.gz, a snapshot of the voice's code only: canta/SNAPSHOT.txt) with
+# cantacore/cantacore.c on top, as its own small shared library; every instance loads a private copy (the effects keep
+# their buffers in static variables). Plain C, no libc.
+CANTA_STAMP := canta/.unpacked
+$(CANTA_STAMP): canta.tar.gz
+	tar xzf canta.tar.gz
+	touch $@
+
+CANTA_SRC := cantacore/cantacore.c canta/firmware/audio/fvoice/fvoice.c canta/firmware/audio/vfx/vfx.c \
+	canta/firmware/song/mora.c canta/firmware/song/lyrics.c
+CANTA_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Icanta,$(CORE_FLAGS))
+
+res/cantacore.$(CORE_EXT): cantacore/cantacore.c cantacore/cantacore.h $(CANTA_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(CANTA_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(CANTA_SRC) $(CORE_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

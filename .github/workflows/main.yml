@@ -57,6 +57,8 @@ jobs:
           ./lt.exe ./liedcore.dll res/espeak-ng-data
           g++ -std=c++11 -O2 -w test/lied_test.cpp -o lst.exe
           ./lst.exe ./liedcore.dll res/espeak-ng-data
+          gcc -std=gnu11 -O2 -w test/cantacore_test.c -o ct.exe -lm && cp res/cantacore.dll .
+          ./ct.exe ./cantacore.dll
 
       - name: Check the package
         run: |
@@ -71,6 +73,8 @@ jobs:
           test -f $D/res/Swarm.svg
           test -f $D/res/liedcore.dll
           test -f $D/res/Lied.svg
+          test -f $D/res/cantacore.dll
+          test -f $D/res/Canta.svg
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/espeak-ng-data/de_dict
           test -d "$D/res/espeak-ng-data/voices/!v"
@@ -126,7 +130,7 @@ jobs:
           D=dist/GenraTest
           ls -la $D $D/res
           test -f $D/plugin.dylib
-          for c in mathcore kurbelcore swarmcore liedcore; do test -f $D/res/$c.dylib; done
+          for c in mathcore kurbelcore swarmcore liedcore cantacore; do test -f $D/res/$c.dylib; done
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/knob/small.svg
           for f in $D/plugin.dylib $D/res/*core.dylib; do
@@ -167,7 +171,7 @@ jobs:
           name: GENRA Test ${{ env.RELVER }}
           files: files/*.vcvplugin
           body: |
-            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED). Appears under the
+            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Appears under the
             brand "Genra" in Rack's browser; the modules follow GENRA without cables when the GENRA plugin is installed.
 
             Files: `win-x64` = Windows, `mac-arm64` = Mac with Apple chip (M1 and later), `mac-x64` = Intel Mac.

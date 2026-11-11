@@ -27,7 +27,7 @@ H = 380
 
 BG, PLATE, LINE, TXT, DIM = "#17181d", "#212329", "#34363f", "#d9dbe2", "#8a8d99"
 # keep in step with the modules (src/<name>/<Name>.cpp: <NAME>_RGB)
-COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c", "Swarm": "#13b8a6"}
+COLORS = {"Math": "#c0549a", "Kurbel": "#c25a1c", "Swarm": "#13b8a6", "Canta": "#ff7a59"}
 
 # component radii (px)
 R_SMALL, R_TRIM, R_JACK, R_BEZEL = 11.3, 8.9, 11.8, 10.6

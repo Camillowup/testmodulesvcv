@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -48,6 +48,15 @@
       "slug": "Lied",
       "name": "LIED",
       "description": "A text singer: four lines of lyrics typed on the panel, spoken by eSpeak NG (12 languages, 14 voices) and sung syllable by syllable at the notes of V/OCT, the vowel held while the gate is; choir, vibrato, echo and reverb",
+      "tags": [
+        "Synth voice",
+        "Speech"
+      ]
+    },
+    {
+      "slug": "Canta",
+      "name": "CANTA",
+      "description": "MIKU-FM's singing voice: a formant voice that sings Japanese syllables, each gate the next syllable of lyrics typed on the panel; ANIMAL babble, SCAT and VOWELS, five characters, a harmony voice, chorus, delay, reverb, drive; four pixel singers sing along",
       "tags": [
         "Synth voice",
         "Speech"
