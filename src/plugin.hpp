@@ -10,3 +10,4 @@ extern Model* modelKurbel;
 extern Model* modelSwarm;
 extern Model* modelLied;
 extern Model* modelCanta;
+extern Model* modelMiaou;

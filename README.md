@@ -4,7 +4,7 @@ Testplugin für neue Instrumente der GENRA-Familie, bevor sie in **GENRA Instrum
 Rack unter der Marke **Genra**, neben GENRA und GENRA Instruments, und funktioniert mit beiden zusammen (Follow GENRA,
 MIX ohne Kabel).
 
-Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED** und **CANTA**.
+Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA** und **MIAOU**.
 
 ## Installieren
 
@@ -210,11 +210,38 @@ Follow GENRA. Rechtsklick auch: Clock-Eingang (16tel wie GENRA, 8tel, Viertel, 2
 gate sings the next syllable* (gebundene Silben bei Sequencern, die das Gate offen halten). Text und Einstellungen
 werden im Patch gespeichert.
 
+## MIAOU
+
+![MIAOU](docs/panels/Miaou.png)
+
+Das Spielzeug-Keyboard aus der FM-1-Firmware **MIAOU** (26 HP): fünf Klänge, polyphon (bis 16 Stimmen über ein
+Poly-Kabel). Nur die Klänge und der kleine Lautsprecher; Rhythmen, Kinderlieder, Recorder, Arpeggiator und Sequencer
+von MIAOU sind nicht dabei, das übernimmt GENRA.
+
+**Display:** links eine eigene Pixel-Katze (nichts aus MIAOU): die Augen folgen dem letzten Ton (tief links, hoch
+rechts), sie blinzelt ab und zu, und beim Miauen geht das Maul auf. **Anklicken** = ein kurzes Miau. Rechts der Klang,
+PAW an/aus, der letzte Ton, der Lautsprecher und 27 Tasten (C3–D5), die beim Spielen leuchten.
+
+**Kopf:**
+- **PAW**: alle Tasten miauen (rastet ein, leuchtet); nochmal drücken = zurück zum Klang.
+- **SOUND**: **PIANO** (Chip-Klavier), **BELLS** (FM-Glocken), **ORGAN** (Rechteck-Orgel), **BANJO** (gezupfte Saite,
+  Karplus-Strong), **MEOW** (eine Stimme durch drei wandernde Formanten: m-i-a-ou). Lämpchen anklicken. **LEVEL**.
+
+**TOY** (je mit CV, ±5 V = ± halber Bereich): **DECAY** (Ausklang und Loslassen, 25–400 %), **TONE** (Helligkeit:
+Filter von Klavier und Orgel, Glockenhelligkeit, Banjo-Anschlag), **MEOW** (Länge des Miaus, 0,2–1,55 s), **SWOOP**
+(wie weit das Miau hoch- und runtergeht), **BRTH** (Hauch), **KITTEN** (Formanten in Halbtönen: höher = jüngere
+Katze; +3 ist MIAOUs eigenes Kätzchen), **SPEAKER** (der Spielzeug-Lautsprecher: keine Bässe, weiche Höhen,
+angezerrt, 8 Bit; 0 = sauber). Mitte bzw. Standard = wie in MIAOU. **FX:** CHORUS, DELAY (330 ms, Ping-Pong), REVERB
+(Raum).
+
+**Buchsen unten:** V/OCT · GATE · VEL (GENRA-Leiste, polyphon), **PAW** (Gate: miaut, solange es anliegt), **SOUND**
+(CV, 2 V pro Klang, zum Schalter addiert), L/R (nur L gesteckt: Mono). Ohne Kabel: Rechtsklick › Follow GENRA.
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
-| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`) |
+| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, MIAOU: `src/miaou/`) |
 | `genra/`, `res/knob/` | **nicht im Repo:** die gemeinsamen Teile (Knöpfe, Follow GENRA, Link-Hub, JIANT-UI) kommen vor jedem Build frisch aus dem GENRA-Repo (`src/` und `res/knob/` von Camillowup/Genra-for-Vcv, Branch main); von Hand: `make genra-src` |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
@@ -225,8 +252,9 @@ werden im Patch gespeichert.
 | `espeak.tar.gz` | Schnappschuss der eSpeak-NG-1.52.0-Quellen (siehe `espeak/SNAPSHOT.txt`), beim Bauen entpackt; die übersetzten Sprachdaten liegen in `res/espeak-ng-data` |
 | `cantacore/` | der CANTA-Kern (`res/cantacore.dll`): MIKU-FMs Stimme mit Sprachen, Harmonie und Presets, eine private Kopie pro Modul |
 | `canta.tar.gz` | Schnappschuss nur des Stimmen-Codes von MIKU-FM (Commit 781760c; siehe `canta/SNAPSHOT.txt`), beim Bauen entpackt; keine Grafiken |
+| `miaoucore/` | der MIAOU-Kern: MIAOUs Klänge (`toy.c`) mit ihren Stimmen in einer Struktur, direkt ins Plugin gebaut (keine eigene Bibliothek nötig) |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie) |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz) |
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
@@ -240,4 +268,5 @@ Modul nach GENRA Instruments, kommt es im selben Schritt hier heraus (sonst steh
 GPL-3.0-only (`LICENSE`). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
 die Sängerinnen sind eigene Grafiken, von MIKU-FMs Grafik (Hatsune Miku, Piapro Character License) ist nichts übernommen. LIED spricht mit eSpeak NG (GPL-3.0-or-later). KURBEL ist die Drehleier aus ESTAMPIE (GHOULBOX' GURDY-Engine), die Schalmei Feluccas
 TRIO-Engine (MIT). MATH ist die Engine aus JIANT FM von Juan Ignacio Antonucci (Juan Jiant), einem Fork von
-Felucca (Leo Kuroshita, Hügelton Instruments), ebenfalls GPL-3.0-only. Fremdteile und ihre Lizenzen: `licenses/`.
+Felucca (Leo Kuroshita, Hügelton Instruments), ebenfalls GPL-3.0-only. MIAOU spielt die Klänge aus MIAOU
+(github.com/pjac1810/miaou, GPL-3.0-only); die Katze ist eine eigene Grafik. Fremdteile und ihre Lizenzen: `licenses/`.

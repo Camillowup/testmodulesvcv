@@ -61,6 +61,15 @@
         "Synth voice",
         "Speech"
       ]
+    },
+    {
+      "slug": "Miaou",
+      "name": "MIAOU",
+      "description": "MIAOU's toy keyboard: a chip piano, FM bells, a square organ, a plucked banjo and a meow through moving formants, polyphonic; PAW makes every key meow; decay, tone, the meow's length, swoop, breath and kitten, the toy's little speaker; chorus, delay, reverb; a pixel cat that watches the notes",
+      "tags": [
+        "Synth voice",
+        "Polyphonic"
+      ]
     }
   ]
 }
