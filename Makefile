@@ -85,7 +85,10 @@ LIED_SRC := liedcore/liedcore.c $(addprefix $(ESPEAK_LIB)/,$(addsuffix .c,$(ESPE
 	$(addprefix espeak/src/ucd-tools/src/,$(addsuffix .c,$(UCD_C)))
 LIED_FLAGS := -std=gnu11 -O2 -w -DLIBESPEAK_NG_EXPORT=1 -Iliedcore -Iespeak/src/include -Iespeak/src/include/compat \
 	-Iespeak/src/ucd-tools/src/include \
-	-I$(ESPEAK_LIB)
+	-I$(ESPEAK_LIB) -DPATH_ESPEAK_DATA='"espeak-ng-data"' \
+	-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration
+# (PATH_ESPEAK_DATA: what eSpeak's CMake defines; LIED always passes its own path. The -Wno-error: GCC 14 made these
+#  errors, eSpeak's Windows code still has one)
 ifdef ARCH_LIN
 	LIED_FLAGS += -fPIC -fvisibility=hidden -shared
 	LIED_LIBS := -lm
