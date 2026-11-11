@@ -125,6 +125,9 @@ class Panel:
         if label:
             self.text(x, ly or y + 19.5, label, 4.8)
 
+    def pair_label(self, x0, x1, y, word):
+        self.text((x0 + x1) / 2, y, f"\u25c0 {word} \u25b6", 4.8)
+
     def area(self, name, x, y, w, h):
         """A rectangle the module widget draws into."""
         self.add("area", name, x, y, w=w, h=h)

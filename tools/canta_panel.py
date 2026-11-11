@@ -20,8 +20,9 @@ def canta_panel():
     p = Panel("Canta", "CANTA", 26, "MIKU-FM · SINGING VOICE")
     p.display(14, 30, 362, 106)
     p.plate(14, 140, 362, 40)
-    p.button("PREV", 27, 154, "◀ PRE")
-    p.button("NEXT_BTN", 52, 154, "PRE ▶")
+    p.button("PREV", 27, 154)
+    p.button("NEXT_BTN", 52, 154)
+    p.pair_label(27, 52, 173.5, "PRESET")
     p.button("CALL", 77, 154, "CALL", light=True)
     p.sep(92, 146, 174)
     for name, title, x, w in (("LYR_SEL", "LYRICS", 96, 54), ("SYL_SEL", "SYLLABLE", 154, 48), ("HARM_SEL", "HARMONY", 206, 48)):
