@@ -51,6 +51,7 @@ struct Math : Module, follow::Host {
 	int preset = 0;
 	int clockMode = 0;                            // CLOCK input: 16ths (GENRA's default clock out), 8ths, quarters, 24 PPQN
 	bool fromPatch = false;
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	std::atomic<int> presetReq{-1};
 
 	// for the UI thread (written by the engine thread)
@@ -72,8 +73,12 @@ struct Math : Module, follow::Host {
 	uint32_t framesSinceVis = 0;
 	bool visDue = true;
 	jiant::ScreenClock screenClock;
-	struct CvVoice { bool gate = false; int note = 60; };
+	// a channel of V/OCT + GATE: `high` the gate input, `gate` its note sounds; `arm` counts the samples from the gate's
+	// edge to the note (NOTE_DELAY: V/OCT and VEL may come a sample after the gate, e.g. through a quantizer)
+	struct CvVoice { bool high = false; bool gate = false; int arm = 0; int note = 60; int vel = 100; };
+	enum { NOTE_DELAY = 2 };
 	CvVoice cv[16];
+	int cvActive = 0;                             // the channels the last sample used (the loop ends there)
 	bool callOn = false;
 	int playing = -1;                             // the PLAY mode the notes are in (-1: none yet)
 	bool thruOn = false;                          // THRU: the held note sounds
@@ -131,6 +136,7 @@ struct Math : Module, follow::Host {
 		paramQuantities[PLAY_PARAM]->randomizeEnabled = false;
 		for (int& s : sent)
 			s = INT32_MIN;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	/** E3..E8: the knob 0..1 over the range the firmware gives it, shown as the FM-1 writes it. */
@@ -160,7 +166,7 @@ struct Math : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, presets
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("MATH: %s", status.c_str());
 			return;
@@ -172,7 +178,8 @@ struct Math : Module, follow::Host {
 		outBuf.clear();
 		src.reset();
 		for (auto& v : cv)
-			v.gate = false;
+			v = CvVoice();
+		cvActive = 16;
 		callOn = false;
 		playing = -1;
 		thruOn = false;
@@ -185,6 +192,7 @@ struct Math : Module, follow::Host {
 		else
 			core.api->load_preset(preset);
 		shownPreset = preset;
+		powered = true;
 	}
 
 	/** The factory sound into the knobs (and the engine). */
@@ -217,7 +225,7 @@ struct Math : Module, follow::Host {
 		params[CALL_PARAM].setValue(0.f);
 		powerOn();
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		fromPatch = false;
@@ -239,7 +247,7 @@ struct Math : Module, follow::Host {
 		if (json_t* j = json_object_get(r, "clockMode"))
 			clockMode = clamp((int) json_integer_value(j), 0, 3);
 		fromPatch = true;
-		if (core.api) {
+		if (powered && core.api) {
 			int n = std::max(1, (int) core.api->npresets());
 			preset = ((preset % n) + n) % n;
 			core.api->load_preset(preset);
@@ -288,7 +296,8 @@ struct Math : Module, follow::Host {
 		if (sent[JMA_VOICE] != INT32_MIN && sent[JMA_VOICE] != vo) {
 			a->all_off();
 			for (auto& v : cv)
-				v.gate = false;
+				v.high = v.gate = false, v.arm = 0;
+			cvActive = 16;
 			thruOn = false;
 		}
 		push(a, JMA_VOICE, vo);
@@ -297,30 +306,44 @@ struct Math : Module, follow::Host {
 
 	/** KEYS: V/OCT + GATE (polyphonic) into notes, as ANIMAL. */
 	void processKeys(const jma_api* a) {
-		int n = inputs[GATE_INPUT].isConnected() ? std::max(1, inputs[GATE_INPUT].getChannels()) : 0;
-		for (int c = 0; c < 16; c++) {
+		int n = inputs[GATE_INPUT].isConnected() ? std::min(16, std::max(1, inputs[GATE_INPUT].getChannels())) : 0;
+		int last = std::max(n, cvActive);          // (channels that went away still let go of their note)
+		for (int c = 0; c < last; c++) {
 			CvVoice& v = cv[c];
 			bool on = false;
 			if (c < n) {
 				float g = inputs[GATE_INPUT].getPolyVoltage(c);
-				on = v.gate ? g > 0.5f : g >= 1.f;
+				on = v.high ? g > 0.5f : g >= 1.f;
 			}
-			int note = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
-			if (on && !v.gate) {
-				int vel = 100;
-				if (inputs[VEL_INPUT].isConnected())
-					vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
-				a->note_on(note, vel);
-				v.note = note;
+			bool rise = on && !v.high && !v.gate;
+			v.high = on;
+			if (rise) {
+				v.arm = NOTE_DELAY;                 // the gate's edge: the note follows in NOTE_DELAY samples
+			} else if (v.arm > 0) {
+				if (--v.arm == 0 || !on) {          // (a gate shorter than the wait still plays)
+					v.arm = 0;
+					int note = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
+					int vel = 100;
+					if (inputs[VEL_INPUT].isConnected())
+						vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
+					a->note_on(note, vel);
+					v.note = note;
+					v.vel = vel;
+					v.gate = true;
+				}
 			} else if (!on && v.gate) {
 				a->note_off(v.note);
-			} else if (on && note != v.note) {
-				a->note_on(note, 100);
-				a->note_off(v.note);
-				v.note = note;
+				v.gate = false;
+			} else if (on && v.gate) {
+				int note = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
+				if (note != v.note) {               // a new pitch under a held gate: the note again, at its velocity
+					a->note_on(note, v.vel);
+					a->note_off(v.note);
+					v.note = note;
+				}
 			}
-			v.gate = on;
 		}
+		cvActive = n;
 		bool call = params[CALL_PARAM].getValue() > 0.5f;
 		if (call && !callOn)
 			a->note_on(CALL_NOTE, 100);
@@ -353,7 +376,8 @@ struct Math : Module, follow::Host {
 		if (mode != playing) {                    // KEYS <-> THRU: everything off, then the new way
 			a->all_off();
 			for (auto& v : cv)
-				v.gate = false;
+				v.high = v.gate = false, v.arm = 0;
+			cvActive = 16;
 			callOn = false;
 			thruOn = false;
 			playing = mode;
@@ -394,7 +418,8 @@ struct Math : Module, follow::Host {
 		} else {
 			freeQ += bpm / 60.0 / sampleRate;
 		}
-		clocked = alive;
+		if (alive != clocked.load(std::memory_order_relaxed))
+			clocked.store(alive, std::memory_order_relaxed);
 	}
 
 	void renderBlock(const jma_api* a, float sampleRate) {
@@ -450,7 +475,7 @@ struct Math : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		int req = presetReq.exchange(-1);
+		int req = presetReq.load(std::memory_order_relaxed) >= 0 ? presetReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = preset - 1;

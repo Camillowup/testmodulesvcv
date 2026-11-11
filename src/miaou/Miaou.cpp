@@ -73,6 +73,36 @@ struct Chorus {
 		r = tap((0.013f - 0.006f * s) * sr);
 		w++;
 	}
+	/** the same without the two voices (CHORUS at 0: nothing of them is heard): the line and the sway go on */
+	void feed(float in) {
+		buf[w & mask] = in;
+		ph += 0.5f / sr;
+		if (ph >= 1.f)
+			ph -= 1.f;
+		w++;
+	}
+};
+
+/** A send effect's rest: with its send closed and its tail gone (below -120 dB for a second) it is not worked out. */
+struct SendRest {
+	static constexpr float FLOOR = 1e-6f;   // volts
+	int quiet = 0;
+	bool resting = false;
+	/** Before the effect: true if it rests this sample (its output is then 0). */
+	bool rest(float send) {
+		if (send > 0.f) {
+			resting = false;
+			quiet = 0;
+		}
+		return resting;
+	}
+	/** After the effect: its output, and how many samples of silence let it rest. */
+	void heard(float send, float l, float r, int hold) {
+		if (send > 0.f || std::fabs(l) > FLOOR || std::fabs(r) > FLOOR)
+			quiet = 0;
+		else if (++quiet >= hold)
+			resting = true;
+	}
 };
 
 // ------------------------------------------------------------------------------------------------ the module
@@ -101,8 +131,15 @@ struct Miaou : Module, follow::Host {
 	std::atomic<bool> callReq{false};
 
 	// engine thread
-	bool gate[16] = {};
+	bool gate[16] = {};                           // the channel's note sounds
 	float pitch[16] = {};
+	// a channel of V/OCT + GATE: `high` the gate input; `arm` counts the samples from the gate's edge to the note
+	// (NOTE_DELAY: V/OCT and VEL may come a sample after the gate, e.g. through a quantizer)
+	enum { NOTE_DELAY = 2 };
+	bool high[16] = {};
+	int arm[16] = {};
+	int chActive = 0;                             // the channels the last sample used (the loop ends there)
+	SendRest delayRest, reverbRest;
 	int lastNote = -1;
 	float dev[BLOCK];
 	jiant::Resampler src;
@@ -157,6 +194,12 @@ struct Miaou : Module, follow::Host {
 	}
 	void onRemove(const RemoveEvent& e) override { follow::gone(this); }
 	void onPortChange(const PortChangeEvent& e) override { fol.portChange(e); }
+	// the effects' memory: when the module is added and when the rate changes, not in process()
+	void onAdd(const AddEvent& e) override { setupFx(APP->engine->getSampleRate()); }
+	void onSampleRateChange(const SampleRateChangeEvent& e) override {
+		if (e.sampleRate != fxRate)
+			setupFx(e.sampleRate);
+	}
 	json_t* dataToJson() override {
 		json_t* r = json_object();
 		fol.toJson(r);
@@ -167,8 +210,8 @@ struct Miaou : Module, follow::Host {
 	void allOff() {
 		if (eng)
 			mc_all_off(eng);
-		for (bool& g : gate)
-			g = false;
+		for (int c = 0; c < 16; c++)
+			gate[c] = high[c] = false, arm[c] = 0;
 		callLeft = 0;
 	}
 
@@ -191,6 +234,8 @@ struct Miaou : Module, follow::Host {
 		rp.predelayMs = 8.f;
 		reverb.P = rp;
 		reverb.setSampleRate(sr);
+		delayRest = SendRest();
+		reverbRest = SendRest();
 	}
 
 	int soundNow() {
@@ -208,29 +253,42 @@ struct Miaou : Module, follow::Host {
 		int sound = pawNow() ? MC_MEOW : soundNow();
 		int ch = std::max(inputs[GATE_INPUT].getChannels(), 0);
 		ch = std::min(ch, 16);
-		for (int c = 0; c < 16; c++) {
+		int last = std::max(ch, chActive);         // (channels that went away still let go of their note)
+		for (int c = 0; c < last; c++) {
 			bool on = false;
 			if (c < ch) {
 				float g = inputs[GATE_INPUT].getVoltage(c);
-				on = gate[c] ? g > 0.5f : g >= 1.f;
+				on = high[c] ? g > 0.5f : g >= 1.f;
 			}
-			float p = 60.f + 12.f * inputs[VOCT_INPUT].getPolyVoltage(c);
-			if (on && !gate[c]) {
-				int vel = 100;
-				if (inputs[VEL_INPUT].isConnected())
-					vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
-				mc_note_on(eng, c, sound, p, vel);
-				pitch[c] = p;
-				lastNote = (int) std::round(p);
+			bool rise = on && !high[c] && !gate[c];
+			high[c] = on;
+			if (rise) {
+				arm[c] = NOTE_DELAY;                // the gate's edge: the note follows in NOTE_DELAY samples
+			} else if (arm[c] > 0) {
+				if (--arm[c] == 0 || !on) {         // (a gate shorter than the wait still plays)
+					arm[c] = 0;
+					float p = 60.f + 12.f * inputs[VOCT_INPUT].getPolyVoltage(c);
+					int vel = 100;
+					if (inputs[VEL_INPUT].isConnected())
+						vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
+					mc_note_on(eng, c, sound, p, vel);
+					pitch[c] = p;
+					lastNote = (int) std::round(p);
+					gate[c] = true;
+				}
 			} else if (!on && gate[c]) {
 				mc_note_off(eng, c);
-			} else if (on && std::fabs(p - pitch[c]) > 1e-4f) {
-				mc_pitch(eng, c, p);
-				pitch[c] = p;
+				gate[c] = false;
+			} else if (on && gate[c]) {
+				float p = 60.f + 12.f * inputs[VOCT_INPUT].getPolyVoltage(c);
+				if (std::fabs(p - pitch[c]) > 1e-4f) {
+					mc_pitch(eng, c, p);
+					pitch[c] = p;
+				}
 			}
-			gate[c] = on;
 		}
-		if (callReq.exchange(false)) {
+		chActive = ch;
+		if (callReq.load(std::memory_order_relaxed) && callReq.exchange(false)) {
 			mc_note_on(eng, CALL_SRC, MC_MEOW, 67.f, 100);
 			lastNote = 67;
 			callLeft = 4410;   // a click is a short paw on the key: 0.1 s
@@ -289,12 +347,25 @@ struct Miaou : Module, follow::Host {
 		float x = f.samples[0] * 6.f;   // the core's -1..1 at about 2-4 V
 		// FX: the chorus in the dry path, the delay and the reverb as sends (wet only)
 		float chor = params[CHOR_PARAM].getValue(), dly = params[DLY_PARAM].getValue(), rev = params[REV_PARAM].getValue();
-		float cl, cr;
-		chorus.process(x, cl, cr);
-		float l = x + chor * (cl - 0.5f * x), r = x + chor * (cr - 0.5f * x);
+		float l = x, r = x;
+		if (chor > 0.f) {
+			float cl, cr;
+			chorus.process(x, cl, cr);
+			l = x + chor * (cl - 0.5f * x), r = x + chor * (cr - 0.5f * x);
+		} else
+			chorus.feed(x);                            // (at 0 its voices are not heard: only its line goes on)
+		// the sends: the echoes and the tail ring on when a send closes; once they are gone the effect rests until
+		// the send opens again
 		float dl = 0.f, dr = 0.f, rl = 0.f, rr = 0.f;
-		delay.process(l * dly, r * dly, dl, dr);      // (always: the echoes and the tail ring on when a send closes)
-		reverb.process(l * rev, r * rev, rl, rr);
+		int hold = (int) args.sampleRate;
+		if (!delayRest.rest(dly)) {
+			delay.process(l * dly, r * dly, dl, dr);
+			delayRest.heard(dly, dl, dr, hold);
+		}
+		if (!reverbRest.rest(rev)) {
+			reverb.process(l * rev, r * rev, rl, rr);
+			reverbRest.heard(rev, rl, rr, hold);
+		}
 		float level = params[LEVEL_PARAM].getValue();
 		l = gfx::outLimit((l + dl + rl) * level);
 		r = gfx::outLimit((r + dr + rr) * level);

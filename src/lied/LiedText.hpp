@@ -276,7 +276,8 @@ inline Unit cut(const std::vector<float>& s, const std::vector<Ph>& ph, int a, i
                 const std::string& text) {
 	Unit u;
 	int pad = sr * 6 / 1000;
-	int x0 = std::max(0, a - pad), x1 = std::min((int) s.size(), b + pad);
+	// (x0 stays inside the samples too: phonemes past the end of what was spoken, a word longer than the buffer)
+	int x0 = std::min(std::max(0, a - pad), (int) s.size()), x1 = std::min((int) s.size(), b + pad);
 	if (x1 <= x0)
 		x1 = std::min((int) s.size(), x0 + 1);
 	u.s.assign(s.begin() + x0, s.begin() + x1);

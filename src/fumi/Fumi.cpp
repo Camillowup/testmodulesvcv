@@ -6,11 +6,13 @@
 // After KURBEL (src/kurbel/Kurbel.cpp).
 #include "../plugin.hpp"
 #include "../../genra/Follow.hpp"
+#include "../../genra/OutLimit.hpp"
 #include "../../genra/jiant/JiantUI.hpp"
 #include "../../genra/ui/Look.hpp"
 #include "FumiCore.hpp"
 #include "FumiLayout.hpp"
 #include "FumiGlyphs.hpp"
+#include "FumiLevels.hpp"
 #include <atomic>
 #include <array>
 #include <cstring>
@@ -102,8 +104,20 @@ struct Fumi : Module, follow::Host {
 	jiant::Resampler src;
 	dsp::DoubleRingBuffer<dsp::Frame<2>, 2048> outBuf;
 	uint32_t framesSinceUi = 0;
-	bool gate[NCH] = {};
+	bool gate[NCH] = {};                          // the channel's note sounds
 	float cents[NCH] = {};
+	// a channel of V/OCT + GATE: `high` the gate input; `arm` counts the samples from the gate's edge to the note
+	// (NOTE_DELAY: V/OCT and VEL may come a sample after the gate, e.g. through a quantizer)
+	enum { NOTE_DELAY = 2 };
+	bool high[NCH] = {};
+	int arm[NCH] = {};
+	int chActive = 0;                             // the channels the last sample used (the loop ends there)
+	// the pitch of a channel's voltage, kept while voltage, snap and tuning stay (the core is asked only on a change)
+	float pMidi[NCH] = {}, pCents[NCH] = {};
+	int pSnap[NCH] = {};
+	uint32_t pGen[NCH] = {}, tuneGen = 1;
+	float outGain = 1.f;                          // the patch's level (FumiLevels.hpp), slewed
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	bool ornOn[NH] = {};
 	bool bendUp = false, bendDown = false;
 	dsp::BooleanTrigger prevTrig, nextTrig;
@@ -154,6 +168,7 @@ struct Fumi : Module, follow::Host {
 		paramQuantities[VOICE_PARAM]->randomizeEnabled = false;
 		for (int& s : sent)
 			s = INT32_MIN;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	/** The sound's knobs: 0..1 over the parameter's range, shown as FuMi-1 writes it. */
@@ -168,7 +183,7 @@ struct Fumi : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, patches
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("FUMI: %s", status.c_str());
 			return;
@@ -181,14 +196,20 @@ struct Fumi : Module, follow::Host {
 		outBuf.clear();
 		src.reset();
 		for (int c = 0; c < NCH; c++)
-			gate[c] = false;
+			gate[c] = high[c] = false, arm[c] = 0, pGen[c] = 0;
+		chActive = NCH;
 		for (bool& o : ornOn)
 			o = false;
 		bendUp = bendDown = false;
 		int n = std::max(1, (int) a->npatches());
 		patch = ((patch % n) + n) % n;
 		shownPatch = patch;
+		outGain = patchGain();
+		powered = true;
 	}
+
+	/** The patch's output level (FumiLevels.hpp: every patch as loud as the others, a chord just under the limiter). */
+	float patchGain() const { return patch >= 0 && patch < fumilevels::NUM ? fumilevels::PATCH_GAIN[patch] : 1.f; }
 
 	/** The knobs' defaults from the instrument (the first time, or Initialize). */
 	void knobDefaults() {
@@ -213,7 +234,7 @@ struct Fumi : Module, follow::Host {
 			for (int k = 0; k < NS; k++)
 				params[S_PARAM + k].setValue(paramQuantities[S_PARAM + k]->defaultValue);
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		knobDefaults();
@@ -238,7 +259,7 @@ struct Fumi : Module, follow::Host {
 			patch = (int) json_integer_value(j);
 		if (json_t* j = json_object_get(r, "snap"))
 			snap = json_boolean_value(j);
-		if (core.api) {
+		if (powered && core.api) {
 			int n = std::max(1, (int) core.api->npatches());
 			patch = ((patch % n) + n) % n;
 			for (int& s : sent)
@@ -252,7 +273,27 @@ struct Fumi : Module, follow::Host {
 		if (sent[p] != v) {
 			a->set(p, v);
 			sent[p] = v;
+			if (p == JFU_HON || p == JFU_SCALE || p == JFU_TUNING || p == JFU_FINE || p == JFU_A4)
+				tuneGen++;                          // (the tuning moved: the channels' pitches are asked again)
 		}
+	}
+
+	/** The pitch (cents) of channel c's V/OCT now; the core works it out only when the voltage, snap or tuning changed. */
+	float pitchOf(const jfu_api* a, int c) {
+		float midi = 60.f + inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f;
+		int sn = snap ? 1 : 0;
+		if (pGen[c] != tuneGen || midi != pMidi[c] || sn != pSnap[c]) {
+			pCents[c] = a->pitch(midi, sn);
+			pMidi[c] = midi;
+			pSnap[c] = sn;
+			pGen[c] = tuneGen;
+		}
+		return pCents[c];
+	}
+	int velOf(int c) {
+		if (!inputs[VEL_INPUT].isConnected())
+			return 100;
+		return clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
 	}
 
 	void processKnobs(const jfu_api* a) {
@@ -305,31 +346,40 @@ struct Fumi : Module, follow::Host {
 
 	/** V/OCT and GATE, one note per channel; a new pitch under a held gate plays the note again (mono: slides). */
 	void processNotes(const jfu_api* a) {
-		int nch = std::max(inputs[GATE_INPUT].getChannels(), 0);
+		int nch = clamp(inputs[GATE_INPUT].getChannels(), 0, NCH);
+		int last = std::max(nch, chActive);        // (channels that went away still let go of their note)
 		bool anyHeld = false;
-		for (int c = 0; c < NCH; c++) {
+		for (int c = 0; c < last; c++) {
 			bool on = false;
 			if (c < nch) {
 				float g = inputs[GATE_INPUT].getVoltage(c);
-				on = gate[c] ? g > 0.5f : g >= 1.f;
+				on = high[c] ? g > 0.5f : g >= 1.f;
 			}
-			float midi = 60.f + inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f;
-			float ct = on ? a->pitch(midi, snap ? 1 : 0) : cents[c];
-			int vel = 100;
-			if (inputs[VEL_INPUT].isConnected())
-				vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
-			if (on && !gate[c]) {
-				a->note((uint32_t) c, 1, ct, vel);
-				cents[c] = ct;
+			bool rise = on && !high[c] && !gate[c];
+			high[c] = on;
+			if (rise) {
+				arm[c] = NOTE_DELAY;                // the gate's edge: the note follows in NOTE_DELAY samples
+			} else if (arm[c] > 0) {
+				if (--arm[c] == 0 || !on) {         // (a gate shorter than the wait still plays)
+					arm[c] = 0;
+					float ct = pitchOf(a, c);
+					a->note((uint32_t) c, 1, ct, velOf(c));
+					cents[c] = ct;
+					gate[c] = true;
+				}
 			} else if (!on && gate[c]) {
 				a->note((uint32_t) c, 0, 0.f, 0);
-			} else if (on && std::fabs(ct - cents[c]) > 30.f) {
-				a->note((uint32_t) c, 1, ct, vel);
-				cents[c] = ct;
+				gate[c] = false;
+			} else if (on && gate[c]) {
+				float ct = pitchOf(a, c);
+				if (std::fabs(ct - cents[c]) > 30.f) {
+					a->note((uint32_t) c, 1, ct, velOf(c));
+					cents[c] = ct;
+				}
 			}
-			gate[c] = on;
 			anyHeld = anyHeld || on;
 		}
+		chActive = nch;
 		// the sprung bend: BEND above +1 V up, below -1 V down (hysteresis 0.5 V)
 		float b = inputs[BEND_INPUT].getVoltage();
 		bool up = bendUp ? b > 0.5f : b >= 1.f, down = bendDown ? b < -0.5f : b <= -1.f;
@@ -381,7 +431,7 @@ struct Fumi : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		int req = patchReq.exchange(-1);
+		int req = patchReq.load(std::memory_order_relaxed) >= 0 ? patchReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = patch - 1;
@@ -402,7 +452,9 @@ struct Fumi : Module, follow::Host {
 		while (outBuf.empty() && guard++ < 8)
 			renderBlock(a, args.sampleRate);
 		dsp::Frame<2> f = outBuf.empty() ? dsp::Frame<2>{} : outBuf.shift();
-		float l = f.samples[0] * 5.f, r = f.samples[1] * 5.f;
+		// the patch's level (FumiLevels.hpp; a new patch's comes in over a few ms), then the output limiter
+		outGain += (patchGain() - outGain) * 0.005f;
+		float l = genra_out::limit(f.samples[0] * 5.f * outGain), r = genra_out::limit(f.samples[1] * 5.f * outGain);
 		if (outputs[R_OUTPUT].isConnected() || pulled(args.frame)) {
 			outputs[L_OUTPUT].setVoltage(l);
 			outputs[R_OUTPUT].setVoltage(r);

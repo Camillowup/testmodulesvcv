@@ -111,6 +111,10 @@ struct Singer {
 	float vibPhase = 0.f, sinceOn = 0.f;
 	float breathEnv = 0.f, nlp1 = 0.f, nlp2 = 0.f, tilt = 0.f;
 	float lastSpec = 0.f;
+	// coefficients kept until what they are made of changes (the same values as worked out every sample)
+	float cGlideT = -1.f, cGlideSr = 0.f, cGlideK = 0.f;   // the glide's
+	float cTiltSr = 0.f, cTiltK = 0.f;                     // the tilt filter's
+	float cBright = -1.f, cBrightG = 1.f;                  // BRIGHT's gain
 
 	void setRate(float sampleRate, float coreRate) {
 		sr = sampleRate;
@@ -218,13 +222,15 @@ struct Singer {
 	}
 
 	/** One reader's sound at this sample. */
-	float read(Voice& x, Reader& rd, float hz, const Params& p, float level) {
+	/** (noteSemis: the reader's pitch; its frequency is worked out only when a grain is due.) */
+	float read(Voice& x, Reader& rd, float noteSemis, const Params& p, float level) {
 		const Unit* u = x.u;
 		float ratio = srcRate / sr * p.formant;
 		float half = std::max(4.f, u->t0 / ratio);  // a grain is two of the speech's periods long
-		float tout = sr / std::max(20.f, hz);
 		rd.countdown -= 1.f;
 		if (rd.countdown <= 0.f && level > 0.f) {
+			float hz = 261.6256f * std::exp2(noteSemis / 12.f);
+			float tout = sr / std::max(20.f, hz);
 			float jit = 1.f + rng.bi() * p.rough * 0.12f;
 			rd.countdown += tout * jit;
 			if (rd.countdown < 1.f)
@@ -264,8 +270,12 @@ struct Singer {
 		// the note: glide, slide, vibrato
 		float gt = std::max(p.glide, slideTime);
 		if (gt > 0.0005f) {
-			float k = 1.f - std::exp(-1.f / (gt * sr));
-			semis += (semisTo - semis) * k;
+			if (gt != cGlideT || sr != cGlideSr) {
+				cGlideT = gt;
+				cGlideSr = sr;
+				cGlideK = 1.f - std::exp(-1.f / (gt * sr));
+			}
+			semis += (semisTo - semis) * cGlideK;
 		} else
 			semis = semisTo;
 		sinceOn += 1.f / sr;
@@ -288,9 +298,8 @@ struct Singer {
 			for (int i = 0; i < nr; i++) {
 				Reader& rd = x.r[i];
 				float det = rd.detune * p.choir * 0.22f;  // up to a fifth of a semitone apart
-				float hz = 261.6256f * std::exp2((baseSemis + det) / 12.f);
 				float g = i == 0 ? 1.f : p.choir * 0.75f;
-				float s = read(x, rd, hz, p, lvl * g);
+				float s = read(x, rd, baseSemis + det, p, lvl * g);
 				if (nr == 1) {
 					L += s;
 					R += s;
@@ -319,8 +328,15 @@ struct Singer {
 			R += b;
 		}
 		// brightness: tilt around 800 Hz
-		float bg = std::exp2((p.bright - 0.5f) * 3.f);
-		float k = 1.f - std::exp(-2.f * PI * 800.f / sr);
+		if (p.bright != cBright) {
+			cBright = p.bright;
+			cBrightG = std::exp2((p.bright - 0.5f) * 3.f);
+		}
+		if (sr != cTiltSr) {
+			cTiltSr = sr;
+			cTiltK = 1.f - std::exp(-2.f * PI * 800.f / sr);
+		}
+		float bg = cBrightG, k = cTiltK;
 		tilt += (mono - tilt) * k;
 		float hiMono = mono - tilt;
 		float add = hiMono * (bg - 1.f);

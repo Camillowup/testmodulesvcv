@@ -180,8 +180,8 @@ res/fumicore.$(CORE_EXT): fumicore/fumicore.c fumicore/fumicore.h $(FUMI_STAMP)
 	$(CORE_CC) $(FUMI_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
 
 # ---------------------------------------------------------------- the KESSEL core
-# The LXR firmware's sound engine (Erica Synths; kessel.tar.gz, a snapshot of its headers and sound engine sources:
-# kessel/SNAPSHOT.txt) with kesselcore/ on top (kesselcore.c, kc_cc.c: the firmware's parameter handler), as its own
+# The LXR firmware's sound engine (Erica Synths; kessel.tar.gz, a snapshot of its headers and sound engine sources,
+# with two reads past a table's end put right: kessel/SNAPSHOT.txt) with kesselcore/ on top (kesselcore.c, kc_cc.c: the firmware's parameter handler), as its own
 # small shared library; every instance loads a private copy (the voices are static). kesselcore/compat stands in for
 # the STM32 HAL; kc_sections.h turns the firmware's memory sections into plain ones (forced in on every system).
 KESSEL_STAMP := kessel/.unpacked

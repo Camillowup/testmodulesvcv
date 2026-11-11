@@ -74,14 +74,31 @@ Worker::Worker() {
 	th = std::thread([this]() { run(); });
 }
 
-Worker::~Worker() {
+void Worker::stop() {
 	{
 		std::lock_guard<std::mutex> lk(m);
-		stop = true;
+		stopping = true;
 	}
 	cv.notify_all();
 	if (th.joinable())
 		th.join();
+}
+
+void Worker::setPoll(std::function<void()> fn) {
+	std::lock_guard<std::mutex> lk(m);
+	poll = fn;
+}
+
+void Worker::kick() {
+	{
+		std::lock_guard<std::mutex> lk(m);
+		kicked = true;
+	}
+	cv.notify_all();
+}
+
+Worker::~Worker() {
+	stop();
 	sweep(true);
 	for (int i = 0; i < LINES; i++)
 		delete line[i].exchange(nullptr);
@@ -122,18 +139,20 @@ void Worker::run() {
 	while (true) {
 		Request rq;
 		int which = -1;
+		std::function<void()> look;
 		{
 			std::unique_lock<std::mutex> lk(m);
-			cv.wait_for(lk, std::chrono::seconds(1), [&]() {
-				if (stop)
+			cv.wait_for(lk, std::chrono::milliseconds(250), [&]() {
+				if (stopping || kicked)
 					return true;
 				for (int i = 0; i < LINES; i++)
 					if (has[i])
 						return true;
 				return false;
 			});
-			if (stop)
+			if (stopping)
 				return;
+			kicked = false;
 			for (int i = 0; i < LINES; i++)
 				if (has[i]) {
 					which = i;
@@ -141,10 +160,15 @@ void Worker::run() {
 					has[i] = false;
 					break;
 				}
+			if (which < 0)
+				look = poll;
 		}
 		sweep(false);
-		if (which < 0)
+		if (which < 0) {
+			if (look)
+				look();   // (outside the lock: it calls want(); what it asks for is spoken in the next turn)
 			continue;
+		}
 		Core& core = Core::get();
 		if (!core.ready()) {
 			error = core.error;
@@ -171,7 +195,7 @@ void Worker::run() {
 		busy--;
 		{
 			std::lock_guard<std::mutex> lk(m);
-			if (stop) {
+			if (stopping) {
 				delete L;
 				return;
 			}

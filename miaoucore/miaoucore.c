@@ -170,6 +170,14 @@ void mc_set(mc_engine *m, int param, float v) {
 static void set_inc(voice_t *v, int32_t pq) {
   v->inc = inc_q8(pq), v->rcp = 0xFFFFFFFFu / ((v->inc >> 16) | 1u);
 }
+/* the banjo's string: as long as one period of the voice's pitch (samples) */
+static uint32_t ks_len(const voice_t *v) {
+  uint32_t hz100 = (uint32_t)(((uint64_t)v->inc * 44100u) >> 25) + 1u;
+  uint32_t len = (44100u * 128u) / hz100;
+  if (len > KS_N - 4) len = KS_N - 4;
+  if (len < 8) len = 8;
+  return len;
+}
 
 void mc_note_off(mc_engine *m, int src) {
   for (int i = 0; i < MC_VOICES; i++) {
@@ -209,10 +217,7 @@ void mc_note_on(mc_engine *m, int src, int inst, float pitch, int vel) {
   if (inst == MC_BELLS) v->inc2 = (uint32_t)(((uint64_t)v->inc * 7) >> 1); /* 3.5: a bell's ratio */
   if (inst == MC_BANJO) {
     /* the string: as long as one period, filled with a pluck (TONE: brighter or softer than MIAOU's) */
-    uint32_t hz100 = (uint32_t)(((uint64_t)v->inc * 44100u) >> 25) + 1u;
-    uint32_t len = (44100u * 128u) / hz100;
-    if (len > KS_N - 4) len = KS_N - 4;
-    if (len < 8) len = 8;
+    uint32_t len = ks_len(v);
     v->ks = m->KS[best], v->klen = len << 16, v->kw = 0, v->kprev = 0;
     int sh = m->toneF > 1.6f ? 0 : m->toneF > 0.75f ? 1 : m->toneF > 0.45f ? 2 : 3;
     int32_t p = 0;
@@ -233,10 +238,11 @@ void mc_pitch(mc_engine *m, int src, float pitch) {
   int32_t pq = clampi((int32_t)lroundf(pitch * 256.f), 0, 115 * 256);
   for (int i = 0; i < MC_VOICES; i++) {
     voice_t *v = &m->V[i];
-    if (v->on && v->gate && v->src == src && v->pq != pq && v->inst != MC_BANJO) {
+    if (v->on && v->gate && v->src == src && v->pq != pq) {
       v->pq = pq, v->note = (uint8_t)clampi((pq + 128) >> 8, 0, 127);
       if (v->inst != MC_MEOW) set_inc(v, pq); /* (the meow sets its own every block) */
       if (v->inst == MC_BELLS) v->inc2 = (uint32_t)(((uint64_t)v->inc * 7) >> 1);
+      if (v->inst == MC_BANJO) v->klen = ks_len(v) << 16; /* the ringing string, at its new length */
     }
   }
 }

@@ -62,6 +62,7 @@ struct Kurbel : Module, follow::Host {
 	int clockMode = 0;
 	bool crankAlone = false;                      // (right-click, off by default) COUP CRANK without a gate: turning the crank plays (drones + melody)
 	bool fromPatch = false;
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	std::atomic<int> presetReq{-1};
 
 	// for the UI thread
@@ -137,6 +138,7 @@ struct Kurbel : Module, follow::Host {
 		paramQuantities[RING_PARAM]->randomizeEnabled = false;
 		for (int& s : sent)
 			s = INT32_MIN;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	/** The engine's knobs: 0..1 over the range the firmware gives the parameter, shown as the FM-1 writes it. */
@@ -167,7 +169,7 @@ struct Kurbel : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, presets
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("KURBEL: %s", status.c_str());
 			return;
@@ -188,6 +190,7 @@ struct Kurbel : Module, follow::Host {
 			engineNow = (int) core.api->engine();
 		}
 		shownPreset = preset;
+		powered = true;
 	}
 
 	/** The factory sound into the knobs (and the engine): its engine, drone, coup, ring. */
@@ -228,7 +231,7 @@ struct Kurbel : Module, follow::Host {
 		params[CALL_PARAM].setValue(0.f);
 		powerOn();
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		fromPatch = false;
@@ -257,7 +260,7 @@ struct Kurbel : Module, follow::Host {
 		if (json_t* j = json_object_get(r, "crankAlone"))
 			crankAlone = json_boolean_value(j);
 		fromPatch = true;
-		if (core.api) {
+		if (powered && core.api) {
 			int n = std::max(1, (int) core.api->npresets());
 			preset = ((preset % n) + n) % n;
 			core.api->load_preset(preset);
@@ -376,7 +379,9 @@ struct Kurbel : Module, follow::Host {
 			}
 			sincePulse = 0.0;
 		}
-		clocked = period > 0.0 && sincePulse < std::min(period * 2.5, (double) sampleRate * 4.0);
+		bool alive = period > 0.0 && sincePulse < std::min(period * 2.5, (double) sampleRate * 4.0);
+		if (alive != clocked.load(std::memory_order_relaxed))
+			clocked.store(alive, std::memory_order_relaxed);
 		if (buzzTrig.process(inputs[BUZZ_INPUT].getVoltage(), 0.1f, 1.f))
 			a->stroke();
 	}
@@ -429,7 +434,7 @@ struct Kurbel : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		int req = presetReq.exchange(-1);
+		int req = presetReq.load(std::memory_order_relaxed) >= 0 ? presetReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = preset - 1;

@@ -85,6 +85,7 @@ struct Saurus : Module, follow::Host {
 	// settings
 	int preset = 1;                               // TYRANT ROAR
 	bool fromPatch = false;
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	std::atomic<int> presetReq{-1};
 
 	// for the UI thread
@@ -106,6 +107,12 @@ struct Saurus : Module, follow::Host {
 	bool chOn[MAXCH] = {};
 	int chNote[MAXCH] = {};
 	bool gateIn[MAXCH] = {};
+	// the samples from a gate's edge to its note (NOTE_DELAY: V/OCT and VEL may come a sample after the gate, e.g.
+	// through a quantizer), the note's velocity, the channels the last sample used
+	enum { NOTE_DELAY = 2 };
+	int chArm[MAXCH] = {};
+	int chVel[MAXCH] = {};
+	int chActive = 0;
 	bool callOn = false;                          // CALL (button or trigger) holds a note
 	int callNote = CALL_NOTE;
 	float callLeft = 0.f;                         // the trigger's hold, seconds
@@ -154,6 +161,7 @@ struct Saurus : Module, follow::Host {
 		paramQuantities[VOICE_PARAM]->randomizeEnabled = false;
 		for (int& s : sent)
 			s = INT32_MIN;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	/** The firmware's raw value (0..127), shown as the FM-1 writes it. */
@@ -177,7 +185,7 @@ struct Saurus : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, presets
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("SAURUS: %s", status.c_str());
 			return;
@@ -189,7 +197,8 @@ struct Saurus : Module, follow::Host {
 		outBuf.clear();
 		src.reset();
 		for (int c = 0; c < MAXCH; c++)
-			chOn[c] = false;
+			chOn[c] = gateIn[c] = false, chArm[c] = 0;
+		chActive = MAXCH;
 		callOn = false;
 		int n = std::max(1, (int) core.api->npresets());
 		preset = ((preset % n) + n) % n;
@@ -198,6 +207,7 @@ struct Saurus : Module, follow::Host {
 		else
 			core.api->load_preset((uint32_t) preset);
 		shownPreset = preset;
+		powered = true;
 	}
 
 	/** The factory sound into the knobs (and the engine). */
@@ -226,7 +236,7 @@ struct Saurus : Module, follow::Host {
 		params[CALL_PARAM].setValue(0.f);
 		powerOn();
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		fromPatch = false;
@@ -244,7 +254,7 @@ struct Saurus : Module, follow::Host {
 		if (json_t* j = json_object_get(r, "preset"))
 			preset = (int) json_integer_value(j);
 		fromPatch = true;
-		if (core.api) {
+		if (powered && core.api) {
 			int n = std::max(1, (int) core.api->npresets());
 			preset = ((preset % n) + n) % n;
 			core.api->load_preset((uint32_t) preset);
@@ -303,31 +313,44 @@ struct Saurus : Module, follow::Host {
 
 	/** V/OCT + GATE, one note a channel; CALL (button: while held; trigger: the call's length) on V/OCT's first note. */
 	void processNotes(const jsa_api* a, float dt) {
-		int chs = std::min(MAXCH, std::max(inputs[GATE_INPUT].getChannels(), 1));
 		bool gated = inputs[GATE_INPUT].isConnected();
-		for (int c = 0; c < MAXCH; c++) {
+		int chs = gated ? std::min(MAXCH, std::max(inputs[GATE_INPUT].getChannels(), 1)) : 0;
+		int last = std::max(chs, chActive);        // (channels that went away still let go of their note)
+		for (int c = 0; c < last; c++) {
 			bool on = false;
-			int nn = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
-			if (gated && c < chs) {
+			if (c < chs) {
 				float g = inputs[GATE_INPUT].getPolyVoltage(c);
 				on = gateIn[c] ? g > 0.5f : g >= 1.f;
 			}
+			bool rise = on && !gateIn[c] && !chOn[c];
 			gateIn[c] = on;
-			if (on && !chOn[c]) {
-				int vel = 100;
-				if (inputs[VEL_INPUT].isConnected())
-					vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
-				noteOn(a, nn, vel);
-				chNote[c] = nn;
+			if (rise) {
+				chArm[c] = NOTE_DELAY;              // the gate's edge: the note follows in NOTE_DELAY samples
+			} else if (chArm[c] > 0) {
+				if (--chArm[c] == 0 || !on) {       // (a gate shorter than the wait still plays)
+					chArm[c] = 0;
+					int nn = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
+					int vel = 100;
+					if (inputs[VEL_INPUT].isConnected())
+						vel = clamp((int) std::round(inputs[VEL_INPUT].getPolyVoltage(c) / 10.f * 127.f), 1, 127);
+					noteOn(a, nn, vel);
+					chNote[c] = nn;
+					chVel[c] = vel;
+					chOn[c] = true;
+				}
 			} else if (!on && chOn[c]) {
 				a->note_off((uint32_t) chNote[c]);
-			} else if (on && nn != chNote[c]) {
-				noteOn(a, nn, 100);
-				a->note_off((uint32_t) chNote[c]);
-				chNote[c] = nn;
+				chOn[c] = false;
+			} else if (on && chOn[c]) {
+				int nn = clamp((int) std::round(inputs[VOCT_INPUT].getPolyVoltage(c) * 12.f) + 60, 0, 127);
+				if (nn != chNote[c]) {              // a new pitch under a held gate: the note again, at its velocity
+					noteOn(a, nn, chVel[c]);
+					a->note_off((uint32_t) chNote[c]);
+					chNote[c] = nn;
+				}
 			}
-			chOn[c] = on;
 		}
+		chActive = chs;
 		// CALL
 		bool btn = params[CALL_PARAM].getValue() > 0.5f;
 		bool pressed = callBtn.process(btn);
@@ -390,7 +413,7 @@ struct Saurus : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		int req = presetReq.exchange(-1);
+		int req = presetReq.load(std::memory_order_relaxed) >= 0 ? presetReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = preset - 1;
@@ -406,7 +429,7 @@ struct Saurus : Module, follow::Host {
 		}
 		processNotes(a, args.sampleTime);
 		age += args.sampleTime;
-		callAge = age;
+		callAge.store(age, std::memory_order_relaxed);
 		int guard = 0;
 		while (outBuf.empty() && guard++ < 8)
 			renderBlock(a, args.sampleRate);

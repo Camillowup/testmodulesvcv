@@ -60,10 +60,16 @@ struct Canta : Module, follow::Host {
 	bool keepLyrics = false;                      // (right-click) presets leave the lyrics alone
 	bool legatoNext = false;                      // (right-click) a new pitch under a held gate sings the next syllable
 	bool fromPatch = false;
-	std::string lyrics;                           // the text (engine thread's copy: what the core has)
+	// The lyrics travel in fixed buffers (longer text is cut at LYR_MAX - 1 bytes; the core takes 256 syllables), and
+	// the engine thread only ever tries the locks (try_lock) and copies: it never waits, never allocates.
+	static const int LYR_MAX = 4096;
+	char lyrics[LYR_MAX] = {};                    // the text (engine thread's copy: what the core has)
+	char lyricsIn[LYR_MAX] = {};                  // engine thread: a request, copied out of lyricsReq
+	bool publishDue = false;                      // engine thread: `lyrics` still has to go to shownLyrics
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	std::atomic<int> presetReq{-1};
 	std::mutex lyricsMutex;
-	std::string lyricsReq;                        // from the UI, under lyricsMutex
+	char lyricsReq[LYR_MAX] = {};                 // from the UI, under lyricsMutex
 	std::atomic<bool> lyricsPending{false};
 
 	// for the UI thread
@@ -80,7 +86,7 @@ struct Canta : Module, follow::Host {
 	std::atomic<int> nUnits{0};
 	std::array<std::atomic<int>, 8> history{};      // the last babbled morae (ANIMAL, SCAT)
 	std::atomic<uint32_t> histN{0};
-	std::string shownLyrics;                        // UI copy of the text (the editor's start)
+	char shownLyrics[LYR_MAX] = {};                 // UI copy of the text (the editor's start), under shownMutex
 	std::mutex shownMutex;
 
 	// engine thread
@@ -152,6 +158,16 @@ struct Canta : Module, follow::Host {
 			s = INT32_MIN;
 		for (auto& h : history)
 			h = 0;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
+	}
+
+	static void copyText(char* dst, const char* src) {
+		size_t n = src ? std::strlen(src) : 0;
+		if (n > (size_t) LYR_MAX - 1)
+			n = LYR_MAX - 1;
+		if (n)
+			std::memmove(dst, src, n);
+		dst[n] = 0;
 	}
 
 	/** Knobs shown as the core writes the value (ms, cents, %). */
@@ -183,7 +199,7 @@ struct Canta : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, presets, lyrics
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("CANTA: %s", status.c_str());
 			return;
@@ -202,6 +218,7 @@ struct Canta : Module, follow::Host {
 		else
 			takeLyrics(lyrics);
 		shownPreset = preset;
+		powered = true;
 	}
 
 	/** The preset's sound into the knobs (and the core); its lyrics too unless "keep lyrics". */
@@ -223,7 +240,7 @@ struct Canta : Module, follow::Host {
 		params[CHR_PARAM].setValue((float) a->get(JCA_CHR));
 		for (int& s : sent)
 			s = INT32_MIN;
-		if (keepLyrics && !lyrics.empty())
+		if (keepLyrics && lyrics[0])
 			takeLyrics(lyrics);
 		else
 			takeLyrics(a->preset_lyrics((uint32_t) preset));
@@ -231,18 +248,28 @@ struct Canta : Module, follow::Host {
 	}
 
 	/** Lyrics into the core (engine thread). Bad lyrics: the old ones stay, the error is shown. */
-	void takeLyrics(const std::string& s) {
+	void takeLyrics(const char* s) {
 		const jca_api* a = core.api;
 		if (!a)
 			return;
-		int e = a->set_lyrics(s.c_str());
+		int e = a->set_lyrics(s);
 		lyricError = e;
 		if (e < 0) {
-			lyrics = s;
-			std::lock_guard<std::mutex> lock(shownMutex);
-			shownLyrics = s;
+			if (s != lyrics)
+				copyText(lyrics, s);
+			publishDue = true;                      // (to the UI's copy as soon as its lock is free: publishLyrics)
+			publishLyrics();
 		}
 		snapshotLyrics(a);
+	}
+
+	/** The text the core has into the UI's copy; if the UI holds the lock right now, the next sample tries again. */
+	void publishLyrics() {
+		std::unique_lock<std::mutex> lock(shownMutex, std::try_to_lock);
+		if (!lock.owns_lock())
+			return;
+		copyText(shownLyrics, lyrics);
+		publishDue = false;
 	}
 
 	void snapshotLyrics(const jca_api* a) {
@@ -257,7 +284,7 @@ struct Canta : Module, follow::Host {
 	/** From the UI: new lyrics, taken by the engine thread. */
 	void requestLyrics(const std::string& s) {
 		std::lock_guard<std::mutex> lock(lyricsMutex);
-		lyricsReq = s;
+		copyText(lyricsReq, s.c_str());
 		lyricsPending = true;
 	}
 
@@ -272,7 +299,7 @@ struct Canta : Module, follow::Host {
 		params[CALL_PARAM].setValue(0.f);
 		powerOn();
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		fromPatch = false;
@@ -303,10 +330,10 @@ struct Canta : Module, follow::Host {
 		if (json_t* j = json_object_get(r, "legatoNext"))
 			legatoNext = json_boolean_value(j);
 		if (json_t* j = json_object_get(r, "lyrics")) {
-			lyrics = json_string_value(j) ? json_string_value(j) : "";
+			copyText(lyrics, json_string_value(j));
 			{
 				std::lock_guard<std::mutex> lock(shownMutex);
-				shownLyrics = lyrics;
+				copyText(shownLyrics, lyrics);
 			}
 			requestLyrics(lyrics);
 		}
@@ -402,7 +429,9 @@ struct Canta : Module, follow::Host {
 			if (pulses++ % ppqn == 0)
 				beats++;
 		}
-		clocked = period > 0.0 && sincePulse < std::min(period * 2.5, (double) sampleRate * 4.0);
+		bool alive = period > 0.0 && sincePulse < std::min(period * 2.5, (double) sampleRate * 4.0);
+		if (alive != clocked.load(std::memory_order_relaxed))
+			clocked.store(alive, std::memory_order_relaxed);
 	}
 
 	void renderBlock(const jca_api* a, float sampleRate) {
@@ -448,16 +477,19 @@ struct Canta : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		if (lyricsPending) {
-			std::string s;
-			{
-				std::lock_guard<std::mutex> lock(lyricsMutex);
-				s = lyricsReq;
+		if (lyricsPending.load(std::memory_order_relaxed)) {
+			// (the UI is writing the request just now: the next sample takes it)
+			std::unique_lock<std::mutex> lock(lyricsMutex, std::try_to_lock);
+			if (lock.owns_lock()) {
+				copyText(lyricsIn, lyricsReq);
 				lyricsPending = false;
+				lock.unlock();
+				takeLyrics(lyricsIn);
 			}
-			takeLyrics(s);
 		}
-		int req = presetReq.exchange(-1);
+		if (publishDue)
+			publishLyrics();
+		int req = presetReq.load(std::memory_order_relaxed) >= 0 ? presetReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = preset - 1;

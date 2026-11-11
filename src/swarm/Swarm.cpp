@@ -77,6 +77,8 @@ struct Swarm : Module, follow::Host {
 	dsp::BooleanTrigger prevTrig, nextTrig, newTrig;
 	dsp::SchmittTrigger clockTrig, resetTrig, arriveTrig, newInTrig;
 	float gain = 1.f;                             // the gate's level now (KEYS), ramped
+	float rampK = 0.f, rampDt = 0.f;              // its ramp's coefficient, for this sample time
+	bool powered = false;                         // the core runs (powerOn): before that it is loaded but not started
 	float newFlash = 0.f;
 	int key = 0;
 	// the song's position (the lead's grid): samples at the engine's rate since RESET
@@ -127,6 +129,7 @@ struct Swarm : Module, follow::Host {
 		paramQuantities[VOICES_PARAM]->randomizeEnabled = false;
 		for (int& s : sent)
 			s = INT32_MIN;
+		core.load();                               // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	struct EQuantity : ParamQuantity {
@@ -148,7 +151,7 @@ struct Swarm : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, presets
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("SWARM: %s", status.c_str());
 			return;
@@ -168,6 +171,7 @@ struct Swarm : Module, follow::Host {
 		else
 			core.api->load_preset(preset);
 		shownPreset = preset;
+		powered = true;
 	}
 
 	void applyPreset(int i) {
@@ -195,7 +199,7 @@ struct Swarm : Module, follow::Host {
 		params[NEW_PARAM].setValue(0.f);
 		powerOn();
 	}
-	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
+	void onRemove(const RemoveEvent& e) override { follow::gone(this); powered = false; core.unload(); }
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		fromPatch = false;
@@ -211,7 +215,7 @@ struct Swarm : Module, follow::Host {
 		json_object_set_new(r, "clockMode", json_integer(clockMode));
 		json_object_set_new(r, "root", json_integer(root));
 		json_object_set_new(r, "scale", json_integer(scale));
-		json_object_set_new(r, "seed", json_integer(core.api ? core.api->seed() : seed));
+		json_object_set_new(r, "seed", json_integer(powered && core.api ? core.api->seed() : seed));
 		fol.toJson(r);
 		return r;
 	}
@@ -228,7 +232,7 @@ struct Swarm : Module, follow::Host {
 		if (json_t* j = json_object_get(r, "seed"))
 			seed = (uint32_t) json_integer_value(j);
 		fromPatch = true;
-		if (core.api) {
+		if (powered && core.api) {
 			core.api->renew(seed ? seed : 1u);
 			int n = std::max(1, (int) core.api->npresets());
 			preset = ((preset % n) + n) % n;
@@ -298,7 +302,8 @@ struct Swarm : Module, follow::Host {
 			engPos = std::max(0.0, ((double) (pulses - 1) + frac) / ppqn) * beat;
 		} else
 			engPos += (double) devRate / sampleRate;
-		clocked = alive;
+		if (alive != clocked.load(std::memory_order_relaxed))
+			clocked.store(alive, std::memory_order_relaxed);
 	}
 
 	void renderBlock(const jsw_api* a, float sampleRate) {
@@ -341,7 +346,7 @@ struct Swarm : Module, follow::Host {
 			outputs[R_OUTPUT].setVoltage(0.f);
 			return;
 		}
-		int req = presetReq.exchange(-1);
+		int req = presetReq.load(std::memory_order_relaxed) >= 0 ? presetReq.exchange(-1) : -1;
 		bool want = req >= 0;
 		if (prevTrig.process(params[PREV_PARAM].getValue() > 0.5f)) {
 			req = preset - 1;
@@ -355,7 +360,7 @@ struct Swarm : Module, follow::Host {
 			fromPatch = false;
 			applyPreset(req);
 		}
-		bool renew = newReq.exchange(false);
+		bool renew = newReq.load(std::memory_order_relaxed) && newReq.exchange(false);
 		renew |= newTrig.process(params[NEW_PARAM].getValue() > 0.5f);
 		renew |= newInTrig.process(inputs[NEW_INPUT].getVoltage(), 0.1f, 1.f);
 		if (renew) {
@@ -385,9 +390,12 @@ struct Swarm : Module, follow::Host {
 				target *= clamp(inputs[VEL_INPUT].getVoltage() / 10.f, 0.f, 1.f);
 		}
 		// a short ramp against clicks (~3 ms)
-		float k = 1.f - std::exp(-args.sampleTime / 0.003f);
-		gain += (target - gain) * k;
-		shownGate = gain;
+		if (args.sampleTime != rampDt) {            // (the same value as before, worked out once per sample rate)
+			rampDt = args.sampleTime;
+			rampK = 1.f - std::exp(-args.sampleTime / 0.003f);
+		}
+		gain += (target - gain) * rampK;
+		shownGate.store(gain, std::memory_order_relaxed);
 
 		int guard = 0;
 		while (outBuf.empty() && guard++ < 8)

@@ -103,6 +103,79 @@ static int divOf(float p, float bpm, int fx) {
 	return d;
 }
 
+/** The core's 44.1 kHz frames to Rack's rate, resting while only silence goes through (after GENRA's jiant::Resampler,
+ * for any number of channels): once the converter holds nothing but zeros it is not run, the zeros are counted out.
+ * `quiet` (this block is silent) comes from outside: KESSEL's two converters (mix, lanes) get the same one, so they
+ * rest and wake in the same blocks and give the same number of frames (their buffers are read side by side). */
+template <int N>
+struct RestSrc {
+	dsp::SampleRateConverter<N> src;
+	uint32_t zeros = 0;      // frames of exact silence in a row through the converter
+	bool resting = false;
+	uint64_t acc = 0;        // resting: the output frames owed, in units of 1 / devRate
+	int lastRate = 0;
+
+	RestSrc() { src.setQuality(6); }
+	void reset() {
+		src.refreshState();
+		zeros = 0;
+		resting = false;
+	}
+	/** Start as the other converter is now (resting or not), so both count their frames the same way from here. */
+	template <int M>
+	void adopt(const RestSrc<M>& o) {
+		src.refreshState();
+		zeros = o.zeros;
+		resting = o.resting;
+		acc = o.acc;
+		lastRate = o.lastRate;
+	}
+	static bool silent(const dsp::Frame<N>* in, int n) {
+		for (int i = 0; i < n; i++)
+			for (int c = 0; c < N; c++)
+				if (in[i].samples[c] != 0.f)
+					return false;
+		return true;
+	}
+	template <class Buf>
+	void process(dsp::Frame<N>* in, int n, int devRate, int rate, Buf& outBuf, bool quiet) {
+		if (resting && (!quiet || rate != lastRate)) {
+			src.setRates(devRate, rate);
+			src.refreshState();               // its history: the zeros it would hold
+			resting = false;
+			zeros = 0;
+		}
+		if (resting) {
+			acc += (uint64_t) n * (uint64_t) rate;
+			uint64_t k = acc / (uint64_t) devRate;
+			acc -= k * (uint64_t) devRate;
+			size_t m = std::min((size_t) k, outBuf.capacity());
+			if (m) {
+				std::memset((void*) outBuf.endData(), 0, m * sizeof(dsp::Frame<N>));
+				outBuf.endIncr(m);
+			}
+			return;
+		}
+		src.setRates(devRate, rate);
+		src.setChannels(N);
+		int inLen = n, outLen = (int) outBuf.capacity();
+		src.process(in, &inLen, outBuf.endData(), &outLen);
+		outBuf.endIncr(outLen);
+		if (!quiet) {
+			zeros = 0;
+			return;
+		}
+		zeros += (uint32_t) n;
+		// the filter's length: quality 6 has 96 taps, times the ratio when it lowers the rate (with room to spare)
+		uint32_t need = 512u * (uint32_t) (1 + devRate / std::max(1, rate)) + 256u;
+		if (zeros >= need) {
+			resting = true;
+			lastRate = rate;
+			acc = (uint64_t) devRate / 2;
+		}
+	}
+};
+
 // what KESSEL tells its expander, every sample (the expander's message buffers)
 struct FxMsg {
 	float l = 0.f, r = 0.f;  // the effect's return (V)
@@ -165,10 +238,15 @@ struct Kessel : Module, follow::Host {
 	float bpm = 0.f;
 	float envF[JKS_NVOICE] = {};
 
-	// rate conversion: the core's 44.1 kHz frames out, the expander's audio in
-	static const int NCH = NOUT + 4;  // lanes, mix L R, return L R
-	dsp::SampleRateConverter<NCH> src;
-	dsp::DoubleRingBuffer<dsp::Frame<NCH>, 4096> outBuf;
+	// rate conversion: the core's 44.1 kHz frames out (the mix and the effect's return always, the lanes only while one
+	// of their outputs is patched; both rest on silence), the expander's audio in
+	static const int NMIX = 4;        // mix L R, return L R
+	static const int LANE_CUSHION = 3;  // frames the lanes' buffer is ahead: the two converters may differ by one
+	RestSrc<NMIX> mixSrc;
+	RestSrc<NOUT> laneSrc;
+	dsp::DoubleRingBuffer<dsp::Frame<NMIX>, 4096> outBuf;
+	dsp::DoubleRingBuffer<dsp::Frame<NOUT>, 4096> laneBuf;
+	bool lanesOn = false;
 	dsp::SampleRateConverter<2> inSrc;
 	dsp::DoubleRingBuffer<dsp::Frame<2>, 1024> inPending;  // the expander's IN at Rack's rate
 	dsp::DoubleRingBuffer<dsp::Frame<2>, 4096> inBuf;      // … at 44.1 kHz
@@ -225,7 +303,6 @@ struct Kessel : Module, follow::Host {
 			v = 0.f;
 		for (auto& v : scope)
 			v = 0.f;
-		src.setQuality(6);
 		inSrc.setQuality(6);
 		forget();
 		// the kits: the factory's by style, the user's as saved module states (StateBank)
@@ -238,6 +315,7 @@ struct Kessel : Module, follow::Host {
 		          [this](int i) { kitReq = clamp(i, 0, kessel_kits::NUM - 1); });
 		bank.preset = 0;
 		bank.presetName = bank.nameOf(0);
+		core.load();  // here (the UI thread), not in onAdd: the engine waits there
 	}
 
 	struct EditQuantity : ParamQuantity {
@@ -282,7 +360,7 @@ struct Kessel : Module, follow::Host {
 
 	// ---------------------------------------------------------------------------------- power, kits
 	void powerOn() {
-		if (!core.load()) {
+		if (!core.loaded() && !core.load()) {
 			status = core.error;
 			WARN("KESSEL: %s", status.c_str());
 			return;
@@ -404,7 +482,7 @@ struct Kessel : Module, follow::Host {
 
 	/** The lane edited: its values into the knobs when it changes, the knobs into the kit when they move. */
 	void processEdit() {
-		int l = laneReq.exchange(-1);
+		int l = laneReq.load(std::memory_order_relaxed) >= 0 ? laneReq.exchange(-1) : -1;
 		if (l >= 0 && l < NL && LANE_VOICE[l] >= 0)
 			lane = l;
 		int v = LANE_VOICE[lane];
@@ -429,7 +507,8 @@ struct Kessel : Module, follow::Host {
 				edited = true;
 			}
 		}
-		shownLane = lane;
+		if (shownLane.load(std::memory_order_relaxed) != lane)
+			shownLane = lane;
 	}
 
 	/** The kit plus the macros (and their CV) into the core: only what changed. */
@@ -480,7 +559,7 @@ struct Kessel : Module, follow::Host {
 	}
 
 	void processHits() {
-		uint32_t pads = padHits.exchange(0);
+		uint32_t pads = padHits.load(std::memory_order_relaxed) ? padHits.exchange(0) : 0u;
 		for (int l = 0; l < NL; l++)
 			if ((pads >> l) & 1u)
 				hit(l, accent(100, 0));
@@ -518,13 +597,29 @@ struct Kessel : Module, follow::Host {
 		}
 		bool alive = ext && clockPeriod > 0.0 && sinceClock < std::max(clockPeriod * 3.0, (double) sampleRate * 0.5);
 		bpm = alive ? clamp((float) (60.0 * sampleRate / (clockPeriod * 4.0)), 30.f, 300.f) : 0.f;
-		bpmShown = bpm;
+		if (bpmShown.load(std::memory_order_relaxed) != bpm)
+			bpmShown.store(bpm, std::memory_order_relaxed);
 	}
 
 	/** One block of the core: the hits, the voices, the mix, the effect bus; into the output buffer. */
 	void renderBlock(float sampleRate) {
 		const jks_api* a = core.api;
+		processEdit();  // (the lane's knobs: once a block, as the core takes them)
 		pushSound();
+		// the lanes' converter: only while a lane output is patched
+		bool needLanes = false;
+		for (int o = 0; o < NOUT; o++)
+			needLanes = needLanes || outputs[LANE_OUTPUT + o].isConnected();
+		if (needLanes && !lanesOn) {
+			lanesOn = true;
+			laneSrc.adopt(mixSrc);
+			laneBuf.clear();
+			for (int i = 0; i < LANE_CUSHION; i++)
+				laneBuf.push(dsp::Frame<NOUT>{});
+		} else if (!needLanes && lanesOn) {
+			lanesOn = false;
+			laneBuf.clear();
+		}
 		for (int l = 0; l < NL; l++) {
 			if (!pending[l])
 				continue;
@@ -555,7 +650,8 @@ struct Kessel : Module, follow::Host {
 		}
 
 		// the effect bus input: the sends, and the expander's IN (resampled to 44.1 kHz)
-		dsp::Frame<NCH> frames[JKS_BLOCK];
+		dsp::Frame<NMIX> frames[JKS_BLOCK];
+		dsp::Frame<NOUT> lanes[JKS_BLOCK];
 		for (int i = 0; i < JKS_BLOCK; i++) {
 			dsp::Frame<2> ext{};
 			if (!inBuf.empty())
@@ -588,10 +684,8 @@ struct Kessel : Module, follow::Host {
 		float level = fx ? fx->params[KFX_LEVEL].getValue() : 0.f;
 
 		for (int i = 0; i < JKS_BLOCK; i++) {
-			dsp::Frame<NCH>& f = frames[i];
+			dsp::Frame<NMIX>& f = frames[i];
 			float l = 0.f, r = 0.f;
-			for (int o = 0; o < NOUT; o++)
-				f.samples[o] = 0.f;
 			for (int v = 0; v < JKS_NVOICE; v++) {
 				float x = block[v * JKS_BLOCK + i];
 				float dry = 1.f - sends[v];
@@ -599,29 +693,35 @@ struct Kessel : Module, follow::Host {
 				r += x * pans[v][1] * dry;
 			}
 			// the lane outputs: each voice alone (the hi-hat on the one struck last)
-			f.samples[0] = block[JKS_DRUM1 * JKS_BLOCK + i];
-			f.samples[1] = block[JKS_SNARE * JKS_BLOCK + i];
-			f.samples[2] = block[JKS_DRUM3 * JKS_BLOCK + i];
-			f.samples[hatOutLane == 5 ? 4 : 3] = block[JKS_HAT * JKS_BLOCK + i];
-			f.samples[5] = block[JKS_DRUM2 * JKS_BLOCK + i];
-			f.samples[6] = block[JKS_CYM * JKS_BLOCK + i];
+			if (lanesOn) {
+				dsp::Frame<NOUT>& lf = lanes[i];
+				for (int o = 0; o < NOUT; o++)
+					lf.samples[o] = 0.f;
+				lf.samples[0] = block[JKS_DRUM1 * JKS_BLOCK + i];
+				lf.samples[1] = block[JKS_SNARE * JKS_BLOCK + i];
+				lf.samples[2] = block[JKS_DRUM3 * JKS_BLOCK + i];
+				lf.samples[hatOutLane == 5 ? 4 : 3] = block[JKS_HAT * JKS_BLOCK + i];
+				lf.samples[5] = block[JKS_DRUM2 * JKS_BLOCK + i];
+				lf.samples[6] = block[JKS_CYM * JKS_BLOCK + i];
+			}
 			float rl = busOut[2 * i] * level, rr = busOut[2 * i + 1] * level;
 			if (fxOn && !fxOwnOut) {
 				l += rl;
 				r += rr;
 			}
-			f.samples[NOUT] = l * vol;
-			f.samples[NOUT + 1] = r * vol;
-			f.samples[NOUT + 2] = rl * vol;
-			f.samples[NOUT + 3] = rr * vol;
+			f.samples[0] = l * vol;
+			f.samples[1] = r * vol;
+			f.samples[2] = rl * vol;
+			f.samples[3] = rr * vol;
 		}
-		int out = 0, inLen = JKS_BLOCK;
-		int outLen = (int) outBuf.capacity();
-		src.setRates(44100, (int) sampleRate);
-		src.setChannels(NCH);
-		src.process(frames, &inLen, outBuf.endData(), &outLen);
-		outBuf.endIncr(outLen);
-		(void) out;
+		bool quiet = RestSrc<NMIX>::silent(frames, JKS_BLOCK) && (!lanesOn || RestSrc<NOUT>::silent(lanes, JKS_BLOCK));
+		mixSrc.process(frames, JKS_BLOCK, 44100, (int) sampleRate, outBuf, quiet);
+		if (lanesOn) {
+			laneSrc.process(lanes, JKS_BLOCK, 44100, (int) sampleRate, laneBuf, quiet);
+			// (the two converters' counts differ by a frame at most; should the lanes ever run ahead, they come back)
+			if (laneBuf.size() > outBuf.size() + 4 * LANE_CUSHION)
+				laneBuf.startIncr(laneBuf.size() - outBuf.size() - LANE_CUSHION);
+		}
 	}
 
 	// the expander's parameters (KesselFx's ids, kept here so both read the same)
@@ -730,23 +830,25 @@ struct Kessel : Module, follow::Host {
 				outputs[o].setVoltage(0.f);
 			return;
 		}
-		int req = kitReq.exchange(-1);
+		int req = kitReq.load(std::memory_order_relaxed) >= 0 ? kitReq.exchange(-1) : -1;
 		if (req >= 0)
 			applyKit(req);
-		processEdit();
 		processHits();
 		processClock(args.sampleRate);
 
 		// the expander's IN, to 44.1 kHz
 		Module* fx = fxModule();
 		{
-			dsp::Frame<2> in{};
-			if (fx) {
+			// (without an expander, or with nothing in its IN, there is nothing to convert: the bus gets silence)
+			bool hasIn = fx && (fx->inputs[2].isConnected() || fx->inputs[3].isConnected());
+			if (hasIn) {
+				dsp::Frame<2> in{};
 				in.samples[0] = fx->inputs[2].getVoltage() / 5.f;
 				in.samples[1] = fx->inputs[3].isConnected() ? fx->inputs[3].getVoltage() / 5.f : in.samples[0];
-			}
-			if (!inPending.full())
-				inPending.push(in);
+				if (!inPending.full())
+					inPending.push(in);
+			} else if (!inPending.empty())
+				inPending.clear();
 			if (inPending.size() >= 32) {
 				int inLen = (int) inPending.size(), outLen = (int) inBuf.capacity();
 				inSrc.setRates((int) args.sampleRate, 44100);
@@ -759,13 +861,21 @@ struct Kessel : Module, follow::Host {
 		int guard = 0;
 		while (outBuf.empty() && guard++ < 8)
 			renderBlock(args.sampleRate);
-		dsp::Frame<NCH> f{};
+		dsp::Frame<NMIX> f{};
 		if (!outBuf.empty())
 			f = outBuf.shift();
 		const float V = 5.f;
-		for (int o = 0; o < NOUT; o++)
-			outputs[LANE_OUTPUT + o].setVoltage(genra_out::limit(f.samples[o] * V));
-		float l = genra_out::limit(f.samples[NOUT] * V), r = genra_out::limit(f.samples[NOUT + 1] * V);
+		if (lanesOn) {
+			dsp::Frame<NOUT> lf{};
+			if (!laneBuf.empty())
+				lf = laneBuf.shift();
+			for (int o = 0; o < NOUT; o++)
+				outputs[LANE_OUTPUT + o].setVoltage(genra_out::limit(lf.samples[o] * V));
+		} else {
+			for (int o = 0; o < NOUT; o++)
+				outputs[LANE_OUTPUT + o].setVoltage(0.f);
+		}
+		float l = genra_out::limit(f.samples[0] * V), r = genra_out::limit(f.samples[1] * V);
 		if (outputs[R_OUTPUT].isConnected() || pulled(args.frame)) {
 			outputs[L_OUTPUT].setVoltage(l);
 			outputs[R_OUTPUT].setVoltage(r);
@@ -776,8 +886,8 @@ struct Kessel : Module, follow::Host {
 		if (fx) {
 			FxMsg* m = (FxMsg*) fx->leftExpander.producerMessage;
 			if (m) {
-				m->l = genra_out::limit(f.samples[NOUT + 2] * V);
-				m->r = genra_out::limit(f.samples[NOUT + 3] * V);
+				m->l = genra_out::limit(f.samples[2] * V);
+				m->r = genra_out::limit(f.samples[3] * V);
 				m->bpm = bpm;
 				m->frame = args.frame;
 				fx->leftExpander.requestMessageFlip();
@@ -825,13 +935,15 @@ struct KesselFx : Module {
 	};
 	void process(const ProcessArgs& args) override {
 		Module* k = leftExpander.module;
-		bool d = k && k->model != nullptr && dynamic_cast<Kessel*>(k) != nullptr;
-		docked = d;
+		bool d = k && k->model == modelKessel;
+		if (docked.load(std::memory_order_relaxed) != d)
+			docked = d;
 		lights[ON_LIGHT].setBrightness(params[ON_PARAM].getValue() > 0.5f ? 1.f : 0.f);
 		if (!d) {
 			outputs[L_OUTPUT].setVoltage(0.f);
 			outputs[R_OUTPUT].setVoltage(0.f);
-			bpmShown = 0.f;
+			if (bpmShown.load(std::memory_order_relaxed) != 0.f)
+				bpmShown = 0.f;
 			return;
 		}
 		const FxMsg* m = (const FxMsg*) leftExpander.consumerMessage;
@@ -839,7 +951,8 @@ struct KesselFx : Module {
 		outputs[R_OUTPUT].setVoltage(outputs[R_OUTPUT].isConnected() ? m->r : 0.f);
 		if (!outputs[R_OUTPUT].isConnected())
 			outputs[L_OUTPUT].setVoltage(0.5f * (m->l + m->r));
-		bpmShown = m->bpm;
+		if (bpmShown.load(std::memory_order_relaxed) != m->bpm)
+			bpmShown.store(m->bpm, std::memory_order_relaxed);
 	}
 };
 

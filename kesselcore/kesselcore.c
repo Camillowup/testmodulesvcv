@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-3.0-only
  * KESSEL for VCV Rack: the KESSEL core. The LXR firmware's sound engine (kessel/Core, Erica Synths, GPL-3.0-only)
- * compiled for the host as it is, with this file on top: what the firmware's mixer does every block (the filters'
+ * compiled for the host as it is (but for two reads past a table's end, kessel/SNAPSHOT.txt), with this file on top: what the firmware's mixer does every block (the filters'
  * frequencies, each voice's slow part and its block, the decimation), but each voice into a buffer of its own, so
  * the module gets every voice alone and mixes them itself; the effect bus on a stereo block of its own. The
  * parameters reach the voices through the firmware's own handler (kc_cc.c). Stand-ins for the few things of the rest
@@ -75,6 +75,25 @@ static void decimate(int v, int16_t *buf) {
 	}
 }
 
+/* A voice that has given nothing but zeros for KC_SLEEP_BLOCKS blocks (2 s: longer than any attack or clap repeat)
+ * sleeps: its block is not worked out (it would be zeros) until the voice is struck or one of its parameters is set.
+ * The slow part (calc...Async) always runs. */
+#ifndef KC_SLEEP_BLOCKS
+#define KC_SLEEP_BLOCKS 1378u
+#endif
+static uint32_t quietBlocks[JKS_NVOICE];
+static uint8_t asleep[JKS_NVOICE];
+static void wake(uint32_t v) {
+	if (v < JKS_NVOICE) {
+		asleep[v] = 0;
+		quietBlocks[v] = 0;
+	}
+}
+static void wakeAll(void) {
+	for (uint32_t v = 0; v < JKS_NVOICE; v++)
+		wake(v);
+}
+
 static Reverb reverb;
 static uint8_t fxType = JKS_FX_OFF;
 
@@ -95,6 +114,7 @@ static void kc_init(uint32_t seed) {
 	}
 	hatOpen = 0;
 	fxType = JKS_FX_OFF;
+	wakeAll();
 }
 
 static void kc_set(uint32_t page, uint32_t num, uint32_t value) {
@@ -103,10 +123,12 @@ static void kc_set(uint32_t page, uint32_t num, uint32_t value) {
 	m.data1 = (uint8_t) num;
 	m.data2 = (uint8_t) (value > 127 ? 127 : value);
 	kc_ccHandler(m, 0, 0, 0.f);  /* (no "original value" bookkeeping: KESSEL keeps its own) */
+	wakeAll();                   /* (a parameter by its LXR number: any voice's) */
 }
 
 static void kc_trigger(uint32_t voice, uint32_t vel, uint32_t open) {
 	uint8_t v = (uint8_t) (vel < 1 ? 1 : (vel > 127 ? 127 : vel));
+	wake(voice);
 	switch (voice) {
 	case JKS_DRUM1:
 	case JKS_DRUM2:
@@ -145,6 +167,11 @@ static void kc_render(float *out) {
 
 	int16_t buf[OUTPUT_DMA_SIZE];
 	for (int v = 0; v < JKS_NVOICE; v++) {
+		if (asleep[v]) {
+			for (int i = 0; i < OUTPUT_DMA_SIZE; i++)
+				out[v * JKS_BLOCK + i] = 0.f;
+			continue;
+		}
 		switch (v) {
 		case JKS_DRUM1:
 		case JKS_DRUM2:
@@ -163,8 +190,15 @@ static void kc_render(float *out) {
 		}
 		/* the firmware's order of the decimation rates: drum 1-3, snare, cymbal, hi-hat (as mixer.c) */
 		decimate(v, buf);
-		for (int i = 0; i < OUTPUT_DMA_SIZE; i++)
+		int any = 0;
+		for (int i = 0; i < OUTPUT_DMA_SIZE; i++) {
+			any |= buf[i];
 			out[v * JKS_BLOCK + i] = buf[i] * (1.f / 32768.f);
+		}
+		if (any)
+			quietBlocks[v] = 0;
+		else if (++quietBlocks[v] >= KC_SLEEP_BLOCKS)
+			asleep[v] = 1;
 	}
 }
 
@@ -207,9 +241,17 @@ static void kc_fxSet(uint32_t type, uint32_t sub, const float *p, float dryWet) 
 		fxSub = sub;
 		if (type == JKS_FX_DIST)
 			fxBus.distortion.distortionType = (uint8_t) sub;
-		else if (type == JKS_FX_DELAY)
+		else if (type == JKS_FX_DELAY) {
 			fxBus.delay.delayType = (uint8_t) sub;
-		else if (type == JKS_FX_RING)
+			if (sub) {
+				/* the ping-pong keeps both sides in one half of the memory each: the pointers the plain delay left
+				 * anywhere in the whole of it come into that half (else its first sample reads and writes past
+				 * the memory's end) */
+				fxBus.delay.oldRead &= FX_BUFFER_SIZE >> 1;
+				fxBus.delay.newRead &= FX_BUFFER_SIZE >> 1;
+				fxBus.delay.write &= FX_BUFFER_SIZE >> 1;
+			}
+		} else if (type == JKS_FX_RING)
 			Ringmod_setWave(&fxBus.ringmod, (uint8_t) sub);
 	}
 	for (int i = 0; i < 4; i++) {
@@ -306,7 +348,12 @@ static void kc_setSlot(uint32_t voice, uint32_t slot, uint32_t value) {
 	kc_par p = SLOTS[voice][slot];
 	if (p.page < 0)
 		return;
-	kc_set((uint32_t) p.page, (uint32_t) p.num, value);
+	MidiMsg m;
+	m.status = p.page == JKS_CC2 ? MIDI_CC2 : MIDI_CC;
+	m.data1 = (uint8_t) p.num;
+	m.data2 = (uint8_t) (value > 127 ? 127 : value);
+	kc_ccHandler(m, 0, 0, 0.f);
+	wake(voice);                 /* (the voice may sound differently now: it is worked out again) */
 }
 
 static int32_t kc_hasSlot(uint32_t voice, uint32_t slot) {

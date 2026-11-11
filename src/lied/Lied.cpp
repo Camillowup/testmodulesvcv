@@ -119,6 +119,7 @@ struct Lied : Module, follow::Host {
 	std::atomic<int> shownLine{0}, shownUnit{-1}, shownStep{0};
 	std::atomic<float> shownSemis{0.f};
 	std::atomic<bool> shownHeld{false};
+	std::atomic<double> uiSeen{-1e9};   // when the panel last stepped (it asks for the lines while it is there)
 
 	Lied() {
 		config(PARAMS_LEN, INPUTS_LEN, OUTPUTS_LEN, LIGHTS_LEN);
@@ -188,6 +189,19 @@ struct Lied : Module, follow::Host {
 		texts[2] = "la la la la la";
 		texts[3] = "";
 		applyPreset(0);
+		worker.setPoll([this]() { pollLines(); });
+	}
+	~Lied() { worker.stop(); }   // (first: its thread reads the lyrics and the knobs)
+
+	/** The worker's thread, a few times a second: without a panel (headless, a host's window closed) nobody asks for
+	 * the lines, so the module does: its text and voice as they are now (want() ignores what it already has). */
+	void pollLines() {
+		if (system::getTime() - uiSeen.load(std::memory_order_relaxed) < 1.0)
+			return;   // the panel is there: it asks (after typing has paused)
+		std::string voice = voiceName();
+		int f0 = voiceF0();
+		for (int i = 0; i < 4; i++)
+			worker.want(i, text(i), voice, f0);
 	}
 
 	// ---------------------------------------------------------------------------------- lyrics, presets
@@ -224,9 +238,16 @@ struct Lied : Module, follow::Host {
 		applyPreset(0);
 	}
 	void onRemove(const RemoveEvent& e) override { follow::gone(this); }
+	void onAdd(const AddEvent& e) override {
+		float sr = APP->engine->getSampleRate();
+		if (sr != fx.sr || fx.dl.empty())
+			fx.setRate(sr);   // (the effects' memory: here, not in process())
+		worker.kick();
+	}
 	void onPortChange(const PortChangeEvent& e) override { fol.portChange(e); }
 	void onSampleRateChange(const SampleRateChangeEvent& e) override {
-		fx.setRate(e.sampleRate);
+		if (e.sampleRate != fx.sr || fx.dl.empty())
+			fx.setRate(e.sampleRate);
 	}
 
 	json_t* dataToJson() override {
@@ -251,6 +272,7 @@ struct Lied : Module, follow::Host {
 		}
 		if (json_t* j = json_object_get(r, "clockMode"))
 			clockMode = clamp((int) json_integer_value(j), 0, 3);
+		worker.kick();   // (without a panel the worker takes the new lines itself)
 	}
 
 	// ---------------------------------------------------------------------------------- the sound
@@ -380,14 +402,31 @@ struct Lied : Module, follow::Host {
 		outputs[SYL_OUTPUT].setVoltage(sylPulse.process(args.sampleTime) ? 10.f : 0.f);
 		outputs[END_OUTPUT].setVoltage(endPulse.process(args.sampleTime) ? 10.f : 0.f);
 
-		shownLine = ln;
-		shownStep = step;
-		shownSemis = semis;
-		shownHeld = singer.v[0].active && singer.v[0].held;
+		// for the panel (written only when they change: no bus lock every sample)
+		if (shownLine.load(std::memory_order_relaxed) != ln)
+			shownLine.store(ln, std::memory_order_relaxed);
+		if (shownStep.load(std::memory_order_relaxed) != step)
+			shownStep.store(step, std::memory_order_relaxed);
+		if (shownSemis.load(std::memory_order_relaxed) != semis)
+			shownSemis.store(semis, std::memory_order_relaxed);
+		bool held = singer.v[0].active && singer.v[0].held;
+		if (shownHeld.load(std::memory_order_relaxed) != held)
+			shownHeld.store(held, std::memory_order_relaxed);
 	}
 };
 
 // ------------------------------------------------------------------------------------------------ the panel
+/** A preset picked on the panel: the voice and the knobs, as one step of Rack's undo history. */
+static void presetAction(Lied* m, int i) {
+	history::ModuleChange* h = new history::ModuleChange;
+	h->name = "change LIED preset";
+	h->moduleId = m->id;
+	h->oldModuleJ = APP->engine->moduleToJson(m);
+	m->applyPreset(i);
+	h->newModuleJ = APP->engine->moduleToJson(m);
+	APP->history->push(h);
+}
+
 static Vec mm(const float* p) { return mm2px(Vec(p[0], p[1])); }
 static Rect mmBox(const float* p) { return Rect(mm2px(Vec(p[0], p[1])), mm2px(Vec(p[2], p[3]))); }
 
@@ -666,7 +705,7 @@ struct PresetField : Widget {
 				for (int i = 0; i < NPRESET; i++)
 					menu->addChild(createCheckMenuItem(string::f("%02d  %s", i + 1, PRESETS[i].name), "",
 					                                   [=]() { return (int) m->shownPreset == i; },
-					                                   [=]() { m->applyPreset(i); }));
+					                                   [=]() { presetAction(m, i); }));
 			}
 			e.consume(this);
 			return;
@@ -679,7 +718,7 @@ struct PresetField : Widget {
 			int p = (int) module->shownPreset;
 			int np = clamp(p + (e.scrollDelta.y < 0.f ? 1 : -1), 0, NPRESET - 1);
 			if (np != p)
-				module->applyPreset(np);
+				presetAction(module, np);
 			e.consume(this);
 			return;
 		}
@@ -784,6 +823,7 @@ struct LiedWidget : ModuleWidget {
 		Lied* m = getModule<Lied>();
 		if (!m)
 			return;
+		m->uiSeen.store(system::getTime(), std::memory_order_relaxed);
 		std::string voice = m->voiceName();
 		uint32_t gen = m->textGen;
 		double now = system::getTime();
@@ -816,7 +856,7 @@ struct LiedWidget : ModuleWidget {
 		for (int i = 0; i < NPRESET; i++)
 			names.push_back(string::f("%02d  %s", i + 1, PRESETS[i].name));
 		menu->addChild(createIndexSubmenuItem("Preset", names, [=]() { return (size_t) m->shownPreset; },
-		                                      [=](size_t i) { m->applyPreset((int) i); }));
+		                                      [=](size_t i) { presetAction(m, (int) i); }));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Lyrics: a hyphen cuts a word where you want it (sin-gen)"));
 		menu->addChild(createMenuLabel("Voice: eSpeak NG 1.52 (GPL-3.0-or-later)"));

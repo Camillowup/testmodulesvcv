@@ -39,7 +39,7 @@ void mc_set(mc_engine *m, int param, float v);
  * the same source again first lets its previous note go */
 void mc_note_on(mc_engine *m, int src, int sound, float pitch, int vel);
 void mc_note_off(mc_engine *m, int src);
-/* a held note's pitch moves (V/OCT under a held gate; not the banjo, whose string is set at the pluck) */
+/* a held note's pitch moves (V/OCT under a held gate; the banjo's string gets the new length and rings on) */
 void mc_pitch(mc_engine *m, int src, float pitch);
 void mc_all_off(mc_engine *m);
 /* frames <= MC_MAXFRAMES, mono, -1..1 */
