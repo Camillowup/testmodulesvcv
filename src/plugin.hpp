@@ -12,3 +12,4 @@ extern Model* modelLied;
 extern Model* modelCanta;
 extern Model* modelMiaou;
 extern Model* modelSaurus;
+extern Model* modelFumi;

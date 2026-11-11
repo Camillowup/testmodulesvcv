@@ -1,6 +1,6 @@
 # Third-party material in GENRA Test
 
-GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
+GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
 text in `../LICENSE`). It contains the following parts by other authors. Each keeps its own licence; the texts are in
 this folder. All of them are compatible with distributing the plugin under GPL-3.0.
 
@@ -17,4 +17,6 @@ this folder. All of them are compatible with distributing the plugin under GPL-3
 | eSpeak NG 1.52.0 (speech synthesis, ucd-tools, the compiled language data) | Jonathan Duddington, Reece H. Dunn and the eSpeak NG contributors | GPL-3.0-or-later | LIED (`liedcore/`, `espeak.tar.gz`, `res/espeak-ng-data`) | `../LICENSE`, `ESPEAK-NG-LICENSING.md` |
 | MIKU-FM: the singing voice only (fvoice, vfx, the mora table, the lyrics grammar; voice logic of engine.c rebuilt in `cantacore/`). **No art**: MIKU-FM's character art (Hatsune Miku, Crypton Future Media, Piapro Character License) is not used; CANTA's singers are its own | MIKU-FM's author (github.com/MichaelAPerry/MIKU-FM1) | GPL-3.0-only | CANTA (`cantacore/`, `canta.tar.gz`) | `../LICENSE`, `MIKU-FM-LICENSING.md` |
 | MIAOU: the five sounds and the toy speaker of `src/toy.c` (commit 417e693), its SVF table (`src/tables.h`) and two helpers of foma's `platform/common.c` (`sine`, `note_inc`); no beats, songs, recorder or sequencer, no art (MIAOU's cat is its own) | MIAOU's author (github.com/pjac1810/miaou), on foma (konsumer) and Felucca (Leo Kuroshita, Hügelton Instruments) | GPL-3.0-only | MIAOU (`miaoucore/`) | `../LICENSE`, `MIAOU-LICENSING.md` |
+| FuMi-1: the instrument (pitch core, the ST-50 tunings, trill and ornaments, 6-operator FM, plate reverb) and FuMi-1's six own patches. **Not** its fifteen community DX7 patches (patches.fm, no licence stated by their authors): left out | cartesive (github.com/cartesive/fumi-1); Felucca (Leo Kuroshita, Hügelton Instruments); FoMni (Charles Vestal) | GPL-3.0-only (msfa in it: Apache-2.0) | FUMI (`fumicore/`, `fumi.tar.gz`) | `../LICENSE`, `FUMI-1-LICENSING.md`, `Apache-2.0-msfa.txt` |
+| Noto Sans CJK JP Bold: the outlines of the 31 kanji and kana FUMI shows (`src/fumi/FumiGlyphs.hpp`) | Adobe, Google | SIL OFL 1.1 | FUMI | `OFL-NotoSansCJK.txt` |
 | GENRA's shared sources (`../genra/`: knobs, Follow GENRA, link hub, JIANT UI) | Bastian Ofner (GENRA) | GPL-3.0-only | the whole plugin | `../LICENSE` |

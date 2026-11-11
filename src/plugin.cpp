@@ -17,4 +17,5 @@ void init(Plugin* p) {
 	p->addModel(modelCanta);
 	p->addModel(modelMiaou);
 	p->addModel(modelSaurus);
+	p->addModel(modelFumi);
 }

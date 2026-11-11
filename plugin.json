@@ -80,6 +80,16 @@
         "Polyphonic",
         "Physical modeling"
       ]
+    },
+    {
+      "slug": "Fumi",
+      "name": "FUMI",
+      "description": "FuMi-1's shigin koto after the Suiko ST-50: the ST-50's measured just tuning, honsuu keys and the in, yo and min'yo scales, a trill that plays in pairs as a hand does, the koto's left-hand ornaments, six FM instruments (kotos, harp, wood blocks)",
+      "tags": [
+        "Synth voice",
+        "Polyphonic",
+        "Physical modeling"
+      ]
     }
   ]
 }
