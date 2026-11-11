@@ -104,11 +104,17 @@ jobs:
     # Mac only for a release (branch release) or by hand (Actions › Run workflow): GitHub has few Mac runners, and
     # building every push on dev, main and release at once left the Mac jobs waiting until they were cancelled
     if: github.ref == 'refs/heads/release' || github.event_name == 'workflow_dispatch'
-    runs-on: macos-latest
+    # x64 on GitHub's Intel Mac (macos-15-intel), arm64 on Apple silicon (macos-15): the Apple-silicon runners are often
+    # short ("capacity constraints"), so the Intel build no longer waits for them
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        arch: [arm64, x64]
+        include:
+          - arch: arm64
+            os: macos-15
+          - arch: x64
+            os: macos-15-intel
     steps:
       - uses: actions/checkout@v4
 
