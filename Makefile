@@ -1,4 +1,4 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, SAURUS). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -8,6 +8,7 @@ SOURCES += $(wildcard src/kurbel/*.cpp)
 SOURCES += $(wildcard src/swarm/*.cpp)
 SOURCES += $(wildcard src/lied/*.cpp)
 SOURCES += $(wildcard src/canta/*.cpp)
+SOURCES += $(wildcard src/saurus/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -58,7 +59,8 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT) \
+	res/sauruscore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -143,6 +145,19 @@ CANTA_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Icanta,$(CORE_FLA
 res/cantacore.$(CORE_EXT): cantacore/cantacore.c cantacore/cantacore.h $(CANTA_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(CANTA_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(CANTA_SRC) $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the SAURUS core
+# PALEOTONE's firmware (paleotone.tar.gz, a snapshot of what its host build needs: paleotone/SNAPSHOT.txt) with
+# sauruscore/sauruscore.c on top, built the same way (its own includes). Every instance loads a private copy.
+SAURUS_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Ipaleotone/build/gen -Ipaleotone/firmware/src,$(CORE_FLAGS))
+PALEOTONE_STAMP := paleotone/.unpacked
+$(PALEOTONE_STAMP): paleotone.tar.gz
+	tar xzf paleotone.tar.gz
+	touch $@
+
+res/sauruscore.$(CORE_EXT): sauruscore/sauruscore.c sauruscore/sauruscore.h $(PALEOTONE_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(SAURUS_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

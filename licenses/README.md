@@ -1,6 +1,6 @@
 # Third-party material in GENRA Test
 
-GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
+GENRA Test (MATH, KURBEL, SWARM, LIED, CANTA, SAURUS) as a whole is free software under the **GNU General Public License, version 3 only** (`GPL-3.0-only`, full
 text in `../LICENSE`). It contains the following parts by other authors. Each keeps its own licence; the texts are in
 this folder. All of them are compatible with distributing the plugin under GPL-3.0.
 
@@ -16,4 +16,5 @@ this folder. All of them are compatible with distributing the plugin under GPL-3
 | Further parts of the ESTAMPIE tree (DaisySP, Rings, msfa, fonts rasterised into the firmware, felucca-bsp) | see `ESTAMPIE-LICENSING.md` | MIT, Apache-2.0, SIL OFL 1.1, MPL-2.0 | KURBEL core | `estampie/` |
 | eSpeak NG 1.52.0 (speech synthesis, ucd-tools, the compiled language data) | Jonathan Duddington, Reece H. Dunn and the eSpeak NG contributors | GPL-3.0-or-later | LIED (`liedcore/`, `espeak.tar.gz`, `res/espeak-ng-data`) | `../LICENSE`, `ESPEAK-NG-LICENSING.md` |
 | MIKU-FM: the singing voice only (fvoice, vfx, the mora table, the lyrics grammar; voice logic of engine.c rebuilt in `cantacore/`). **No art**: MIKU-FM's character art (Hatsune Miku, Crypton Future Media, Piapro Character License) is not used; CANTA's singers are its own | MIKU-FM's author (github.com/MichaelAPerry/MIKU-FM1) | GPL-3.0-only | CANTA (`cantacore/`, `canta.tar.gz`) | `../LICENSE`, `MIKU-FM-LICENSING.md` |
+| PALEOTONE (DINOBOX on SLOOP and Felucca): the SAURUS engine (`eng_saurus.c`) and the firmware it runs in (voices, effects, mix) | PALEOTONE / DINOBOX (github.com/fantasmoslam/Paleotone); GHOULBOX (Jason Persinger); SLOOP (isod89); Leo Kuroshita, Hügelton Instruments (Felucca) | GPL-3.0-only (fm6_core.c: msfa, Apache-2.0; PHYS: DaisySP / Rings, MIT; samples in the firmware: CC0) | SAURUS (`sauruscore/`, `paleotone.tar.gz`) | `../LICENSE`, `PALEOTONE-LICENSING.md`, `Apache-2.0-msfa.txt`, `paleotone/` |
 | GENRA's shared sources (`../genra/`: knobs, Follow GENRA, link hub, JIANT UI) | Bastian Ofner (GENRA) | GPL-3.0-only | the whole plugin | `../LICENSE` |

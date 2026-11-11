@@ -61,6 +61,16 @@
         "Synth voice",
         "Speech"
       ]
+    },
+    {
+      "slug": "Saurus",
+      "name": "SAURUS",
+      "description": "PALEOTONE's creature calls: a buzzing throat through three formants, sized from a bird to a sauropod; eleven call shapes (ROAR, BARK, HOOT, TRILL, CHIRP ..., KEYS: a creature a key), twenty creatures as presets; SIZE, SWOOP, LEN, GROWL, BRTH, MOUTH, WILD with CV; eight pixel creatures call along",
+      "tags": [
+        "Synth voice",
+        "Polyphonic",
+        "Physical modeling"
+      ]
     }
   ]
 }
