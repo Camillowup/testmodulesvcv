@@ -42,6 +42,10 @@ jobs:
           ./kt.exe ./kurbelcore.dll
           gcc -std=gnu11 -O2 -w test/swarmcore_test.c -o st.exe -lm && cp res/swarmcore.dll .
           ./st.exe ./swarmcore.dll
+          gcc -std=gnu11 -O2 -w test/liedcore_test.c -o lt.exe -lm && cp res/liedcore.dll .
+          ./lt.exe ./liedcore.dll res/espeak-ng-data
+          g++ -std=c++11 -O2 -w test/lied_test.cpp -o lst.exe
+          ./lst.exe ./liedcore.dll res/espeak-ng-data
 
       - name: Check the package
         run: |
@@ -54,6 +58,11 @@ jobs:
           test -f $D/res/Kurbel.svg
           test -f $D/res/swarmcore.dll
           test -f $D/res/Swarm.svg
+          test -f $D/res/liedcore.dll
+          test -f $D/res/Lied.svg
+          test -f $D/res/espeak-ng-data/phondata
+          test -f $D/res/espeak-ng-data/de_dict
+          test -d "$D/res/espeak-ng-data/voices/!v"
           test -f $D/res/knob/small.svg
           objdump -p $D/plugin.dll | grep "DLL Name"
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi

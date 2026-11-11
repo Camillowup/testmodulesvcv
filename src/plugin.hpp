@@ -8,3 +8,4 @@
 extern Model* modelMath;
 extern Model* modelKurbel;
 extern Model* modelSwarm;
+extern Model* modelLied;

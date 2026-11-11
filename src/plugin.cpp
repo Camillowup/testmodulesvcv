@@ -13,4 +13,5 @@ void init(Plugin* p) {
 	p->addModel(modelMath);
 	p->addModel(modelKurbel);
 	p->addModel(modelSwarm);
+	p->addModel(modelLied);
 }

@@ -11,3 +11,4 @@ plugin.dylib
 *.exe
 docs/*.svg
 __pycache__/
+/espeak/

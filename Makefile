@@ -1,4 +1,4 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -6,6 +6,7 @@ SOURCES += $(wildcard src/*.cpp)
 SOURCES += $(wildcard src/math/*.cpp)
 SOURCES += $(wildcard src/kurbel/*.cpp)
 SOURCES += $(wildcard src/swarm/*.cpp)
+SOURCES += $(wildcard src/lied/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -36,7 +37,7 @@ ifdef ARCH_WIN
 	CORE_FLAGS += -shared -Imathcore/compat -static
 	CORE_LIBS := -lm -lwinpthread
 endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT)
+CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -65,6 +66,42 @@ $(ESTAMPIE_STAMP): estampie.tar.gz
 res/kurbelcore.$(CORE_EXT): kurbelcore/kurbelcore.c kurbelcore/kurbelcore.h $(ESTAMPIE_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(KURBEL_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the LIED core
+# eSpeak NG 1.52.0 (espeak.tar.gz, a snapshot of its library sources: espeak/SNAPSHOT.txt) with liedcore/liedcore.c on
+# top, as one small shared library. Loaded once per process (eSpeak's state is static; LIED calls it under a lock).
+# Its language data (compiled from the same release) is in res/espeak-ng-data.
+ESPEAK_STAMP := espeak/.unpacked
+$(ESPEAK_STAMP): espeak.tar.gz
+	tar xzf espeak.tar.gz
+	touch $@
+
+ESPEAK_LIB := espeak/src/libespeak-ng
+ESPEAK_C := common mnemonics error ieee80 compiledata compiledict dictionary encoding intonation langopts numbers \
+	phoneme phonemelist readclause setlengths soundicon spect ssml synthdata synthesize tr_languages translate \
+	translateword voices wavegen speech espeak_api klatt
+UCD_C := case categories ctype proplist scripts tostring
+LIED_SRC := liedcore/liedcore.c $(addprefix $(ESPEAK_LIB)/,$(addsuffix .c,$(ESPEAK_C))) \
+	$(addprefix espeak/src/ucd-tools/src/,$(addsuffix .c,$(UCD_C)))
+LIED_FLAGS := -std=gnu11 -O2 -w -DLIBESPEAK_NG_EXPORT=1 -Iliedcore -Iespeak/src/include -Iespeak/src/include/compat \
+	-Iespeak/src/ucd-tools/src/include \
+	-I$(ESPEAK_LIB)
+ifdef ARCH_LIN
+	LIED_FLAGS += -fPIC -fvisibility=hidden -shared
+	LIED_LIBS := -lm
+endif
+ifdef ARCH_MAC
+	LIED_FLAGS += -fPIC -fvisibility=hidden -dynamiclib
+	LIED_LIBS := -lm
+endif
+ifdef ARCH_WIN
+	LIED_FLAGS += -shared -static
+	LIED_LIBS := -lm -ladvapi32
+endif
+
+res/liedcore.$(CORE_EXT): liedcore/liedcore.c liedcore/liedcore.h liedcore/config.h $(ESPEAK_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(LIED_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(LIED_SRC) $(LIED_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

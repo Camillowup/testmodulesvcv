@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.2.1",
+  "version": "2.3.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -42,6 +42,15 @@
         "Synth voice",
         "Drone",
         "Random"
+      ]
+    },
+    {
+      "slug": "Lied",
+      "name": "LIED",
+      "description": "A text singer: four lines of lyrics typed on the panel, spoken by eSpeak NG (12 languages, 14 voices) and sung syllable by syllable at the notes of V/OCT, the vowel held while the gate is; choir, vibrato, echo and reverb",
+      "tags": [
+        "Synth voice",
+        "Speech"
       ]
     }
   ]
