@@ -25,7 +25,8 @@ static const char* COUP_NAMES[6] = {"HOLD", "1/4", "1/8", "1/8T", "1/16", "CRANK
 static const char* TEMP_NAMES[4] = {"EQUAL", "PYTH", "MEAN", "JUST"};
 static const char* CLOCK_MODES[4] = {"16ths (4 PPQN)", "8ths (2 PPQN)", "Quarters (1 PPQN)", "24 PPQN"};
 static const int CLOCK_PPQN[4] = {4, 2, 1, 24};
-static const float CLICKS_PER_REV = 20.f;                     // the FM-1's encoder: the crank's clicks per turn
+static const float CLICKS_PER_REV = 40.f;                     // the crank's clicks per turn: 90 rpm = 60 clicks/s, full
+                                                               // pressure at every WHL (GHOULBOX: full at 60 .. 12 clicks/s)
 static const float RPM_PER_VOLT = 24.f;                        // CRANK CV: 0..10 V = 0..240 rpm
 
 // ------------------------------------------------------------------------------------------------ the module
@@ -39,6 +40,7 @@ struct Kurbel : Module, follow::Host {
 		CRANK_PARAM,
 		RING_PARAM,
 		PREV_PARAM, NEXT_PARAM,
+		CALL_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -47,8 +49,8 @@ struct Kurbel : Module, follow::Host {
 		INPUTS_LEN
 	};
 	enum OutputId { L_OUTPUT, R_OUTPUT, OUTPUTS_LEN };
-	enum LightId { RING_LIGHT, LIGHTS_LEN };
-	enum { BLOCK = 32 };
+	enum LightId { RING_LIGHT, CALL_LIGHT, LIGHTS_LEN };
+	enum { BLOCK = 32, CALL_NOTE = 62 };
 
 	KurbelCore core;
 	std::string status;
@@ -57,7 +59,7 @@ struct Kurbel : Module, follow::Host {
 	int preset = 0;
 	int wheelPreset = 0;                          // the last WHEEL sound (back to it from REED)
 	int clockMode = 0;
-	bool crankAlone = true;                       // COUP CRANK without a gate: turning the crank plays (drones + melody)
+	bool crankAlone = false;                      // (right-click, off by default) COUP CRANK without a gate: turning the crank plays (drones + melody)
 	bool fromPatch = false;
 	std::atomic<int> presetReq{-1};
 
@@ -78,7 +80,8 @@ struct Kurbel : Module, follow::Host {
 	jiant::Resampler src;
 	dsp::DoubleRingBuffer<dsp::Frame<2>, 2048> outBuf;
 	uint32_t framesSinceUi = 0;
-	bool gate = false;
+	bool gate = false;                            // a note sounds (the gate, CALL, or the crank alone)
+	bool gateIn = false;                          // the GATE input is high
 	int note = 60;
 	dsp::BooleanTrigger prevTrig, nextTrig;
 	dsp::SchmittTrigger clockTrig, resetTrig, buzzTrig;
@@ -117,6 +120,7 @@ struct Kurbel : Module, follow::Host {
 		configSwitch(RING_PARAM, 0.f, 1.f, 0.f, "Ring (the drones sound on through the rests)", {"Off", "On"});
 		configButton(PREV_PARAM, "Previous preset");
 		configButton(NEXT_PARAM, "Next preset");
+		configButton(CALL_PARAM, "Call (plays the melody string: V/OCT, or D4 without a cable)");
 		configInput(VOCT_INPUT, "V/Oct (the melody string)");
 		configInput(GATE_INPUT, "Gate");
 		configInput(VEL_INPUT, "Velocity (0..10 V)");
@@ -220,6 +224,7 @@ struct Kurbel : Module, follow::Host {
 	void onAdd(const AddEvent& e) override {
 		params[PREV_PARAM].setValue(0.f);
 		params[NEXT_PARAM].setValue(0.f);
+		params[CALL_PARAM].setValue(0.f);
 		powerOn();
 	}
 	void onRemove(const RemoveEvent& e) override { follow::gone(this); core.unload(); }
@@ -227,7 +232,7 @@ struct Kurbel : Module, follow::Host {
 		Module::onReset(e);
 		fromPatch = false;
 		clockMode = 0;
-		crankAlone = true;
+		crankAlone = false;
 		presetReq = 0;
 	}
 
@@ -316,23 +321,31 @@ struct Kurbel : Module, follow::Host {
 		lights[RING_LIGHT].setBrightness(params[RING_PARAM].getValue() > 0.5f ? 1.f : 0.f);
 	}
 
-	/** One melody string: the first channel of V/OCT and GATE; a new pitch under a held gate slides (legato). */
+	/** One melody string: the first channel of V/OCT and GATE, or CALL; a new pitch under a held note slides (legato).
+	 * "Crank plays without a gate" (right-click, COUP CRANK, WHEEL): without a gate the crank turning plays, as on a
+	 * hurdy-gurdy: the drones and the melody string, on the DRONE's note (C3 ..) or on V/OCT's. */
 	void processNotes(const jku_api* a) {
-		bool on = false;
+		bool on = false, keyed = false;
 		int nn = clamp((int) std::round(inputs[VOCT_INPUT].getVoltage() * 12.f) + 60, 0, 127);
 		if (inputs[GATE_INPUT].isConnected()) {
 			float g = inputs[GATE_INPUT].getVoltage();
-			on = gate ? g > 0.5f : g >= 1.f;
-		} else if (crankAlone && engineNow == JKU_WHEEL && params[COUP_PARAM].getValue() > 4.5f) {
-			// no gate: the crank turning plays, as on a hurdy-gurdy: the drones and the melody string, on the DRONE's
-			// note (C3 ..) or on V/OCT's
+			on = keyed = gateIn ? g > 0.5f : g >= 1.f;
+		}
+		gateIn = keyed;
+		bool call = params[CALL_PARAM].getValue() > 0.5f;
+		lights[CALL_LIGHT].setBrightness(call ? 1.f : 0.f);
+		if (!keyed && call) {
+			on = true;
+			if (!inputs[VOCT_INPUT].isConnected())
+				nn = CALL_NOTE;
+		} else if (!keyed && crankAlone && engineNow == JKU_WHEEL && params[COUP_PARAM].getValue() > 4.5f) {
 			on = rpmNow() >= (gate ? 3.f : 6.f);
 			if (!inputs[VOCT_INPUT].isConnected())
 				nn = 48 + clamp((int) std::round(params[DRONE_PARAM].getValue()), 0, 11);
 		}
 		if (on && !gate) {
 			int vel = 100;
-			if (inputs[VEL_INPUT].isConnected())
+			if (keyed && inputs[VEL_INPUT].isConnected())
 				vel = clamp((int) std::round(inputs[VEL_INPUT].getVoltage() / 10.f * 127.f), 1, 127);
 			a->note_on(nn, vel);
 			note = nn;
@@ -657,6 +670,8 @@ struct KurbelWidget : ModuleWidget {
 
 		addParam(createParamCentered<VCVBezel>(jiant::at(L::PREV), module, Kurbel::PREV_PARAM));
 		addParam(createParamCentered<VCVBezel>(jiant::at(L::NEXT), module, Kurbel::NEXT_PARAM));
+		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<KURBEL_RGB>>>(
+		    jiant::at(L::CALL), module, Kurbel::CALL_PARAM, Kurbel::CALL_LIGHT));
 		addParam(createLightParamCentered<VCVLightLatch<jiant::AccentLight<KURBEL_RGB>>>(
 		    jiant::at(L::RING), module, Kurbel::RING_PARAM, Kurbel::RING_LIGHT));
 		SelectField* drone = createParam<SelectField>(Vec(L::DRONE_SEL[0], L::DRONE_SEL[1]), module, Kurbel::DRONE_PARAM);

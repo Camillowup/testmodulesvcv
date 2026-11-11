@@ -57,7 +57,7 @@ Tempo bzw. Kurbel. Die Chips wählen **WHEEL / REED** (Drehleier / Schalmei) und
 JUST** (gleichstufig, pythagoreisch, mitteltönig, rein; gezählt ab dem Bordun).
 
 **Kopf:**
-- **◀ PRE / PRE ▶**: 8 Werks-Klänge (Hurdy Gurdy, Drone Wheel, Dance Gurdy, Trompette, Vielle, Bagpipe, Trotto Gurdy,
+- **◀ PRE / PRE ▶ · CALL**: 8 Werks-Klänge (Hurdy Gurdy, Drone Wheel, Dance Gurdy, Trompette, Vielle, Bagpipe, Trotto Gurdy,
   Shawm). Auch per Rechtsklick › Preset.
 - **RING** (Taster mit Licht): die Bordun-Saiten klingen durch die Pausen weiter, wie bei einer echten Drehleier.
 - **DRONE**: Tonart der Bordun-Saiten (C bis B), zugleich Grundton der Stimmung.
@@ -76,9 +76,14 @@ für vollen Druck), **BUZZ** (Schnarren), **BODY**, **WOBL** (Unruhe des Rads). 
 **CLOCK · RESET** (Tempo der Stösse; RESET startet die Stösse eines gehaltenen Tons neu), **CRANK** (CV, zum Regler
 addiert: 1 V = 24 rpm), **BUZZ** (Trigger: ein Stoss, bei COUP CRANK), L/R. Ohne Kabel: Rechtsklick › Follow GENRA.
 
-**Kurbeln ohne Gate:** Kommt kein Gate an (kein Kabel, kein Follow) und COUP steht auf CRANK, spielt KURBEL von
-selbst, solange gekurbelt wird: Bordune und Melodiesaite auf dem DRONE-Ton (C3 …), mit V/OCT auf dessen Ton.
-Abschaltbar per Rechtsklick › *Crank plays without a gate*.
+**Kurbeln ohne Gate** (ab 2.2.1 Standard aus): Rechtsklick › *Crank plays without a gate* einschalten. Dann spielt
+KURBEL bei COUP CRANK ohne Gate von selbst, solange gekurbelt wird: Bordune und Melodiesaite auf dem DRONE-Ton (C3 …),
+mit V/OCT auf dessen Ton. Ein Gate spielt wie gewohnt die Note von V/OCT. Die Einstellung wird im Patch gespeichert.
+
+**CALL** (ab 2.2.1): spielt die Melodiesaite, solange gedrückt (auf V/OCT, ohne Kabel D4), zum schnellen Anspielen.
+
+**Kurbel-Tempo** (ab 2.2.1): 90 rpm (der Standard) geben bei jeder WHL-Einstellung vollen Bogendruck, darunter wird
+es leiser bis still; vorher brauchte es je nach WHL deutlich mehr.
 
 ## SWARM
 
