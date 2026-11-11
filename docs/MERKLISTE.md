@@ -17,7 +17,8 @@ schmal wie möglich. Alle Dropdown-Felder wechseln auch per Mausrad.
 Umgestellt (gebaut, in Rack zu testen): MATH 22 HP, SWARM 23 HP, SAURUS 22 HP, KURBEL 24 HP, MIAOU 19 HP,
 FUMI 25 HP, CANTA 26 HP. Panels kommen aus `tools/gpanel.py` (die `tools/<modul>_panel.py` beschreiben nur die
 Sektionen). LIED war schon im Vorlagen-Look (25 HP, eigener Generator) und hat jetzt das Mausrad auf allen Feldern.
-Alle Parameter und Buchsen sind gleich geblieben, alte Patches laden weiter. In Rack prüfen:
+Alle Parameter und Buchsen sind gleich geblieben, alte Patches laden weiter. Seit dem zweiten Bau sitzen alle Sektionen
+bündig 2 mm über den Buchsen, das Display füllt die übrige Höhe. In Rack prüfen:
 - dass keine Schrift überlappt (die Display-Texte sind dynamisch),
 - MIAOU: der Klang wird jetzt im Kopf-Feld gewählt (die SOUND-Lämpchen sind weg),
 - CANTA: das Silben-Rad ist weg, gross steht nur noch die Silbe, die klingt; die Textzeile sitzt rechts im Display.

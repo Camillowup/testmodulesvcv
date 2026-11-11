@@ -25,10 +25,10 @@ H = 128.5
 PX = 75 / 25.4  # Rack px per mm
 BG, PLATE, LINE, TXT, DIM, DARK = "#17181d", "#212329", "#34363f", "#d9dbe2", "#8a8d99", "#07080a"
 TITLE, RING, TRAY, SYNC_LINE = "#e6e7ec", "#4a4c57", "#141519", "#5a5c66"
-R = {"large": 6.1, "knob": 4.8, "small": 3.84, "trim": 3.0, "button": 4.6, "jack": 4.0}
-ITEM_H = {"large": 18.6, "knob": 14.9, "small": 13.8, "button": 13.0}
-COL_W = {"large": 16.2, "knob": 12.8, "small": 11.4, "button": 12.8}
-CEN = {"large": 7.4, "knob": 5.8, "small": 4.8, "button": 4.8}
+R = {"large": 6.1, "knob": 4.8, "small": 3.84, "trim": 3.0, "mini": 3.0, "button": 4.6, "step": 2.6, "jack": 4.0}
+ITEM_H = {"large": 18.6, "knob": 14.9, "small": 13.8, "button": 13.0, "step": 10.2, "mini": 12.0}
+COL_W = {"large": 16.2, "knob": 12.8, "small": 11.4, "button": 12.8, "step": 7.4, "mini": 9.8}
+CEN = {"large": 7.4, "knob": 5.8, "small": 4.8, "button": 4.8, "step": 3.0, "mini": 3.9}
 SLOT = 9.4
 
 FONT_DIR = "/usr/share/fonts/opentype/inter/"
@@ -172,7 +172,7 @@ def sec_size(s):
         w = max(w, 34)
     for fr in s.get("fields", []):
         w = max(w, s.get("fieldw", 28) * len(fr) + 6)
-    h = 8.2 + (7.5 if s.get("field") else 0) + 7.5 * len(s.get("fields", []))
+    h = 8.2 + (7.5 if s.get("field") else 0) + 7.5 * len(s.get("fields", [])) + (s["screen"][1] + 1.6 if s.get("screen") else 0)
     h += max([col_h(c) for c in s.get("cols", [])] + [0])
     h += 9.0 * len(s.get("lamps", []))
     return w, h + 0.6
@@ -208,7 +208,7 @@ def jack_rows(spec, W):
             rows.append([g])
     if spec.get("outs"):
         outs = ("out", spec["outs"])
-        if used(rows[-1] + [outs]) <= avail and len(rows) > 1:
+        if used(rows[-1] + [outs]) <= avail and (len(rows) > 1 or spec.get("jackrows", 2) == 1):
             rows[-1].append(outs)
         else:
             rows.append([outs])
@@ -230,9 +230,11 @@ def build(spec):
         jr = jack_rows(spec, W)
         last = jr[-1]
         lw = sum(len(g[1]) * (11.0 if g[0] == "out" else SLOT) for g in last) + 2.3 * (len(last) - 1)
-        if len(jr) <= spec.get("jackrows", 2) and (len(jr) == 1 or lw <= W - 23):
+        if len(jr) <= spec.get("jackrows", 2) and lw <= W - 23:
             break
         hp += 1
+        if hp > 120:
+            sys.exit(f"{spec['name']}: the jacks do not fit in {spec.get('jackrows', 2)} rows")
     W = hp * 5.08
     p.W, p.hp = W, hp
     p.e(f'<svg xmlns="http://www.w3.org/2000/svg" width="{W:.2f}mm" height="{H}mm" viewBox="0 0 {W:.2f} {H}">')
@@ -249,24 +251,46 @@ def build(spec):
         p.field("PRESETF", px, 3.4, pw, spec["preset"])
         p.boxes.append((px, 3.4, px + pw, 8.8, "[preset]"))
         right = px
+    if spec.get("link"):
+        right = min(right, W - 17.0 - width("LINK", 1.6, 700, 0.4) - 2.0)
     for sub in (spec.get("sub", ""), spec.get("subshort", "")):
         if sub and 12.9 + namew + 3.4 + width(sub, 1.76, 600, 0.47) + 2 <= right:
             p.text(12.9 + namew + 3.4, 7.45, sub, 1.76, DIM, 600, "start", 0.47)
             break
-    if 12.9 + namew + 2 < W - 21.5:
+    if spec.get("link"):  # an expander: LINK and its light where the accent bar would be
+        if 12.9 + namew + 2.0 < W - 17.0 - width("LINK", 1.6, 700, 0.4):  # (narrow panels: the light alone)
+            p.text(W - 17.0, 7.45, "LINK", 1.6, DIM, 700, "end", 0.4)
+        p.area("LINK", W - 16.2, 4.3, 3.6, 3.6)
+    elif 12.9 + namew + 2 < W - 21.5:
         p.e(f'<rect x="{W - 21.5:.2f}" y="5.55" width="8" height="1.08" rx="0.54" fill="{p.acc}"/>')
 
-    # the display: a picture on the left (SCREEN) when the module has one, the rest INFO
-    dh, dy = spec.get("dh", 14), 10.5
-    p.area("DISPLAY", 3, dy, W - 6, dh)
-    p.e(f'<rect x="3" y="{dy}" width="{W - 6:.2f}" height="{dh}" rx="1.6" fill="{DARK}" stroke="{LINE}" stroke-width="0.4"/>')
+    # the display: a picture on the left (SCREEN) when the module has one, the rest INFO. Its height is what the
+    # sections and the jacks leave: the sections always sit 2 mm above the jacks, flush on every panel.
+    dy = 10.5
+    jtop = H - 0.7 - len(jr) * 11.9
+    secs = sum(max(sec_size(s)[1] for s in r) for r in rows) + 2 * (len(rows) - 1)
+    lanes_h = 24.5 if spec.get("lanes") else 0
+    dh = jtop - 2.0 - secs - lanes_h - 2.0 - dy
+    spare = 0.0
+    if spec.get("display") is False:  # an expander without a display: the sections start under the header and
+        dy, dh = 10.5 - 2.0, 0.0      # what is left makes the sections taller, so they still end flush
+        spare = (jtop - 2.0 - secs - lanes_h - 2.0 - dy) / len(rows)
+        if spare < 0:
+            sys.exit(f"{spec['name']}: the sections are {-spare * len(rows):.1f} mm too tall")
+    elif dh < 13.0:
+        sys.exit(f"{spec['name']}: the display would be {dh:.1f} mm, less than 13 mm (too much on the panel)")
+    if dh > 0:
+        p.area("DISPLAY", 3, dy, W - 6, dh)
+    if dh > 0:
+        p.e(f'<rect x="3" y="{dy}" width="{W - 6:.2f}" height="{dh}" rx="1.6" fill="{DARK}" stroke="{LINE}" stroke-width="0.4"/>')
     x0 = 5.5
-    if spec.get("screen"):
+    if dh > 0 and spec.get("screen"):
         sw = spec["screen"]  # its width (mm); height: the display's inner height
         p.area("SCREEN", 4.5, dy + 1.5, sw, dh - 3)
         p.e(f'<rect x="4.5" y="{dy + 1.5}" width="{sw:.2f}" height="{dh - 3:.2f}" rx="0.8" fill="{mix(p.acc, DARK, 0.15)}"/>', mock=True)
         x0 = 4.5 + sw + 3
-    p.area("INFO", x0, dy + 1.5, W - 3 - x0 - 2.5, dh - 3)
+    if dh > 0:
+        p.area("INFO", x0, dy + 1.5, W - 3 - x0 - 2.5, dh - 3)
     for k, (x, y, w, h) in spec.get("dareas", {}).items():  # areas inside the display, relative to INFO's top right
         p.area(k, W - 5.5 - x if x >= 0 else x0 - x, dy + y, w, h)
 
@@ -290,10 +314,9 @@ def build(spec):
             p.jack(f"{ln['jack']}{i}", cx + 3.9, ky, ln.get("jacklabel", "TRIG"))
         y += 22.5 + 2.0
     # sections
-    jtop = H - 0.7 - len(jr) * 11.9
     for r in rows:
         sizes = [sec_size(s) for s in r]
-        rh = max(h for _, h in sizes)
+        rh = max(h for _, h in sizes) + spare
         natural = sum(w for w, _ in sizes) + 2 * (len(r) - 1)
         extra = (W - 6 - natural) / len(r)
         x = 3
@@ -311,6 +334,11 @@ def build(spec):
 def draw_section(p, s, x, y, w, h):
     p.section(x, y, w, h, s["title"], s.get("dyntitle"))
     cy = y + 8.2
+    if s.get("screen"):  # a small display of the section (the module draws it)
+        sn, sh = s["screen"]
+        p.area(sn, x + 3, cy - 1.7, w - 6, sh)
+        p.e(f'<rect x="{x + 3:.2f}" y="{cy - 1.7:.2f}" width="{w - 6:.2f}" height="{sh:.2f}" rx="0.9" fill="{DARK}" stroke="{LINE}" stroke-width="0.4"/>')
+        cy += sh + 1.6
     if s.get("field"):
         f = s["field"]
         p.field(f[0], x + 3, y + 6.5, w - 6, *f[1:])
@@ -331,7 +359,10 @@ def draw_section(p, s, x, y, w, h):
             for it in c:
                 kind, name, label = it[0], it[1], it[2]
                 dyn = it[3] if len(it) > 3 else None
-                if kind == "button":
+                if kind == "step":
+                    p.add("step", name, cx + cw / 2, yy + CEN[kind])
+                    p.text(cx + cw / 2, yy + CEN[kind] + R["step"] + 2.6, label, 1.4, TXT, 600, "middle", 0.2)
+                elif kind == "button":
                     p.button(name, cx + cw / 2, yy + CEN[kind], label, light=not (len(it) > 3 and it[3] == "plain"))
                 else:
                     p.knob(kind, name, cx + cw / 2, yy + CEN[kind], label, dyn)
@@ -360,7 +391,7 @@ def draw_jacks(p, rows, W):
     p.e(f'<rect x="3" y="{top:.2f}" width="{W - 6:.2f}" height="{n * 11.9 + 0.2:.2f}" rx="1.2" fill="{PLATE}"/>')
     for ri, r in enumerate(rows):
         y = top + 4.8 + ri * 11.9
-        last = ri == n - 1 and n > 1
+        last = ri == n - 1  # the bottom row stays clear of the screws
         x = 11.5 if last else 6.0
         right = W - 11.5 if last else W - 6
         tot = sum(len(g[1]) * (11.0 if g[0] == "out" else SLOT) for g in r) + 2.3 * (len(r) - 1)
@@ -396,15 +427,16 @@ Panel.check = check
 
 
 # ---------------------------------------------------------------- output
-def layout(p, ns_outer, ns):
+def layout(p, ns_outer, ns, unit="px"):
+    k = PX if unit == "px" else 1.0  # px: Rack pixels; mm: for panels whose code converts with mm2px()
     groups, order = {}, []
     for kind, name, x, y, kw in p.comps:
         if kind == "area":
-            v = [x * PX, y * PX, kw["w"] * PX, kw["h"] * PX]
+            v = [x * k, y * k, kw["w"] * k, kw["h"] * k]
         elif kind == "leds":
-            v = [x * PX, y * PX, kw["dx"] * PX]
+            v = [x * k, y * k, kw["dx"] * k]
         else:
-            v = [x * PX, y * PX]
+            v = [x * k, y * k]
         m = re.match(r"(.*?[A-Z_])(\d+)$", name)
         key = m.group(1) if m else name
         if key not in groups:
@@ -413,13 +445,20 @@ def layout(p, ns_outer, ns):
         groups[key].append((int(m.group(2)) if m else 0, v))
     for key in groups:  # arrays in the order of their numbers
         idx = [i for i, _ in groups[key]]
-        if idx and sorted(idx) != list(range(len(idx))) and len(idx) > 1:
-            sys.exit(f"{key}: numbers {sorted(idx)} are not 0..n-1")
+        if idx and sorted(idx) != list(range(len(idx))):
+            groups[key] = None  # not 0..n-1 (STEP1 .. STEP16, MIX1 MIX2): each keeps its own name
+            continue
         groups[key] = [v for _, v in sorted(groups[key], key=lambda t: t[0])]
-    fmt = lambda v: "{" + ", ".join(f"{a:.1f}f" for a in v) + "}"
-    L = [f"namespace {ns} {{", f"static const float W = {p.hp * 15}.f;", f"static const int HP = {p.hp};"]
+    fmt = lambda v: "{" + ", ".join((f"{a:.1f}f" if unit == "px" else f"{a:.3f}f") for a in v) + "}"
+    L = [f"namespace {ns} {{", (f"static const float W = {p.hp * 15}.f;" if unit == "px" else f"static const float W = {p.W:.3f}f;"), f"static const int HP = {p.hp};"]
     for key in order:
         vs = groups[key]
+        if vs is None:
+            for kind, name, x, y, kw in p.comps:
+                if re.fullmatch(re.escape(key) + r"\d+", name):
+                    v = [x * k, y * k, kw["w"] * k, kw["h"] * k] if kind == "area" else [x * k, y * k]
+                    L.append(f"static const float {name}[{len(v)}] = {fmt(v)};")
+            continue
         arr = re.search(r"\d$", next(n for k, n, *_ in p.comps if n.startswith(key)))
         if len(vs) == 1 and not arr:
             L.append(f"static const float {key}[{len(vs[0])}] = {fmt(vs[0])};")
@@ -435,10 +474,12 @@ def stand_ins(p):
          '<stop offset="0" stop-color="#ffffff"/><stop offset="0.6" stop-color="#c9cbd1"/><stop offset="1" stop-color="#8d9098"/>'
          '</radialGradient></defs>']
     for kind, n, x, y, kw in p.comps:
-        if kind in ("large", "knob", "small", "trim"):
+        if kind in ("large", "knob", "small", "trim", "mini"):
             r = R[kind]
             s.append(f'<circle cx="{x}" cy="{y}" r="{r}" fill="#050507"/><circle cx="{x}" cy="{y}" r="{r - 0.35:.2f}" fill="url(#kn)"/>'
                      f'<line x1="{x}" y1="{y - r * 0.35:.2f}" x2="{x}" y2="{y - r * 0.8:.2f}" stroke="#f2f2f5" stroke-width="{r * 0.16:.2f}" stroke-linecap="round"/>')
+        elif kind == "step":
+            s.append(f'<rect x="{x - 2.6}" y="{y - 2.6}" width="5.2" height="5.2" rx="0.8" fill="#3a3c45" stroke="#050507" stroke-width="0.5"/>')
         elif kind in ("button", "lightbutton"):
             s.append(f'<circle cx="{x}" cy="{y}" r="{R["button"]}" fill="#050507"/><circle cx="{x}" cy="{y}" r="{R["button"] - 0.7:.2f}" fill="#7a7c84"/>')
         elif kind in ("input", "output"):
