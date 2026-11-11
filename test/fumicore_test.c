@@ -13,7 +13,7 @@ static float L[44100], R[44100];
 static double rms(uint32_t n) { double s = 0; for (uint32_t i = 0; i < n; i++) s += L[i] * L[i] + R[i] * R[i]; return sqrt(s / (2 * n)); }
 static double peak(uint32_t n) { double p = 0; for (uint32_t i = 0; i < n; i++) { double a = fabs(L[i]) > fabs(R[i]) ? fabs(L[i]) : fabs(R[i]); if (a > p) p = a; } return p; }
 static double run(const jfu_api *a, uint32_t n) { a->render(n, L, R); return rms(n); }
-static int near(float a, float b, float e) { return fabsf(a - b) <= e; }
+static int approx(float a, float b, float e) { return fabsf(a - b) <= e; }
 int main(int argc, char **argv)
 {
     const char *path = argc > 1 ? argv[1] : "./fumicore.so";
@@ -58,15 +58,15 @@ int main(int argc, char **argv)
     printf("san %d  A3 %.1f  A#3(fa) %.1f  white5 %.1f  white6 %.1f\n", a->san_midi(), a->pitch(57.f, 0), a->pitch(58.f, 0),
            a->white_cents(5), a->white_cents(6));
     if (a->san_midi() != 57) fails++;
-    if (!near(a->pitch(57.f, 0), -1200.f, 0.01f)) fails++;
-    if (!near(a->pitch(58.f, 0), -1100.f - 20.8f, 0.5f)) fails++;
-    if (!near(a->white_cents(6), a->pitch(58.f, 0), 0.01f)) fails++;
+    if (!approx(a->pitch(57.f, 0), -1200.f, 0.01f)) fails++;
+    if (!approx(a->pitch(58.f, 0), -1100.f - 20.8f, 0.5f)) fails++;
+    if (!approx(a->white_cents(6), a->pitch(58.f, 0), 0.01f)) fails++;
     /* snapped: IN is mi fa la ti do = 0 1 5 7 8: C4 (60, 3 above A3) goes to fa (58) or la (62)? nearest: 58 (2) vs 62 (2): either; 59 -> 58 */
     float s59 = a->pitch(59.f, 1), s61 = a->pitch(61.f, 1);
     printf("snap 59 -> %.1f, 61 -> %.1f\n", s59, s61);
-    if (!near(s59, a->pitch(58.f, 0), 0.01f) || !near(s61, a->pitch(62.f, 0), 0.01f)) fails++;
+    if (!approx(s59, a->pitch(58.f, 0), 0.01f) || !approx(s61, a->pitch(62.f, 0), 0.01f)) fails++;
     a->set(JFU_TUNING, 0);
-    if (!near(a->pitch(58.f, 0), -1100.f, 0.01f)) fails++;
+    if (!approx(a->pitch(58.f, 0), -1100.f, 0.01f)) fails++;
     a->set(JFU_HON, 6);
     if (a->san_midi() != 59) fails++;
     a->set(JFU_HON, 4);
