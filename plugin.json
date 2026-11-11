@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -89,6 +89,27 @@
         "Synth voice",
         "Polyphonic",
         "Physical modeling"
+      ]
+    },
+    {
+      "slug": "Kessel",
+      "name": "KESSEL",
+      "description": "A drum machine voice from the open-source LXR firmware's sound engine (Erica Synths, GPL-3.0; not affiliated): three drum voices, snare (with REPEAT its clap), cymbal and hi-hat on GENRA's drum triggers, each lane alone and a mix, 25 kits, kit macros",
+      "tags": [
+        "Drum",
+        "Synth voice"
+      ]
+    },
+    {
+      "slug": "KesselFx",
+      "name": "KESSEL FX",
+      "description": "KESSEL's effect bus as an expander: delay (in divisions of the clock), ping pong, reverb, tube, fold and rat distortion, ring mod, bit crush and DJ filter, one at a time, with a CV on the parameter you pick",
+      "tags": [
+        "Effect",
+        "Expander",
+        "Delay",
+        "Reverb",
+        "Distortion"
       ]
     }
   ]

@@ -1,4 +1,5 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI). Build:
+# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI,
+# KESSEL with KESSEL FX). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
@@ -13,6 +14,7 @@ SOURCES += $(wildcard src/miaou/*.cpp)
 SOURCES += miaoucore/miaoucore.c
 SOURCES += $(wildcard src/saurus/*.cpp)
 SOURCES += $(wildcard src/fumi/*.cpp)
+SOURCES += $(wildcard src/kessel/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
@@ -64,7 +66,7 @@ ifdef ARCH_WIN
 	CORE_LIBS := -lm -lwinpthread
 endif
 CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT) \
-	res/sauruscore.$(CORE_EXT) res/fumicore.$(CORE_EXT)
+	res/sauruscore.$(CORE_EXT) res/fumicore.$(CORE_EXT) res/kesselcore.$(CORE_EXT)
 
 JIANT_STAMP := jiant/.unpacked
 $(JIANT_STAMP): jiant.tar.gz
@@ -176,6 +178,47 @@ FUMI_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-DFM_HOST -Ifumicor
 res/fumicore.$(CORE_EXT): fumicore/fumicore.c fumicore/fumicore.h $(FUMI_STAMP)
 	@mkdir -p res
 	$(CORE_CC) $(FUMI_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
+
+# ---------------------------------------------------------------- the KESSEL core
+# The LXR firmware's sound engine (Erica Synths; kessel.tar.gz, a snapshot of its headers and sound engine sources:
+# kessel/SNAPSHOT.txt) with kesselcore/ on top (kesselcore.c, kc_cc.c: the firmware's parameter handler), as its own
+# small shared library; every instance loads a private copy (the voices are static). kesselcore/compat stands in for
+# the STM32 HAL; kc_sections.h turns the firmware's memory sections into plain ones (forced in on every system).
+KESSEL_STAMP := kessel/.unpacked
+$(KESSEL_STAMP): kessel.tar.gz
+	tar xzf kessel.tar.gz
+	touch $@
+
+KESSEL_SRC := kesselcore/kesselcore.c kesselcore/kc_cc.c \
+	kessel/Core/Src/Preset/initKit.c kessel/Core/Src/Soundengine/DSPAudio/1PoleLp.c \
+	kessel/Core/Src/Soundengine/DSPAudio/BufferTools.c \
+	kessel/Core/Src/Soundengine/DSPAudio/CymbalVoice.c kessel/Core/Src/Soundengine/DSPAudio/Decay.c \
+	kessel/Core/Src/Soundengine/DSPAudio/DrumVoice.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/Compressor.c kessel/Core/Src/Soundengine/DSPAudio/FX/Delay.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/Distortion.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/FxRamBuffer.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/Reverb.c kessel/Core/Src/Soundengine/DSPAudio/FX/Ringmod.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/AllpassDelay.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/VerbDelay.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/VerbModDelay.c \
+	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/sinCos.c \
+	kessel/Core/Src/Soundengine/DSPAudio/HiHat.c kessel/Core/Src/Soundengine/DSPAudio/Oscillator.c \
+	kessel/Core/Src/Soundengine/DSPAudio/ResonantFilter.c kessel/Core/Src/Soundengine/DSPAudio/Samples.c \
+	kessel/Core/Src/Soundengine/DSPAudio/SlopeEg2.c kessel/Core/Src/Soundengine/DSPAudio/Snare.c \
+	kessel/Core/Src/Soundengine/DSPAudio/TiltEq.c kessel/Core/Src/Soundengine/DSPAudio/distortion.c \
+	kessel/Core/Src/Soundengine/DSPAudio/dither.c kessel/Core/Src/Soundengine/DSPAudio/lfo.c \
+	kessel/Core/Src/Soundengine/DSPAudio/random.c kessel/Core/Src/Soundengine/DSPAudio/snapEg.c \
+	kessel/Core/Src/Soundengine/DSPAudio/squareRootLut.c \
+	kessel/Core/Src/Soundengine/DSPAudio/transientGenerator.c \
+	kessel/Core/Src/Soundengine/DSPAudio/transientTables.c \
+	kessel/Core/Src/Soundengine/DSPAudio/wavetable.c kessel/Core/Src/Soundengine/FxBus.c
+KESSEL_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Ikesselcore/compat -Ikesselcore -Ikessel/Core/Inc \
+	-include kesselcore/compat/kc_sections.h,$(CORE_FLAGS))
+KESSEL_FLAGS := $(subst -include mathcore/compat/mac_section.h,,$(KESSEL_FLAGS))
+
+res/kesselcore.$(CORE_EXT): kesselcore/kesselcore.c kesselcore/kesselcore.h kesselcore/kc_cc.c kesselcore/kc_lxr.h $(KESSEL_STAMP)
+	@mkdir -p res
+	$(CORE_CC) $(KESSEL_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(KESSEL_SRC) $(CORE_LIBS)
 
 all: $(CORES)
 dist: $(CORES)

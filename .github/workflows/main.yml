@@ -65,6 +65,8 @@ jobs:
           ./sat.exe ./sauruscore.dll
           gcc -std=gnu11 -O2 -w test/fumicore_test.c -o ft.exe -lm && cp res/fumicore.dll .
           ./ft.exe ./fumicore.dll
+          gcc -std=gnu11 -O2 -w test/kesselcore_test.c -o kst.exe -lm && cp res/kesselcore.dll .
+          ./kst.exe ./kesselcore.dll
 
       - name: Check the package
         run: |
@@ -86,6 +88,9 @@ jobs:
           test -f $D/res/Saurus.svg
           test -f $D/res/fumicore.dll
           test -f $D/res/Fumi.svg
+          test -f $D/res/kesselcore.dll
+          test -f $D/res/Kessel.svg
+          test -f $D/res/KesselFx.svg
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/espeak-ng-data/de_dict
           test -d "$D/res/espeak-ng-data/voices/!v"
@@ -150,7 +155,7 @@ jobs:
           D=dist/GenraTest
           ls -la $D $D/res
           test -f $D/plugin.dylib
-          for c in mathcore kurbelcore swarmcore liedcore cantacore sauruscore fumicore; do test -f $D/res/$c.dylib; done
+          for c in mathcore kurbelcore swarmcore liedcore cantacore sauruscore fumicore kesselcore; do test -f $D/res/$c.dylib; done
           test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/knob/small.svg
           for f in $D/plugin.dylib $D/res/*core.dylib; do
@@ -192,7 +197,7 @@ jobs:
           name: GENRA Test ${{ env.RELVER }}
           files: files/*.vcvplugin
           body: |
-            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI). Appears under the
+            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL). Appears under the
             brand "Genra" in Rack's browser; the modules follow GENRA without cables when the GENRA plugin is installed.
 
             Files: `win-x64` = Windows, `mac-arm64` = Mac with Apple chip (M1 and later), `mac-x64` = Intel Mac.

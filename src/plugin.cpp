@@ -18,4 +18,6 @@ void init(Plugin* p) {
 	p->addModel(modelMiaou);
 	p->addModel(modelSaurus);
 	p->addModel(modelFumi);
+	p->addModel(modelKessel);
+	p->addModel(modelKesselFx);
 }

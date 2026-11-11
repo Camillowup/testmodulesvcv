@@ -4,7 +4,10 @@ Testplugin für neue Instrumente der GENRA-Familie, bevor sie in **GENRA Instrum
 Rack unter der Marke **Genra**, neben GENRA und GENRA Instruments, und funktioniert mit beiden zusammen (Follow GENRA,
 MIX ohne Kabel).
 
-Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA**, **MIAOU**, **SAURUS** und **FUMI**.
+Zurzeit drin: **MATH**, **KURBEL**, **SWARM**, **LIED**, **CANTA**, **MIAOU**, **SAURUS**, **FUMI** und **KESSEL** (mit
+Expander **KESSEL FX**).
+
+Offenes und Geplantes: `docs/MERKLISTE.md`.
 
 ## Installieren
 
@@ -308,11 +311,51 @@ Kabel: Rechtsklick › Follow GENRA. V/OCT spielt chromatisch, die Stimmung (SUI
 Rechtsklick › *Snap V/OCT to the scale* rastet auf die Töne der Tonleiter ein. Rechtsklick auch: **Fine** (±50 Cent)
 und **A4** (430–445 Hz).
 
+## KESSEL
+
+![KESSEL](docs/panels/Kessel.png) ![KESSEL FX](docs/panels/KesselFx.png)
+
+Drum-Modul mit der Klang-Engine der Open-Source-Firmware des **LXR** von Erica Synths (26 HP; nicht von Erica
+Synths, nur ihre freie Engine). Sechs Stimmen: drei Drum-Stimmen (Kick, Rim, Tom), Snare, Becken und Hi-Hat. Look wie
+FUNKE und SCHMELZ, Farbe der Drumspur (wie DRUM-X).
+
+**Spuren in GENRAs Reihenfolge:** KICK, SNARE, (frei), RIM, HAT CL, HAT OP, TOM, CYM. GENRAs Clap spielt die Snare
+(beim LXR ist der Clap die Snare mit **REPEAT**), darum bleibt ihr Platz frei. HAT CL und HAT OP sind eine Stimme
+(die offene wird von der geschlossenen abgewürgt); HAT OP hat ihren eigenen DEC.
+
+**Spur-Tasten:** wählen die Spur, die die Regler darunter zeigen, und spielen sie an. Sie leuchten bei jedem Schlag.
+
+**VOICE · <Spur>:** Oszillator per Dropdown (Mausrad geht), **TUNE** (gross), dazu je nach Stimme: Drum-Stimmen
+**FM · FM FREQ · CLICK · P.AMT · P.DEC**, Snare **NOISE · N.FREQ · REPEAT** (0 = Snare, höher = Clap) **· P.AMT ·
+P.DEC**, Becken **FM · FM FREQ · REPEAT · FM 2 · FREQ 2**, Hi-Hat **FM · FM FREQ · CLICK · FM 2 · FREQ 2**; **PAN**.
+**FILTER · AMP:** Filtertyp per Dropdown, **CUTOFF** (gross), **RES**, **DRIVE**, **LEVEL**, **ATK**, **DEC**, **FX
+SEND** (wie viel der Stimme in KESSEL FX geht).
+
+**KIT · MASTER:** für alle Stimmen **TUNE** (±24 Halbtöne), **DECAY**, **TONE** (alle Cutoffs), **DRIVE**, **ACCENT**
+(wie viel leiser die Schläge ohne ACC sind, wenn ACC gesteckt ist), **FX** (alle Sends), **VOLUME**.
+
+**Kits:** 25 Werks-Kits nach Stil im Feld oben (Klick: Liste, Mausrad: nächstes), eigene über Rechtsklick › Save
+preset as. Ein Punkt hinter dem Namen: verändert. NEW an GENRA kann ein Kit fürs Genre laden (Follow GENRA).
+
+**Buchsen:** GENRA-Leiste **DRUMS** (GENRAs 8 Drum-Trigger, polyfon; Höhe = Velocity) **· VEL · ACC**, dann **CLOCK ·
+RESET** (das Tempo für das Delay von KESSEL FX), CV für **TUNE** (1 V/Okt), **DECAY, TONE, DRIVE, FX, VOL**. Unten
+die Einzelausgänge der Spuren (trocken, mono) und **L/R**. Ohne Kabel: Rechtsklick › Follow GENRA (Drums, Clock, Reset).
+
+### KESSEL FX
+
+Expander rechts neben KESSEL (12 HP): **ein** Effekt aus dem Effektbus des LXR, gespeist von den FX-SEND-Reglern:
+**DELAY**, **PING PONG**, **REVERB**, **TUBE**, **FOLD**, **RAT**, **RING MOD**, dazu eigene **BIT CRUSH** und **DJ
+FILTER** (unter der Mitte Tiefpass, darüber Hochpass). Auswahl per Dropdown (Mausrad geht), **MIX** (gross), **ON**,
+vier Regler, deren Beschriftung mit dem Effekt wechselt. Mit Clock (von KESSEL oder der eigenen CLOCK-Buchse) wählt
+**TIME** beim Delay Notenwerte (1/32 bis 1/4). **MOD · OUT:** das Ziel des CV-Eingangs per Dropdown, **DEPTH**,
+**LEVEL** (Rückweg). Buchsen: **CLOCK, CV, IN L/R** (fremdes Audio in den Effekt), Ausgänge **L/R**: der Rückweg allein;
+sind sie nicht gesteckt, geht der Rückweg in KESSELs Mix.
+
 ## Aufbau
 
 | Ordner | Inhalt |
 | --- | --- |
-| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, MIAOU: `src/miaou/`, SAURUS: `src/saurus/`, FUMI: `src/fumi/`) |
+| `src/` | das Plugin (MATH: `src/math/`, KURBEL: `src/kurbel/`, SWARM: `src/swarm/`, LIED: `src/lied/`, CANTA: `src/canta/`, MIAOU: `src/miaou/`, SAURUS: `src/saurus/`, FUMI: `src/fumi/`, KESSEL: `src/kessel/`) |
 | `genra/`, `res/knob/` | **nicht im Repo:** die gemeinsamen Teile (Knöpfe, Follow GENRA, Link-Hub, JIANT-UI) kommen vor jedem Build frisch aus dem GENRA-Repo (`src/` und `res/knob/` von Camillowup/Genra-for-Vcv, Branch main); von Hand: `make genra-src` |
 | `mathcore/` | der MATH-Kern: die Firmware als kleine C-Bibliothek (`res/mathcore.dll`), eine private Kopie pro Modul |
 | `jiant.tar.gz` | Schnappschuss der JIANT-FM-Quellen (Branch `codex/swarm`, V10.7.16; siehe `jiant/SNAPSHOT.txt`), beim Bauen entpackt |
@@ -328,8 +371,11 @@ und **A4** (430–445 Hz).
 | `miaoucore/` | der MIAOU-Kern: MIAOUs Klänge (`toy.c`) mit ihren Stimmen in einer Struktur, direkt ins Plugin gebaut (keine eigene Bibliothek nötig) |
 | `sauruscore/` | der SAURUS-Kern (`res/sauruscore.dll`): PALEOTONEs Firmware mit der SAURUS-Engine, eine private Kopie pro Modul |
 | `paleotone.tar.gz` | Schnappschuss der PALEOTONE-Quellen, nur was der Host-Build braucht (siehe `paleotone/SNAPSHOT.txt`), beim Bauen entpackt |
+| `kesselcore/` | der KESSEL-Kern (`res/kesselcore.dll`): die Klang-Engine des LXR mit Effektbus, jede Stimme einzeln, eine private Kopie pro Modul; `compat/` ersetzt die STM32-HAL |
+| `kessel.tar.gz` | Schnappschuss der LXR-Klang-Engine (Commit a43cd4f; siehe `kessel/SNAPSHOT.txt`), nur Header und Quellen der Engine, unverändert |
+| `tools/kessel_kits.py` | erzeugt KESSELs 25 Werks-Kits (`src/kessel/KesselKits.hpp`), misst dabei jede Stimme im echten Kern und macht sie so laut wie möglich |
 | `tools/*_panel.py` | erzeugen `res/<Modul>.svg` und `src/<modul>/<Modul>Layout.hpp` (gemeinsame Teile: `tools/jpanel.py`); `preview` macht ein PNG |
-| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz; SAURUS: alle 21 Presets, Rufformen; FUMI: alle Klänge, Stimmung, Einrasten, 本数, Triller, Verzierungen) |
+| `test/*core_test.c` | Tests der Kerne ohne Rack (MATH: Presets, KEYS, THRU, SYNC; KURBEL: Presets, Kurbel, Stoss; SWARM: Presets, Luft, ARRIVE, NEW, Zeichnung; LIED: alle Sprachen und Stimmen, Tonhöhe; CANTA: Presets, Liedtext, FIXED, ANIMAL, Harmonie; MIAOU: alle Klänge, Regler an den Enden, Miau-Länge, 16 Stimmen, Fuzz; SAURUS: alle 21 Presets, Rufformen; FUMI: alle Klänge, Stimmung, Einrasten, 本数, Triller, Verzierungen; KESSEL: jede Stimme klingt und klingt aus, jeder Effekt) |
 | `docs/panels/` | Panel-Bilder der Module |
 | `test/lied_test.cpp` | LIEDs Gesang ohne Rack: Silben bekannter Wörter, gesungene Tonhöhe = Note, gehaltener Vokal, CHOIR und FX |
 
@@ -344,7 +390,10 @@ GPL-3.0-only (`LICENSE`). SAURUS ist die Kreaturen-Engine aus PALEOTONE (github.
 und Felucca, GPL-3.0-only); die Pixel-Kreaturen sind eigene Grafiken. CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
 GPL-3.0-only (`LICENSE`). FUMI ist das Instrument aus FuMi-1 (github.com/cartesive/fumi-1, GPL-3.0-only; die
 FM-Engine msfa unter Apache-2.0), nur mit seinen sechs eigenen Klängen; die japanischen Zeichen im Display sind
-Umrisse aus Noto Sans CJK JP (SIL OFL 1.1). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
+Umrisse aus Noto Sans CJK JP (SIL OFL 1.1). KESSEL spielt die Klang-Engine der LXR-Firmware von Erica Synths
+(github.com/erica-synths/lxr-desktop-app, GPL-3.0-only mit den Zusätzen ihrer NOTICE.md): eine veränderte Fassung,
+nicht die offizielle Firmware, und KESSEL ist nicht mit Erica Synths verbunden ("Erica Synths" und "LXR" sind ihre
+Marken). CANTA singt mit MIKU-FMs Stimme (github.com/MichaelAPerry/MIKU-FM1, Code GPL-3.0-only);
 die Sängerinnen sind eigene Grafiken, von MIKU-FMs Grafik (Hatsune Miku, Piapro Character License) ist nichts übernommen. LIED spricht mit eSpeak NG (GPL-3.0-or-later). KURBEL ist die Drehleier aus ESTAMPIE (GHOULBOX' GURDY-Engine), die Schalmei Feluccas
 TRIO-Engine (MIT). MATH ist die Engine aus JIANT FM von Juan Ignacio Antonucci (Juan Jiant), einem Fork von
 Felucca (Leo Kuroshita, Hügelton Instruments), ebenfalls GPL-3.0-only. MIAOU spielt die Klänge aus MIAOU

@@ -13,3 +13,5 @@ extern Model* modelCanta;
 extern Model* modelMiaou;
 extern Model* modelSaurus;
 extern Model* modelFumi;
+extern Model* modelKessel;
+extern Model* modelKesselFx;
