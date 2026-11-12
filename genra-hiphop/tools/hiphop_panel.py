@@ -89,7 +89,8 @@ rect(bx, 3.3, 1.3, 7.2, RED, 0.2)
 text(bx + 2.8, 6.0, "HIP-HOP", 1.9, INK_DIM, 700, "start", 0.35)
 text(bx + 2.8, 9.6, "PRODUCTION CENTER", 1.9, INK_DIM, 700, "start", 0.35)
 # PLAY and the four header knobs
-comp("PLAY", 124.0, 6.6, 13.0, 6.6)
+comp("STOP", 103.6, 3.3, 11.6, 6.6)
+comp("PLAY", 116.2, 3.3, 11.6, 6.6)
 for name, x, label in (("BPM", 141.5, "BPM"), ("SWING", 155.0, "SWING"), ("VOL", 168.5, "CHOP"), ("BRK", 182.0, "BREAK")):
     comp(name, x, 6.0)
     text(x, 12.6, label, 1.45, INK, 700)
@@ -253,7 +254,7 @@ print(f"res/HipHop.svg: {HP} HP, {len(comps)} parts")
 if "--preview" in sys.argv:
     out.clear()
     LABELS = {"LOAD": "LOAD", "NEW": "NEW", "REC": "REC", "LOCK": "LOCK", "ROOT": "ROOT", "UNDO": "UNDO", "SAVE": "SAVE",
-              "NEWALL": "NEW ALL", "PLAY": "PLAY"}
+              "NEWALL": "NEW ALL", "PLAY": "PLAY", "STOP": "STOP"}
     CHORDS = ["F#m7", "Bm9", "Dmaj", "C#7", "F#m", "Am7", "E", "Bm"]
     for k, v in comps.items():
         if len(v) == 2:

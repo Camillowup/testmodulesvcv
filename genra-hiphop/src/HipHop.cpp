@@ -256,7 +256,8 @@ struct GenraHipHop : Module {
 
 	// ---- from the panel (UI thread) to the audio thread
 	std::atomic<int> reqNew{0};       // bit per track, bit 5: all
-	std::atomic<bool> reqUndo{false}, reqStyle{false}, reqRender{false};
+	std::atomic<bool> reqUndo{false}, reqStyle{false}, reqRender{false}, reqKill{false};
+	bool wasRunning = false;
 	std::atomic<int> padQ[32];
 	std::atomic<int> padQw{0};
 	int padQr = 0;
@@ -608,13 +609,23 @@ struct GenraHipHop : Module {
 			else
 				phase = 1.f;
 		}
-		if (!run && step.load() >= 0 && !inputs[CLK_INPUT].isConnected()) {
-			// stopped: let the gates go
+		if (wasRunning && !run) {
+			// stopped: the gates go, back to bar 1 (PLAY starts there)
 			bassGate.left = melGate.left = 0;
 			for (Gate& g : padGate)
 				g.left = 0;
+			for (Gate& g : drumGate)
+				g.left = 0;
 			nPend = 0;
 			step = -1;
+			phase = 1.f;
+		}
+		wasRunning = run;
+		if (reqKill.exchange(false)) {
+			for (SVoice& v : cv)
+				v.release(sr);
+			for (SVoice& v : bv)
+				v.release(sr);
 		}
 		if (tickNow) {
 			int s = (step.load() + 1) % LEN;
@@ -1065,6 +1076,7 @@ struct HHButton : widget::OpaqueWidget {
 	NVGcolor col = C_GRAPH;
 	std::function<void()> act, release;
 	std::function<bool()> lit;
+	int symbol = 0; // 1 play triangle, 2 stop square (before the text)
 	bool down = false;
 	void draw(const DrawArgs& args) override {
 		bool on = lit && lit();
@@ -1082,7 +1094,27 @@ struct HHButton : widget::OpaqueWidget {
 			nvgStrokeWidth(args.vg, 1.6f);
 			nvgStroke(args.vg);
 		}
-		label(args.vg, uiBold(), box.size.x / 2, box.size.y / 2 + 0.5f, text, 9.5f, C_CREAM);
+		float tx = box.size.x / 2;
+		if (symbol) {
+			nvgFontFaceId(args.vg, uiBold()->handle);
+			nvgFontSize(args.vg, 9.5f);
+			nvgTextLetterSpacing(args.vg, 0.4f);
+			float tw = nvgTextBounds(args.vg, 0, 0, text.c_str(), NULL, NULL);
+			float x0 = (box.size.x - tw - 9.f) / 2, y = box.size.y / 2;
+			nvgBeginPath(args.vg);
+			if (symbol == 1) {
+				nvgMoveTo(args.vg, x0, y - 3.2f);
+				nvgLineTo(args.vg, x0 + 5.5f, y);
+				nvgLineTo(args.vg, x0, y + 3.2f);
+				nvgClosePath(args.vg);
+			}
+			else
+				nvgRect(args.vg, x0, y - 2.7f, 5.4f, 5.4f);
+			nvgFillColor(args.vg, C_CREAM);
+			nvgFill(args.vg);
+			tx = x0 + 9.f + tw / 2;
+		}
+		label(args.vg, uiBold(), tx, box.size.y / 2 + 0.5f, text, 9.5f, C_CREAM);
 	}
 	void onButton(const ButtonEvent& e) override {
 		if (e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS) {
@@ -1286,14 +1318,21 @@ struct HHLcd : widget::Widget {
 	}
 };
 
-struct HHWave : widget::Widget {
+struct HHWave : widget::OpaqueWidget {
 	GenraHipHop* module = nullptr;
+	void onButton(const ButtonEvent& e) override {
+		if (module && e.button == GLFW_MOUSE_BUTTON_LEFT && e.action == GLFW_PRESS && !module->uiChops.load() &&
+		    !module->loader->busy) {
+			module->loadSample();
+			e.consume(this);
+		}
+	}
 	void draw(const DrawArgs& args) override {
 		NVGcontext* vg = args.vg;
 		const ChopSet* c = module ? module->uiChops.load() : nullptr;
 		float w = box.size.x, h = box.size.y;
 		if (!c || c->peaks.empty()) {
-			label(vg, uiBold(), w / 2, h / 2, module && module->loader->busy ? "ANALYSING..." : "LOAD A WAV (LOAD BUTTON)", 9.f,
+			label(vg, uiBold(), w / 2, h / 2, module && module->loader->busy ? "ANALYSING..." : "CLICK HERE OR PRESS LOAD", 9.f,
 			      nvgRGB(0x8f, 0x8a, 0x7c));
 			return;
 		}
@@ -1341,6 +1380,7 @@ struct HHBars : widget::Widget {
 };
 
 struct GenraHipHopWidget : ModuleWidget {
+	float lastStop = -10.f;
 	std::string note; // last export message
 	float noteTime = 0.f;
 
@@ -1364,10 +1404,21 @@ struct GenraHipHopWidget : ModuleWidget {
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/HipHop.svg")));
 		using M = GenraHipHop;
 		// header
+		HHButton* stop = button(hhl::STOP, "STOP", C_GRAPH, [=]() {
+			if (!m)
+				return;
+			float now = (float) system::getTime();
+			if (!m->running && now - lastStop < 0.5f)
+				m->reqKill = true; // twice: cut the chops and the break too
+			m->running = false;
+			lastStop = now;
+		});
+		stop->symbol = 2;
 		HHButton* play = button(hhl::PLAY, "PLAY", C_RED, [=]() {
 			if (m)
-				m->running = !m->running;
+				m->running = true;
 		});
+		play->symbol = 1;
 		play->lit = [=]() { return m && m->running; };
 		addParam(createParamCentered<HHKnobSmall>(Vec(hhl::BPM[0], hhl::BPM[1]), m, M::BPM_PARAM));
 		addParam(createParamCentered<HHKnobSmall>(Vec(hhl::SWING[0], hhl::SWING[1]), m, M::SWING_PARAM));

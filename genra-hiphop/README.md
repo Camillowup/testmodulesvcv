@@ -2,7 +2,7 @@
 
 Ein Hip-Hop-Beat-Generator im Look einer alten Production Center (beiges Gehäuse, graue Pads, Akai-Rot, grünes LCD).
 Eigenes Plugin (**GENRA HipHop**, Slug `GenraHipHop`) unter der Marke **Genra**, liegt im Repo von GENRA Test im
-Unterordner `genra-hiphop/`. Stand 2.0.1: Hauptordner fürs Laden, Drag & Drop, Lade-Schritte im Display und in `log.txt`.
+Unterordner `genra-hiphop/`. Stand 2.0.2: Transport mit STOP, Bass mit echter Dichte-Schicht, Laden per Klick aufs leere Display.
 
 ![Panel](docs/hiphop.png)
 
@@ -14,7 +14,8 @@ Rack-Benutzerordner legen (Rack › Help › Open user folder) und Rack neu star
 
 ## Bedienung
 
-**Kopf:** PLAY startet und stoppt (ohne Kabel im RUN-Eingang). **BPM**, **SWING** (50 % gerade bis 75 %), **CHOP**
+**Kopf:** STOP hält an und springt auf Takt 1 (zweimal STOP schneidet auch Chops und Break ab), PLAY startet bei
+Takt 1 (ohne Kabel im RUN-Eingang). **BPM**, **SWING** (50 % gerade bis 75 %), **CHOP**
 (Lautstärke der Chops) und **BREAK** (Lautstärke des Breaks).
 
 **Display:** Jahrzehnt und Stil, Tempo, Tonart (ein `*` heisst: von Hand gesetzt), Swing, Takt; darunter das Sample
@@ -56,6 +57,9 @@ Tonhöhe). **Klick** spielt das Pad. **Rechtsklick:** Lock (bleibt bei NEW und M
   auslassen, umdrehen). Einen Break lädst du per Rechtsklick › Load break: die Hits werden nach Helligkeit auf Kick,
   Snare, Hats … verteilt und von den Drum-Hits gespielt (Ausgang BRK L/R).
 - **BASS:** FOLLOW (Stil, folgt den Akkorden der Chops), ROOT+5, WALK, 808. **OCT** statt CHOP (kein MIDI-Chop).
+  DENS ganz links: nur die Grundtöne (mindestens zwei pro Takt); nach rechts kommen Vorschläge vor der Snare,
+  Oktavsprünge, Läufe in den nächsten Akkord und 16tel-Ghosts dazu. Die Grundtöne klingen bis kurz vor den nächsten
+  (East Coast bleibt kurz und knackig).
 - **MELODY:** STAB, LEAD, ARP, RIFF; **CHOP** = MIDI-Chop. Wo ein Chop einsetzt, tritt die Melodie zurück.
 - **PADS:** SUSTAIN, STAB, SWELL (MOD-Ausgang steigt an); **CHOP** = MIDI-Chop.
 
@@ -68,6 +72,9 @@ auf Kanal 10 mit GM-Noten, Bass, Melodie, Pads, Chop mit Pad 1 = C1, Pitch als P
 ohne Dateifenster in den MIDI-Ordner aller GENRA-Module), MIDI-Eingang, Clock-Auflösung.
 
 ## Noch nicht drin (Merkliste)
+
+- **Wellenform-Display:** Schnitte verschieben (Einrasten am Nulldurchgang), setzen (Doppelklick), entfernen
+  (Rechtsklick auf die Linie), Klick spielt den Chop, Rechtsklick sonst = anderes Sample.
 
 - **ABLAUF**-Verbindung (Patterns speichern, Hip-Hop-Abschnitte INTRO, VERSE, HOOK, BRIDGE, BREAK, OUTRO,
   MAKE SONG). Braucht eine Änderung an ABLAUF im GENRA-Repo.

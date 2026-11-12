@@ -2,7 +2,8 @@
 #pragma once
 namespace hhl {
 static const float W = 570.000f;
-static const float PLAY[4] = {366.142f, 19.488f, 38.386f, 19.488f};
+static const float STOP[4] = {305.906f, 9.744f, 34.252f, 19.488f};
+static const float PLAY[4] = {343.110f, 9.744f, 34.252f, 19.488f};
 static const float BPM[2] = {417.815f, 17.717f};
 static const float SWING[2] = {457.677f, 17.717f};
 static const float VOL[2] = {497.539f, 17.717f};

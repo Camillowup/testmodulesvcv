@@ -288,6 +288,90 @@ static int bassNote(int pc) {
 	return n;
 }
 
+/** What DENS brings to the bass, and how long its notes ring.
+ *  - at least two notes per bar (none of the bars stays almost empty)
+ *  - extras with graded priority: a push before the snare (0.3-0.45), octave jumps (0.5-0.65),
+ *    walk-ups into the next chord (0.6-0.75), 16th ghosts (0.8-0.95)
+ *  - the core notes ring up to the next core note (Premier-style East Coast stays short) */
+static void bassLayer(Pattern& p, const Style& st, const Settings& set, const SampleInfo& si, const PadSet* pads,
+                      Rng& rng, int mode, int scale) {
+	auto empty = [&](int s) { return s >= 0 && s < LEN && p.bass[s].pitch < 0; };
+	auto rootAt = [&](int s) {
+		Chord c = chordAt(p, si, pads, s);
+		if (!c.valid())
+			c = p.bar[s / STEPS];
+		return bassNote(c.root);
+	};
+	// at least two core notes per bar
+	for (int b = 0; b < BARS; b++) {
+		int core = 0;
+		for (int i = 0; i < STEPS; i++)
+			core += p.bass[b * STEPS + i].pitch >= 0 && p.bass[b * STEPS + i].prio == 0.f;
+		static const int FILL[] = {8, 10, 6, 12};
+		for (int k = 0; k < 4 && core < 2; k++) {
+			int s = b * STEPS + FILL[k];
+			if (empty(s)) {
+				addNote(p.bass, s, rootAt(s) + (rng.chance(0.3f) ? 7 : 0), 1.f, 0.8f, 0.f);
+				core++;
+			}
+		}
+	}
+	// the extras, the same in every bar (a groove), bar 4 gets its own walk-up
+	int push = rng.chance(0.5f) ? 7 : 11; // the 16th before a snare / the "a" of 3
+	float pushPrio = rng.range(0.3f, 0.45f);
+	int jump = 1 + rng.below(3);
+	float jumpPrio = rng.range(0.5f, 0.65f);
+	for (int b = 0; b < BARS; b++) {
+		int s0 = b * STEPS;
+		if (empty(s0 + push))
+			addNote(p.bass, s0 + push, rootAt(s0 + push) + (rng.chance(0.4f) ? 7 : 0), 0.9f, 0.7f, pushPrio);
+		if (p.bass[s0].pitch >= 0 && empty(s0 + jump * 2)) {
+			addNote(p.bass, s0 + jump * 2, p.bass[s0].pitch + 12, 0.8f, 0.65f, jumpPrio);
+			if (mode == BM_808)
+				p.bass[s0 + jump * 2].slide = rng.chance(0.5f);
+		}
+		// walk-up into the next bar's chord (bars 2 and 4, with DENS)
+		if (b % 2 == 1) {
+			int target = rootAt((s0 + STEPS) % LEN);
+			for (int k = 0; k < 3; k++) {
+				int s = s0 + 13 + k;
+				if (!empty(s))
+					continue;
+				int n = snapScale(target - (3 - k) * 2, scale, set.key.root);
+				addNote(p.bass, s, n, 0.8f, 0.6f, 0.6f + 0.05f * k);
+			}
+		}
+		// 16th ghosts on the empty 8ths
+		for (int i = 2; i < STEPS; i += 2) {
+			int s = s0 + i;
+			if (empty(s) && empty(s - 1) && rng.chance(0.5f)) {
+				int prev = s - 1;
+				while (prev > s0 && p.bass[prev].pitch < 0)
+					prev--;
+				int n = p.bass[prev].pitch >= 0 ? p.bass[prev].pitch : rootAt(s);
+				addNote(p.bass, s, n + (rng.chance(0.3f) ? 12 : 0), 0.6f, 0.5f, rng.range(0.8f, 0.95f));
+			}
+		}
+	}
+	// how long the core notes ring: up to the next core note
+	bool shortStyle = st.bass == BM_ROOTS && st.chopLoop < 0.4f; // East Coast: short and punchy
+	for (int s = 0; s < LEN; s++) {
+		Note& n = p.bass[s];
+		if (n.pitch < 0 || n.prio > 0.f)
+			continue;
+		int nx = s + 1;
+		while (nx < s + STEPS && (p.bass[nx % LEN].pitch < 0 || p.bass[nx % LEN].prio > 0.f))
+			nx++;
+		float gap = (float) (nx - s);
+		if (mode == BM_808)
+			n.len = std::max(n.len, std::min(gap, 8.f) - 0.2f);
+		else if (shortStyle)
+			n.len = std::min(gap, 2.f) - 0.15f;
+		else
+			n.len = std::min(gap, 6.f) - 0.25f;
+	}
+}
+
 static void genBass(Pattern& p, const Style& st, const Settings& set, const SampleInfo& si, const PadSet* pads,
                     Rng& rng) {
 	for (int s = 0; s < LEN; s++)
@@ -401,6 +485,8 @@ static void genBass(Pattern& p, const Style& st, const Settings& set, const Samp
 					p.bass[s].slide = true;
 			}
 	}
+	if (mode != BM_WALK)
+		bassLayer(p, st, set, si, pads, rng, mode, scale);
 }
 
 // ---------------------------------------------------------------- melody
