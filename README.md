@@ -9,9 +9,8 @@ Expander **KESSEL FX**).
 
 Offenes und Geplantes: `docs/MERKLISTE.md`.
 
-Im Unterordner `genra-chop/` liegt zusätzlich ein **eigenes Plugin**: **GENRA CHOP** (bis 2.1.0 GENRA HipHop;
-Hip-Hop-Beat-Generator mit Sample-Chopping, eigener Look) mit **GENRA CHOP GRID** und **GENRA CHOP ABLAUF**.
-Bedienung: `genra-chop/README.md`; Artefakt **genra-chop-windows** unter Actions.
+**GENRA CHOP** (Hip-Hop-Beat-Generator mit Sample-Chopping, GRID, ABLAUF, FX; bis 2.1.0 GENRA HipHop) ist ein
+eigenes Plugin und liegt seit 2.4.0 im eigenen Repo: https://github.com/Camillowup/Genra-Chop
 
 ## Installieren
 
