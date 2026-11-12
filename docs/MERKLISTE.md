@@ -29,8 +29,11 @@ Gebaut und in Rack zu testen. Schon im neuen Look. Offen, falls gewünscht:
 - Kits beim Anhören nachstimmen (Lautstärke, Charakter der Stile).
 - Ein MIDI-Eingang direkt im Modul (wie bei SCHLAG) wäre möglich.
 
-## GENRA HipHop (eigenes Plugin in `genra-hiphop/`, erster Bau 2.0.0)
+## GENRA CHOP (eigenes Plugin in `genra-chop/`, bis 2.1.0 GENRA HipHop)
 
-In Rack testen (Panel, Pads, Sample laden, Break, MIDI-Export, SAVE). Offen (Details in `genra-hiphop/README.md`):
-- ABLAUF-Verbindung mit den Hip-Hop-Abschnitten (INTRO, VERSE, HOOK, BRIDGE, BREAK, OUTRO) und MAKE SONG.
-- Follow GENRA für die GENRA-Instrumente (Änderung an `Follow.cpp` im GENRA-Repo nötig).
+2.2.0 (12.11.2026): Umbenennung, MOVE, CLEAR, LOAD SAMPLE, MIDI learn, GENRA CHOP ABLAUF – in Rack testen.
+Offen (Details in `genra-chop/README.md`):
+- Wellenform-Fenster: Klick lädt ein Sample, sonst Chops mit der Maus verschieben (erst nach dem Test von GENRA CHOP).
+- Follow GENRA für die GENRA-Instrumente (DRUM-X, SCHLAG, FUNKE …): GENRA CHOP ist dort noch keine Quelle
+  (`Follow.cpp` im GENRA-Repo kennt nur GENRA und GENRA BOX).
+- GENRA CHOP GRID: schwarze Tasten links in der Piano-Roll schwarz.

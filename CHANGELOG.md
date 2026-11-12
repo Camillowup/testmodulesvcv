@@ -2,6 +2,17 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### GENRA CHOP 2.2.0 (eigenes Plugin in `genra-chop/`)
+- **Umbenannt:** GENRA HipHop heisst **GENRA CHOP** (Slug `GenraChop`, Ordner `genra-chop/`), der Grid-Editor
+  **GENRA CHOP GRID**. Alte Test-Patches laden nicht mehr.
+- **MOVE** (Startpunkt des zuletzt angetippten Chops), **CLEAR** (ganzes Chop-Pattern; halten + Pad = nur dieses Pad),
+  **LOAD SAMPLE** gross und gelb neben dem Wellenform-Fenster, der NEW der Chop-Spur ist weg.
+- **MIDI learn** für alle Regler, Taster und Felder; pro Controller und Computer gespeichert, bis zu drei Controller,
+  Encoder-Erkennung, Export/Import.
+- **GENRA CHOP ABLAUF** (neu, 26 HP): 64 Pattern-Pads, Varianten INTRO bis OUTRO, Song-Liste, MAKE SONG in sieben
+  Hip-Hop-Formen, Übergänge nach Stil, Song-MIDI-Export.
+- Fehler: KEY von Hand würfelte nur den Bass neu statt Bass, Melodie und Pads.
+
 ### 2.7.0 – Durchsicht aller Module: Fehler behoben, weniger CPU
 Alle Parameter und Buchsen sind gleich geblieben, alte Patches laden unverändert. Der Klang ist gleich, ausser wo es
 unten steht (FUMIs Lautstärke; KESSELs Rauschen läuft nach einer Pause anders weiter).

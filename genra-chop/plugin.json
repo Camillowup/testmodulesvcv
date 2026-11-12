@@ -1,0 +1,47 @@
+{
+  "slug": "GenraChop",
+  "name": "GENRA CHOP",
+  "version": "2.2.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-chop/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "GenraChop",
+      "name": "GENRA CHOP",
+      "description": "A hip-hop beat generator in the look of an old production center: 29 styles from the 80s to the 2020s (Boom Bap to Trap), drums, bass, melody and pads, a sample chopped onto 16 playable pads with its chords and key found, a break chopped onto the drums, MIDI chop per track, MIDI learn for every control, MIDI export and the chops saved as WAVs",
+      "tags": [
+        "Sequencer",
+        "Sampler",
+        "Drum",
+        "Random",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "GenraChopGrid",
+      "name": "GENRA CHOP GRID",
+      "description": "The grid editor for GENRA CHOP: drum and chop raster, piano roll for bass, melody and pads, velocity and chance, own length and swing per track, track tools, REC MIDI, MIDI export and import",
+      "tags": [
+        "Sequencer",
+        "Utility"
+      ]
+    },
+    {
+      "slug": "GenraChopAblauf",
+      "name": "GENRA CHOP ABLAUF",
+      "description": "The song arranger for GENRA CHOP: 64 pattern pads with names, variations for intro, verse, hook, bridge, break and outro, a song list, MAKE SONG in hip-hop song forms, transitions between the parts, song MIDI export",
+      "tags": [
+        "Sequencer",
+        "Utility"
+      ]
+    }
+  ]
+}
