@@ -13,6 +13,9 @@ std::string midiFolder();
 std::string chopFolder();
 void pickMidiFolder();
 void pickChopFolder();
+/** The root folder LOAD opens in (like SCHLAG; empty: not set). */
+std::string sampleFolder();
+void pickSampleFolder();
 /** A file name that does not exist yet in dir: <YYYY-MM-DD>_<name><ext> (then -2, -3 …). */
 std::string freeName(const std::string& dir, const std::string& name, const std::string& ext);
 std::string cleanName(const std::string& s);

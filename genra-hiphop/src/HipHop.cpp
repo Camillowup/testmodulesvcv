@@ -20,35 +20,61 @@ struct Loader {
 	std::atomic<ChopSet*> done{nullptr};
 	std::atomic<bool> busy{false};
 	std::mutex m;
-	std::string err; // under m
+	std::string err;    // under m
+	std::string status; // under m: what happened last (shown when there is no sample)
 	bool keepPattern = false;
+	void say(const std::string& s, bool isErr) {
+		std::lock_guard<std::mutex> lk(m);
+		(isErr ? err : status) = s;
+		if (isErr)
+			status.clear();
+		else
+			err.clear();
+		INFO("GENRA HIP-HOP: %s", s.c_str());
+	}
 	~Loader() { delete done.exchange(nullptr); }
 };
 
 static void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, bool keepPattern) {
 	L->busy = true;
 	L->keepPattern = keepPattern;
+	L->say("loading " + path, false);
 	std::thread([L, path, mode]() {
 		ChopSet* cs = new ChopSet();
 		std::string err;
 		bool ok = false;
 		try {
 			std::vector<uint8_t> buf = system::readFile(path);
+			L->say(string::f("read %d bytes", (int) buf.size()), false);
 			ok = readWav(buf, cs->data, err);
+			if (ok) {
+				cs->data.path = path;
+				cs->data.name = system::getStem(path);
+				analyse(*cs, mode);
+				L->say(string::f("analysed: %d chops, %.1f s", cs->info.count, cs->data.frames() / cs->data.sampleRate), false);
+				if (cs->info.count <= 0) {
+					ok = false;
+					err = "no chops found";
+				}
+			}
 		}
 		catch (Exception& e) {
+			ok = false;
 			err = e.what();
 		}
-		if (ok) {
-			cs->data.path = path;
-			cs->data.name = system::getStem(path);
-			analyse(*cs, mode);
-			delete L->done.exchange(cs);
+		catch (std::exception& e) {
+			ok = false;
+			err = e.what();
 		}
+		catch (...) {
+			ok = false;
+			err = "unknown error";
+		}
+		if (ok)
+			delete L->done.exchange(cs);
 		else {
 			delete cs;
-			std::lock_guard<std::mutex> lk(L->m);
-			L->err = err;
+			L->say(err.empty() ? std::string("could not read the file") : err, true);
 		}
 		L->busy = false;
 	}).detach();
@@ -186,7 +212,19 @@ struct GenraHipHop : Module {
 	std::shared_ptr<Loader> brkLoader = std::make_shared<Loader>();
 	ChopSet* chops = nullptr; // the audio thread's (swapped in process())
 	ChopSet* brk = nullptr;
-	std::atomic<ChopSet*> trash{nullptr}, trash2{nullptr};
+	std::atomic<ChopSet*> trash[4];                        // old sets, deleted by the UI
+	std::atomic<ChopSet*> incoming{nullptr}, incomingBrk{nullptr}; // handed over by the UI
+	std::atomic<bool> taken{false};                        // the audio thread took a new sample (for the log)
+	void toTrash(ChopSet* c) {
+		if (!c)
+			return;
+		for (auto& t : trash) {
+			ChopSet* none = nullptr;
+			if (t.compare_exchange_strong(none, c))
+				return;
+		}
+		// all four full (the UI is not running?): keep it, a small leak is better than a crash
+	}
 	std::atomic<const ChopSet*> uiChops{nullptr}; // for the panel (deleted only via trash, after the UI let go)
 
 	// ---- playing
@@ -274,6 +312,8 @@ struct GenraHipHop : Module {
 		configOutput(RST_OUTPUT, "Reset");
 		configOutput(BAR_OUTPUT, "Bar (trigger on every bar's one)");
 		undo.resize(8);
+		for (auto& t : trash)
+			t = nullptr;
 		for (auto& q : padQ)
 			q = -1;
 		set.style = 5;
@@ -284,8 +324,10 @@ struct GenraHipHop : Module {
 	~GenraHipHop() {
 		delete chops;
 		delete brk;
-		delete trash.exchange(nullptr);
-		delete trash2.exchange(nullptr);
+		for (auto& t : trash)
+			delete t.exchange(nullptr);
+		delete incoming.exchange(nullptr);
+		delete incomingBrk.exchange(nullptr);
 	}
 
 	const Style& style() const { return STYLES[clamp(set.style, 0, NUM_STYLES - 1)]; }
@@ -449,11 +491,11 @@ struct GenraHipHop : Module {
 		float sr = args.sampleRate;
 		tick++;
 		// ---- a new sample / break from the worker thread
-		ChopSet* c = (!trash.load() && loader->done.load()) ? loader->done.exchange(nullptr) : nullptr;
+		ChopSet* c = incoming.exchange(nullptr);
 		if (c) {
 			for (SVoice& v : cv)
 				v.active = false;
-			trash = chops; // the UI deletes it (collectTrash)
+			toTrash(chops); // the UI deletes it (collectTrash)
 			chops = c;
 			uiChops = c;
 			if (set.keyAuto)
@@ -465,12 +507,13 @@ struct GenraHipHop : Module {
 				generate(pat, T_CHOP, set, c->info, pads, random::u32(), false, bpmNow());
 			}
 			dirty = true;
+			taken = true;
 		}
-		ChopSet* b = (!trash2.load() && brkLoader->done.load()) ? brkLoader->done.exchange(nullptr) : nullptr;
+		ChopSet* b = incomingBrk.exchange(nullptr);
 		if (b) {
 			for (SVoice& v : bv)
 				v.active = false;
-			trash2 = brk;
+			toTrash(brk);
 			brk = b;
 		}
 		// ---- requests from the panel
@@ -707,10 +750,23 @@ struct GenraHipHop : Module {
 
 	/** UI thread: after the audio thread let go of a ChopSet (and the panel too), delete it. */
 	void collectTrash() {
-		if (ChopSet* t = trash.load())
-			if (uiChops.load() != t)
-				delete trash.exchange(nullptr);
-		delete trash2.exchange(nullptr);
+		// hand finished analyses to the audio thread
+		if (!incoming.load())
+			if (ChopSet* c = loader->done.exchange(nullptr)) {
+				incoming = c;
+				loader->say("handed over", false);
+			}
+		if (!incomingBrk.load())
+			if (ChopSet* c = brkLoader->done.exchange(nullptr))
+				incomingBrk = c;
+		if (taken.exchange(false))
+			loader->say("in use", false);
+		const ChopSet* ui = uiChops.load();
+		for (auto& t : trash) {
+			ChopSet* c = t.load();
+			if (c && c != ui)
+				delete t.exchange(nullptr);
+		}
 	}
 
 	// ---------------------------------------------------------------- saving
@@ -900,7 +956,10 @@ struct GenraHipHop : Module {
 
 	// ---------------------------------------------------------------- UI-thread actions
 	void loadSample() {
-		std::string dir = samplePath.empty() ? "" : system::getDirectory(samplePath);
+		std::string dir = samplePath.empty() ? hhx::sampleFolder() : system::getDirectory(samplePath);
+		if (!hhx::sampleFolder().empty() && !samplePath.empty() &&
+		    samplePath.compare(0, hhx::sampleFolder().size(), hhx::sampleFolder()) != 0)
+			dir = hhx::sampleFolder(); // the last sample was outside the root folder: back to the root
 		osdialog_filters* f = osdialog_filters_parse("WAV:wav,WAV");
 		char* p = osdialog_file(OSDIALOG_OPEN, dir.empty() ? nullptr : dir.c_str(), nullptr, f);
 		osdialog_filters_free(f);
@@ -911,7 +970,7 @@ struct GenraHipHop : Module {
 		startLoad(loader, samplePath, chopMode, false);
 	}
 	void loadBreak() {
-		std::string dir = breakPath.empty() ? (samplePath.empty() ? "" : system::getDirectory(samplePath))
+		std::string dir = breakPath.empty() ? (samplePath.empty() ? hhx::sampleFolder() : system::getDirectory(samplePath))
 		                                    : system::getDirectory(breakPath);
 		osdialog_filters* f = osdialog_filters_parse("WAV:wav,WAV");
 		char* p = osdialog_file(OSDIALOG_OPEN, dir.empty() ? nullptr : dir.c_str(), nullptr, f);
@@ -923,6 +982,15 @@ struct GenraHipHop : Module {
 		startLoad(brkLoader, breakPath, CM_TRANSIENT, true);
 		if (set.drumMode == 0)
 			set.drumMode = 2;
+	}
+	void loadPath(const std::string& p) {
+		std::string ext = string::lowercase(system::getExtension(p));
+		if (ext != ".wav") {
+			loader->say("only WAV files", true);
+			return;
+		}
+		samplePath = p;
+		startLoad(loader, samplePath, chopMode, false);
 	}
 	void setChopMode(int m) {
 		if (m == chopMode)
@@ -1202,7 +1270,12 @@ struct HHLcd : widget::Widget {
 				               c->info.count, module->set.keyAuto ? "AUTO" : "MAN");
 			else {
 				std::lock_guard<std::mutex> lk(module->loader->m);
-				l3 = module->loader->err.empty() ? "NO SAMPLE - PRESS LOAD" : string::uppercase("ERR: " + module->loader->err);
+				if (!module->loader->err.empty())
+					l3 = string::uppercase("ERR: " + module->loader->err);
+				else if (!module->loader->status.empty())
+					l3 = string::uppercase(module->loader->status);
+				else
+					l3 = "NO SAMPLE - PRESS LOAD";
 			}
 			if (module->rec)
 				l3 = "REC  " + l3;
@@ -1503,6 +1576,14 @@ struct GenraHipHopWidget : ModuleWidget {
 		noteTime = 3.f;
 	}
 
+	void onPathDrop(const PathDropEvent& e) override {
+		GenraHipHop* m = dynamic_cast<GenraHipHop*>(module);
+		if (m && !e.paths.empty()) {
+			m->loadPath(e.paths[0]);
+			e.consume(this);
+		}
+	}
+
 	void step() override {
 		if (GenraHipHop* m = dynamic_cast<GenraHipHop*>(module))
 			m->collectTrash();
@@ -1531,6 +1612,9 @@ struct GenraHipHopWidget : ModuleWidget {
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Sample"));
 		menu->addChild(createMenuItem("Load sample…", "", [=]() { m->loadSample(); }));
+		std::string root = hhx::sampleFolder();
+		menu->addChild(createMenuItem("Sample root folder…", root.empty() ? "not set" : system::getFilename(root),
+		                              []() { hhx::pickSampleFolder(); }));
 		menu->addChild(createMenuItem("Load break (drums)…", "", [=]() { m->loadBreak(); }));
 		menu->addChild(createMenuItem("Clear break", "", [=]() {
 			m->breakPath.clear();

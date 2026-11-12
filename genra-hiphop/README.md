@@ -2,7 +2,7 @@
 
 Ein Hip-Hop-Beat-Generator im Look einer alten Production Center (beiges Gehäuse, graue Pads, Akai-Rot, grünes LCD).
 Eigenes Plugin (**GENRA HipHop**, Slug `GenraHipHop`) unter der Marke **Genra**, liegt im Repo von GENRA Test im
-Unterordner `genra-hiphop/`. Erster Bau: 2.0.0, noch nicht in Rack getestet.
+Unterordner `genra-hiphop/`. Stand 2.0.1: Hauptordner fürs Laden, Drag & Drop, Lade-Schritte im Display und in `log.txt`.
 
 ![Panel](docs/hiphop.png)
 
@@ -39,7 +39,9 @@ Tonhöhe). **Klick** spielt das Pad. **Rechtsklick:** Lock (bleibt bei NEW und M
 - **MODE:** Transient (an den Anschlägen geschnitten), Equal 16, Equal 8. Ein Wechsel schneidet neu.
 - **MUTATE:** wie viel der Chop-Spur sich alle vier Takte verändert (0 = steht).
 - **PITCH:** alle Chops zusammen in Halbtönen. **DUST:** Vinyl, 12 Bit, dunkler.
-- **LOAD:** WAV laden (Windows-Fenster). Die Analyse läuft im Hintergrund: Chops, Akkord pro Chop, Tonart.
+- **LOAD:** WAV laden (Windows-Fenster, öffnet im Hauptordner: Rechtsklick › Sample root folder). Oder die WAV-Datei
+  aufs Modul ziehen. Die Analyse läuft im Hintergrund: Chops, Akkord pro Chop, Tonart. Ohne Sample zeigt das Display
+  den letzten Schritt (gelesen, analysiert, übergeben, in Gebrauch) oder den Fehler; dasselbe steht in Racks `log.txt`.
 - **NEW:** neue Chop-Spur (mit den Akkorden, dem Bass und den Pads, die daran hängen).
 - **REC:** was du auf den Pads spielst (Maus oder MIDI), landet auf dem nächsten Schritt in der Chop-Spur.
 - **LOCK:** sperrt die Akkorde der vier Takte (NEW würfelt alles andere).

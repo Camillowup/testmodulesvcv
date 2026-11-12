@@ -75,6 +75,11 @@ static void pick(const char* key, const std::string& cur) {
 }
 void pickMidiFolder() { pick("midiExportFolder", midiFolder()); }
 void pickChopFolder() { pick("chopExportFolder", chopFolder()); }
+std::string sampleFolder() { return setting("hiphopSampleFolder"); }
+void pickSampleFolder() {
+	std::string cur = sampleFolder();
+	pick("hiphopSampleFolder", cur.empty() ? documents() : cur);
+}
 
 std::string cleanName(const std::string& s) {
 	std::string o;
