@@ -103,6 +103,34 @@ jobs:
           name: genra-test-windows
           path: dist/*.vcvplugin
 
+      # GENRA HipHop: its own plugin in genra-hiphop/ (self-contained, own look)
+      - name: Build plugin GENRA HipHop
+        run: |
+          cd genra-hiphop
+          VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin.json)
+          echo "Version $VER"
+          make RACK_DIR=../sdk/Rack-SDK SLUG=GenraHipHop VERSION=$VER -j4 dist
+
+      - name: Test GENRA HipHop's engine (without Rack)
+        run: |
+          cd genra-hiphop
+          g++ -std=c++11 -O2 -Isrc test/hh_test.cpp src/hh/Core.cpp src/hh/Styles.cpp src/hh/Chop.cpp -o hht.exe
+          ./hht.exe
+
+      - name: Check GENRA HipHop's package
+        run: |
+          D=genra-hiphop/dist/GenraHipHop
+          ls -la $D $D/res
+          test -f $D/plugin.dll
+          test -f $D/res/HipHop.svg
+          test -f $D/res/HHKnob.svg
+          if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genra-hiphop-windows
+          path: genra-hiphop/dist/*.vcvplugin
+
   # macOS, both chips (Apple silicon arm64, Intel x64) on GitHub's Apple-silicon runner; x64 by cross-compiling with
   # clang -arch x86_64 against the x64 SDK (as the GENRA repo does). Not tested on a Mac yet.
   mac:
@@ -168,6 +196,18 @@ jobs:
         with:
           name: genra-test-mac-${{ matrix.arch }}
           path: dist/*.vcvplugin
+
+      - name: Build plugin GENRA HipHop
+        run: |
+          cd genra-hiphop
+          VER=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' plugin.json)
+          make RACK_DIR=$GITHUB_WORKSPACE/sdk/Rack-SDK SLUG=GenraHipHop VERSION=$VER -j4 dist
+          ls dist/*.vcvplugin
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: genra-hiphop-mac-${{ matrix.arch }}
+          path: genra-hiphop/dist/*.vcvplugin
 
   # a push to the branch "release" publishes GitHub release v<version> with the Windows and Mac files
   release:

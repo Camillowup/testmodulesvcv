@@ -9,6 +9,9 @@ Expander **KESSEL FX**).
 
 Offenes und Geplantes: `docs/MERKLISTE.md`.
 
+Im Unterordner `genra-hiphop/` liegt zusätzlich ein **eigenes Plugin**: **GENRA HipHop** (Hip-Hop-Beat-Generator mit
+Sample-Chopping, eigener Look). Bedienung: `genra-hiphop/README.md`; Artefakt **genra-hiphop-windows** unter Actions.
+
 ## Installieren
 
 1. Unter **Releases** die Datei für dein System herunterladen: `win-x64` = Windows, `mac-arm64` = Mac mit Apple-Chip,

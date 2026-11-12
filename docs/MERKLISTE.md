@@ -28,3 +28,9 @@ bündig 2 mm über den Buchsen, das Display füllt die übrige Höhe. In Rack pr
 Gebaut und in Rack zu testen. Schon im neuen Look. Offen, falls gewünscht:
 - Kits beim Anhören nachstimmen (Lautstärke, Charakter der Stile).
 - Ein MIDI-Eingang direkt im Modul (wie bei SCHLAG) wäre möglich.
+
+## GENRA HipHop (eigenes Plugin in `genra-hiphop/`, erster Bau 2.0.0)
+
+In Rack testen (Panel, Pads, Sample laden, Break, MIDI-Export, SAVE). Offen (Details in `genra-hiphop/README.md`):
+- ABLAUF-Verbindung mit den Hip-Hop-Abschnitten (INTRO, VERSE, HOOK, BRIDGE, BREAK, OUTRO) und MAKE SONG.
+- Follow GENRA für die GENRA-Instrumente (Änderung an `Follow.cpp` im GENRA-Repo nötig).
