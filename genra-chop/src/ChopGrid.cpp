@@ -420,6 +420,8 @@ struct ChopGrid : Module {
 	float pitchBase[NUM_TRACKS] = {0.f, 0.15f, 0.5f, 0.4f, 0.f}; // PITCH per track
 	std::atomic<bool> recOn{false};
 	midi::InputQueue midiIn;
+	// no MIDI input of its own: GENRA CHOP's (the panel sets it; not saved)
+	midi::InputQueue midiAuto;
 	struct RecEv {
 		uint8_t on, note, vel;
 	};
@@ -439,7 +441,7 @@ struct ChopGrid : Module {
 
 	void process(const ProcessArgs& args) override {
 		midi::Message msg;
-		while (midiIn.tryPop(&msg, args.frame)) {
+		while (midiIn.tryPop(&msg, args.frame) || midiAuto.tryPop(&msg, args.frame)) {
 			uint8_t st = msg.getStatus();
 			if ((st != 0x9 && st != 0x8) || !recOn)
 				continue;
@@ -595,10 +597,20 @@ struct GridView : widget::OpaqueWidget {
 		const ChopSet* c = hh ? hh->uiChops.load() : nullptr;
 		return clamp(c ? c->info.count : 16, 16, PADS);
 	}
+	/** A row moved by `d` rows on the screen (drums: in GENRA CHOP's order of the rows). */
+	int moveRow(int t, int row, int d) const {
+		if (isPiano(t))
+			return row + d;
+		if (t == T_DRUMS)
+			return DRUM_AT[clamp(drumPos(row) + d, 0, DRUMS - 1)];
+		return clamp(row + d, 0, rowsOfRaster(t) - 1);
+	}
 	int rowCount(int t) const { return isPiano(t) ? (int) pianoRows(t).size() : rowsOfRaster(t); }
 	float rowH(int t) const { return rh() / std::max(1, rowCount(t)); }
 	/** Row index (top 0) of a row value (pitch / voice / pad), -1 if not visible. */
 	int rowIndex(int t, int row, const std::vector<int>& pr) const {
+		if (t == T_DRUMS)
+			return drumPos(row); // GENRA CHOP's order: kick, snare, hats first
 		if (!isPiano(t))
 			return row;
 		for (size_t i = 0; i < pr.size(); i++)
@@ -608,7 +620,7 @@ struct GridView : widget::OpaqueWidget {
 	}
 	int rowValueAt(int t, float y, const std::vector<int>& pr) const {
 		int i = clamp((int) ((y - ry()) / rowH(t)), 0, rowCount(t) - 1);
-		return isPiano(t) ? pr[i] : i;
+		return isPiano(t) ? pr[i] : (t == T_DRUMS ? DRUM_AT[i] : i);
 	}
 	Rect itemRect(int t, const Item& it, const std::vector<int>& pr) const {
 		int ri = rowIndex(t, it.row, pr);
@@ -626,6 +638,28 @@ struct GridView : widget::OpaqueWidget {
 	}
 
 	// ---------------------------------------------------------------- talking to GENRA CHOP
+	/** No MIDI input chosen for REC: the one GENRA CHOP plays its pads with. */
+	void syncMidi() {
+		if (!m)
+			return;
+		int drv = -1, dev = -1, ch = -1;
+		if (m->midiIn.getDeviceId() < 0 && hh && hh->midiIn.getDeviceId() >= 0) {
+			drv = hh->midiIn.getDriverId();
+			dev = hh->midiIn.getDeviceId();
+			ch = hh->midiIn.getChannel();
+		}
+		if (dev < 0) {
+			if (m->midiAuto.getDeviceId() >= 0)
+				m->midiAuto.setDeviceId(-1);
+			return;
+		}
+		if (m->midiAuto.getDriverId() != drv)
+			m->midiAuto.setDriverId(drv);
+		if (m->midiAuto.getDeviceId() != dev)
+			m->midiAuto.setDeviceId(dev);
+		if (m->midiAuto.getChannel() != ch)
+			m->midiAuto.setChannel(ch);
+	}
 	void step() override {
 		hh = nullptr;
 		if (m) {
@@ -641,6 +675,8 @@ struct GridView : widget::OpaqueWidget {
 					}
 			}
 		}
+		// REC without a MIDI input of its own: GENRA CHOP's
+		syncMidi();
 		if (hh && drag == D_NONE) {
 			uint32_t v = hh->shareVer.load();
 			if ((!have || v != ver) && !hh->gridIn.load()) {
@@ -919,7 +955,7 @@ struct GridView : widget::OpaqueWidget {
 			if (active) {
 				std::string lb;
 				if (t == T_DRUMS)
-					lb = DRUM_NAME[i];
+					lb = DRUM_NAME[DRUM_AT[i]];
 				else if (t == T_CHOP) {
 					lb = string::f("%d", i + 1);
 					if (cset && i < cset->info.count) {
@@ -935,7 +971,7 @@ struct GridView : widget::OpaqueWidget {
 					int n = pr[i];
 					lb = string::f("%s%d", NOTE_NAMES[((n % 12) + 12) % 12], n / 12 - 1);
 				}
-				bool hl = (t == T_DRUMS || t == T_CHOP) && m && m->laneVoice == i;
+				bool hl = (t == T_DRUMS || t == T_CHOP) && m && m->laneVoice == (t == T_DRUMS ? DRUM_AT[i] : i);
 				// piano: the black keys black (light text)
 				bool blackKey = false;
 				if (isPiano(t)) {
@@ -969,7 +1005,7 @@ struct GridView : widget::OpaqueWidget {
 			for (int v = 0; v < DRUMS; v++) {
 				int L = trackLen(t, v);
 				if (L < LEN && xOf(L) < rx() + rw())
-					rectFill(vg, std::max(rx(), xOf(L)), y0 + v * rhh, rx() + rw() - std::max(rx(), xOf(L)), rhh,
+					rectFill(vg, std::max(rx(), xOf(L)), y0 + drumPos(v) * rhh, rx() + rw() - std::max(rx(), xOf(L)), rhh,
 					         nvgRGBA(0, 0, 0, 0x70));
 			}
 		// ghosts of the other tone tracks
@@ -1118,7 +1154,7 @@ struct GridView : widget::OpaqueWidget {
 		float x = rx() + rw() + 3.f;
 		if (t == T_DRUMS) {
 			float rhh = rh() / DRUMS;
-			return Rect(Vec(x, ry() + v * rhh + 0.5f), Vec(RIGHT - 4.f, rhh - 1.f));
+			return Rect(Vec(x, ry() + drumPos(v) * rhh + 0.5f), Vec(RIGHT - 4.f, rhh - 1.f));
 		}
 		return Rect(Vec(x, ry()), Vec(RIGHT - 4.f, 12.f));
 	}
@@ -1289,7 +1325,8 @@ struct GridView : widget::OpaqueWidget {
 		dragDirty = false;
 		// row names: the voice / pad for the lane
 		if (p.x < KEYS && p.y >= ry() && p.y < ry() + rh() && (t == T_DRUMS || t == T_CHOP)) {
-			m->laneVoice = clamp((int) ((p.y - ry()) / rowH(t)), 0, rowsOfRaster(t) - 1);
+			int row = clamp((int) ((p.y - ry()) / rowH(t)), 0, rowsOfRaster(t) - 1);
+			m->laneVoice = t == T_DRUMS ? DRUM_AT[row] : row;
 			return;
 		}
 		// lane labels
@@ -1318,7 +1355,7 @@ struct GridView : widget::OpaqueWidget {
 		{
 			int L = 0, v = -1;
 			if (t == T_DRUMS && p.y >= ry() && p.y < ry() + rh()) {
-				v = clamp((int) ((p.y - ry()) / rowH(t)), 0, DRUMS - 1);
+				v = DRUM_AT[clamp((int) ((p.y - ry()) / rowH(t)), 0, DRUMS - 1)];
 				L = trackLen(t, v);
 			}
 			else if (t != T_DRUMS)
@@ -1541,11 +1578,9 @@ struct GridView : widget::OpaqueWidget {
 			sel.clear();
 			for (Item& it : moving) {
 				int s = clamp(it.s + ds, 0, LEN - 1);
-				int row = it.row + drow;
+				int row = moveRow(t, it.row, drow);
 				if (isPiano(t) && drow)
 					row = snapPitch(t, s, row);
-				if (!isPiano(t))
-					row = clamp(row, 0, rowsOfRaster(t) - 1);
 				sel.push_back(putItem(P, t, s, row, it));
 			}
 			moving.clear();
@@ -1675,9 +1710,7 @@ struct GridView : widget::OpaqueWidget {
 		sel.clear();
 		for (Item& it : its) {
 			it.off = clamp(it.off + nudge, -11.f / 24.f, 11.f / 24.f);
-			int row = it.row + drow;
-			if (!isPiano(t))
-				row = clamp(row, 0, rowsOfRaster(t) - 1);
+			int row = moveRow(t, it.row, drow);
 			sel.push_back(putItem(P, t, clamp(it.s + ds, 0, LEN - 1), row, it));
 		}
 		commit();
@@ -2103,7 +2136,7 @@ struct ChopGridWidget : ModuleWidget {
 		menu->addChild(createMenuItem(string::f("Export %s only", TRACK_NAME[m->track]), "", [=]() { g->say(g->exportMidi(m->track)); }));
 		menu->addChild(createMenuItem("Import MIDI file…", "", [=]() { g->importMidi(); }));
 		menu->addChild(createMenuItem("MIDI export folder…", "", []() { hhx::pickMidiFolder(); }));
-		menu->addChild(createSubmenuItem("MIDI input (for REC)", "", [=](Menu* sub) { app::appendMidiMenu(sub, &m->midiIn); }));
+		menu->addChild(createSubmenuItem("MIDI input (for REC; none: GENRA CHOP's)", "", [=](Menu* sub) { app::appendMidiMenu(sub, &m->midiIn); }));
 		menu->addChild(new MenuSeparator);
 		menu->addChild(createMenuLabel("Keys (mouse over the grid)"));
 		menu->addChild(createMenuLabel("Shift+drag frame, Ctrl+click pick, Ctrl+A/C/V/D, Del"));

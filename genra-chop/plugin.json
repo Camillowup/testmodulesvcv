@@ -1,7 +1,7 @@
 {
   "slug": "GenraChop",
   "name": "GENRA CHOP",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -46,7 +46,7 @@
     {
       "slug": "GenraChopFx",
       "name": "GENRA CHOP FX",
-      "description": "Two effect buses to play live, after the idea of the SP-404: 37 effects (vinyl, cassette, lo-fi, filters, isolator, resonator, drive, compressor, gater, delays, tape echo, reverb, chorus, flanger, phaser, looper, scatter, stopper, tape stop, backspin, downer, sub octaver), FX ON to tap or hold, six quick keys, presets, synced to a 16th clock, CV and MIDI learn",
+      "description": "Two effect buses to play live, after the idea of the SP-404: 39 effects (vinyl, cassette, lo-fi, filters, low and high cut, isolator, resonator, drive, compressor, gater, delays, tape echo, reverb, chorus, flanger, phaser, looper, scatter, stopper, tape stop, backspin, downer, sub octaver), eight sources in and out on their own jacks (for a mixer with one fader each), returns and a mix out, a little screen above every control, FX ON to tap or hold, eight quick keys, eight DJ pads and a DJ filter on all outputs, presets, synced to a 16th clock, CV and MIDI learn",
       "tags": [
         "Effect",
         "Delay",

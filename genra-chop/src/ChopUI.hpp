@@ -34,6 +34,19 @@ inline void label(NVGcontext* vg, std::shared_ptr<window::Font> f, float x, floa
 	nvgTextAlign(vg, align);
 	nvgText(vg, x, y, s.c_str(), NULL);
 }
+/** A label that never reaches past maxW: smaller if it has to. */
+inline void labelFit(NVGcontext* vg, std::shared_ptr<window::Font> f, float x, float y, const std::string& s, float size, float maxW,
+                     NVGcolor col, int align = NVG_ALIGN_CENTER | NVG_ALIGN_MIDDLE) {
+	if (!f || s.empty())
+		return;
+	nvgFontFaceId(vg, f->handle);
+	nvgFontSize(vg, size);
+	nvgTextLetterSpacing(vg, 0.4f);
+	float w = nvgTextBounds(vg, 0, 0, s.c_str(), NULL, NULL);
+	if (w > maxW && maxW > 4.f)
+		size = std::max(4.5f, size * maxW / w);
+	label(vg, f, x, y, s, size, col, align);
+}
 inline Rect rectOf(const float* v) { return Rect(Vec(v[0], v[1]), Vec(v[2], v[3])); }
 
 /** A button in the look (label in the button): press calls `act`; `lit` shows a toggle's state. */

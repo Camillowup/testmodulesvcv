@@ -91,8 +91,10 @@ text(bx + 2.8, 6.0, "CHOP", 1.9, INK_DIM, 700, "start", 0.35)
 text(bx + 2.8, 9.6, "PRODUCTION CENTER", 1.9, INK_DIM, 700, "start", 0.35)
 # PLAY and the four header knobs
 # STOP and PLAY bigger (14.6 x 8.4 mm), easier to find and to hit
-comp("STOP", 101.4, 2.4, 14.6, 8.4)
-comp("PLAY", 117.0, 2.4, 14.6, 8.4)
+# SAMPLE (the whole sample) flush with the LCD's right edge, STOP flush with the waveform's left edge
+comp("SPLAY", 80.4, 2.4, 15.6, 8.4)
+comp("STOP", 99.0, 2.4, 14.6, 8.4)
+comp("PLAY", 114.6, 2.4, 14.6, 8.4)
 for name, x, label in (("BPM", 141.5, "BPM"), ("SWING", 155.0, "SWING"), ("VOL", 168.5, "CHOP"), ("BRK", 182.0, "BREAK")):
     comp(name, x, 6.0)
     text(x, 12.6, label, 1.45, INK, 700)
@@ -136,7 +138,14 @@ comp("NEWALL", 56.2, 83.6, 39.8, 6.6)
 
 # ---------------------------------------------------------------- right: the waveform, the four tracks
 rect(99, 15, 90, 24.4, GRAPH, 1.2)
-comp("WAVE", 100.2, 16.2, 87.6, 22.0)
+comp("WAVE", 100.2, 16.2, 87.6, 15.6)
+# WARP: on/off, how, the tempo (sample > beat), x2 / /2; the stretcher top right in the waveform
+comp("WARP", 100.6, 32.4, 14.0, 5.6)
+comp("WMODE", 115.6, 32.4, 22.0, 5.6)
+comp("WBPM", 139.0, 32.4, 30.0, 5.6)
+comp("WX2", 170.0, 32.4, 8.4, 5.6)
+comp("WD2", 179.0, 32.4, 8.4, 5.6)
+comp("WALGO", 164.6, 17.0, 22.6, 4.4)
 TRACKS = (("DRUMS", "DENS", "CHOP"), ("BASS", "DENS", "OCT"), ("MELODY", "DENS", "CHOP"), ("PADS", "DENS", "CHOP"))
 CW, CG = 21.6, 1.2
 for t, (name, k1, k2) in enumerate(TRACKS):
@@ -151,7 +160,8 @@ for t, (name, k1, k2) in enumerate(TRACKS):
     comp(f"TK2_{t}", x + 16.0, 62.6)
     text(x + 5.6, 70.4, k1, 1.45, INK, 700)
     text(x + 16.0, 70.4, k2, 1.45, RED if k2 == "CHOP" else INK, 700)
-    comp(f"TNEW{t}", x + 3.5, 75.6, CW - 7.0, 6.6)
+    comp(f"TNEW{t}", x + 1.4, 75.6, (CW - 2.8) * 0.55 - 0.4, 6.6)
+    comp(f"TCLR{t}", x + 1.4 + (CW - 2.8) * 0.55 + 0.4, 75.6, (CW - 2.8) * 0.45 - 0.4, 6.6)
 comp("BARS", 99, 86.8, 90, 3.6)
 
 # ---------------------------------------------------------------- the jacks
@@ -176,7 +186,7 @@ for i, (n, lb) in enumerate((("CLK_IN", "CLK"), ("RST_IN", "RST"), ("RUN_IN", "R
     jack(n, x + i * J, Y1, lb)
 x = 52.0
 plate(x, 8, Y1)
-for i, lb in enumerate(("KICK", "SNR", "CLAP", "RIM", "CH", "OH", "TOM", "PERC")):
+for i, lb in enumerate(("KICK", "SNR", "CH", "OH", "CLAP", "RIM", "TOM", "PERC")):  # GENRA CHOP's own order
     jack(f"DRUM{i}", x + i * J, Y1, lb, True)
 x = 134.0
 plate(x, 2, Y1)
@@ -263,7 +273,7 @@ print(f"res/GenraChop.svg: {HP} HP, {len(comps)} parts")
 # ---------------------------------------------------------------- preview (python3 tools/chop_panel.py --preview x.png)
 if "--preview" in sys.argv:
     out.clear()
-    LABELS = {"LOAD": "LOAD SAMPLE", "CLEAR": "CLEAR", "REC": "REC", "LOCK": "LOCK", "ROOT": "ROOT", "UNDO": "UNDO", "SAVE": "SAVE",
+    LABELS = {"SPLAY": "SAMPLE", "WARP": "WARP", "WX2": "x2", "WD2": "/2", "LOAD": "LOAD SAMPLE", "CLEAR": "CLEAR", "REC": "REC", "LOCK": "LOCK", "ROOT": "ROOT", "UNDO": "UNDO", "SAVE": "SAVE",
               "NEWALL": "NEW ALL", "PLAY": "PLAY", "STOP": "STOP"}
     CHORDS = ["F#m7", "Bm9", "Dmaj", "C#7", "F#m", "Am7", "E", "Bm"]
     for k, v in comps.items():
@@ -280,6 +290,7 @@ if "--preview" in sys.argv:
             x, y, w, h = v
             if k.startswith("PAD"):
                 i = int(k[3:])
+                i = (3 - i // 4) * 4 + i % 4  # as on an MPC: pad 1 bottom left
                 e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="1.2" fill="{PAD}" stroke="#8f8a7c" stroke-width="0.4"/>')
                 text(x + w / 2, y + 3.0, str(i + 1), 1.5, INK_DIM, 700, check=False)
                 if i < 8:
@@ -289,9 +300,24 @@ if "--preview" in sys.argv:
                 e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.6" fill="{RED if i == 0 else GRAPH}"/>')
                 text(x + w / 2, y + h / 2 + 0.55, "ABCD"[i], 1.5, CREAM, 700, check=False)
             elif k in LABELS:
-                col = RED if k in ("REC", "NEWALL", "PLAY") else (YELLOW if k == "LOAD" else GRAPH)
+                col = RED if k in ("REC", "NEWALL", "PLAY") else (YELLOW if k in ("LOAD", "SPLAY") else ("#55534f" if k in ("WARP", "WX2", "WD2") else GRAPH))
                 e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.8" fill="{col}"/>')
-                text(x + w / 2, y + h / 2 + 0.7, LABELS[k], 1.7, "#2a2416" if k == "LOAD" else CREAM, 700, check=False)
+                text(x + w / 2, y + h / 2 + 0.7, LABELS[k], 1.7, "#2a2416" if k in ("LOAD", "SPLAY") else CREAM, 700, check=False)
+            elif k.startswith("TCLR"):
+                e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.8" fill="{GRAPH}"/>')
+                text(x + w / 2, y + h / 2 + 0.6, "CLEAR", 1.45, CREAM, 700, check=False)
+            elif k == "WALGO":
+                hw = w / 2
+                e(f'<rect x="{x}" y="{y}" width="{hw - 0.2}" height="{h}" rx="0.6" fill="{YELLOW}"/>')
+                e(f'<rect x="{x + hw + 0.2}" y="{y}" width="{hw - 0.2}" height="{h}" rx="0.6" fill="#55534f"/>')
+                text(x + hw / 2, y + h / 2 + 0.55, "RUBBER", 1.35, "#2a2416", 700, check=False)
+                text(x + hw * 1.5, y + h / 2 + 0.55, "SIGNAL", 1.35, CREAM, 700, check=False)
+            elif k == "WMODE":
+                e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.8" fill="#55534f"/>')
+                text(x + 1.5, y + h / 2 + 0.6, "AUTO  v", 1.6, CREAM, 700, "start", check=False)
+            elif k == "WBPM":
+                e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.6" fill="{LCD}"/>')
+                text(x + w / 2, y + h / 2 + 0.7, "87 > 92 BPM", 1.8, "#24301a", 700, check=False)
             elif k.startswith("TNEW"):
                 e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.8" fill="{RED}"/>')
                 text(x + w / 2, y + h / 2 + 0.7, "NEW", 1.7, CREAM, 700, check=False)

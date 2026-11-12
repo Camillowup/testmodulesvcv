@@ -189,6 +189,21 @@ int main() {
 			CHECK(c2.end[i] <= c2.start[i + 1] && c2.start[i] < c2.end[i], "chop %d out of order", i);
 		printf("CHOPS: equal 40, transient 64 -> %d, transient 4\n", c2.info.count);
 	}
+	// ---- WARP: the tempo found, BEATS keeps every chop at its new place
+	{
+		printf("tempo found: %.2f BPM (stabs every 0.45 s = 133.33)\n", cs.bpm);
+		CHECK(std::fabs(cs.bpm - 133.33f) < 1.5f, "tempo %.2f, want 133.33", cs.bpm);
+		double ratio = cs.bpm / 92.0;
+		SampleData w;
+		warpBeats(cs, ratio, w);
+		CHECK(std::llabs((long long) w.frames() - (long long) std::llround(cs.data.frames() * ratio)) <= 1, "beats length");
+		ChopSet ws;
+		makeWarped(cs, std::move(w), ratio, WARP_BEATS, ws);
+		CHECK(ws.info.count == cs.info.count, "warped count");
+		for (int i = 0; i < ws.info.count; i++)
+			CHECK(std::llabs((long long) ws.cutStart[i] - std::llround(cs.cutStart[i] * ratio)) <= 1, "warped start %d", i);
+		printf("WARP: %d chops at %.3f, mode %s\n", ws.info.count, ratio, WARP_MODES[autoWarp(cs)]);
+	}
 	// ---- WAV out and back in
 	std::vector<uint8_t> w = writeWav(cs.data, cs.start[0], cs.end[0], true, 3);
 	SampleData back;

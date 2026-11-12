@@ -9,6 +9,7 @@
 namespace hh {
 
 const char* const CHOP_MODES[NUM_CHOP_MODES] = {"Transient", "Equal"};
+const char* const WARP_MODES[NUM_WARP_MODES] = {"AUTO", "BEATS", "TONE"};
 
 // ---------------------------------------------------------------- WAV
 static uint32_t rd32(const uint8_t* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t) p[3] << 24); }
@@ -184,9 +185,10 @@ static std::vector<float> monoOf(const SampleData& s) {
 	return m;
 }
 
-/** Onsets by spectral flux: (frame position, strength), strongest first. */
-static std::vector<std::pair<size_t, float>> onsets(const std::vector<float>& m, float sr) {
-	const size_t N = 1024, HOP = 256;
+static const size_t FLUX_HOP = 256;
+/** Spectral flux, one value per 256 frames. */
+static std::vector<float> fluxOf(const std::vector<float>& m) {
+	const size_t N = 1024, HOP = FLUX_HOP;
 	std::vector<float> flux;
 	std::vector<float> mag, prev(N / 2, 0.f);
 	for (size_t at = 0; at + N / 2 < m.size(); at += HOP) {
@@ -199,6 +201,13 @@ static std::vector<std::pair<size_t, float>> onsets(const std::vector<float>& m,
 		}
 		flux.push_back(f);
 	}
+	return flux;
+}
+
+/** Onsets by spectral flux: (frame position, strength), strongest first. */
+static std::vector<std::pair<size_t, float>> onsets(const std::vector<float>& m, float sr) {
+	const size_t HOP = FLUX_HOP;
+	std::vector<float> flux = fluxOf(m);
 	std::vector<std::pair<size_t, float>> out;
 	int minGap = std::max(1, (int) (0.08f * sr / HOP));
 	for (int i = 1; i + 1 < (int) flux.size(); i++) {
@@ -277,6 +286,8 @@ static void cut(ChopSet& cs, const std::vector<float>& m) {
 		}
 		else
 			cs.start[i] = cs.end[i] = 0;
+		cs.cutStart[i] = cs.start[i];
+		cs.cutEnd[i] = cs.end[i];
 	}
 }
 
@@ -367,12 +378,8 @@ void analyse(ChopSet& cs, int mode, int count) {
 	std::vector<float> m = monoOf(cs.data);
 	float sr = cs.data.sampleRate;
 	cut(cs, m);
-	// the display's waveform
-	cs.peaks.assign(512, 0.f);
-	for (size_t i = 0; i < m.size(); i++) {
-		size_t k = i * 512 / m.size();
-		cs.peaks[k] = std::max(cs.peaks[k], std::fabs(m[i]));
-	}
+	computePeaks(cs);
+	cs.bpm = findTempo(cs.data);
 	// per chop: the 12 tones, how long it rings, how bright
 	const size_t N = 4096;
 	std::vector<float> mag;
@@ -435,6 +442,159 @@ void analyse(ChopSet& cs, int mode, int count) {
 		cs.voicePad[OH] = order[std::max(0, n - 2)];
 		cs.voicePad[PERC] = order[std::max(0, n - 3)];
 	}
+}
+
+// ---------------------------------------------------------------- WARP
+void computePeaks(ChopSet& cs) {
+	size_t n = cs.data.frames();
+	cs.peaks.assign(512, 0.f);
+	if (!n)
+		return;
+	const bool st = !cs.data.R.empty();
+	for (size_t i = 0; i < n; i++) {
+		size_t k = i * 512 / n;
+		float v = st ? 0.5f * std::fabs(cs.data.L[i] + cs.data.R[i]) : std::fabs(cs.data.L[i]);
+		cs.peaks[k] = std::max(cs.peaks[k], v);
+	}
+}
+
+float findTempo(const SampleData& s) {
+	size_t n = s.frames();
+	float sr = s.sampleRate;
+	if (n < (size_t) (0.5f * sr))
+		return 0.f;
+	std::vector<float> env = fluxOf(monoOf(s));
+	size_t m = env.size();
+	if (m < 16)
+		return 0.f;
+	float mean = 0.f;
+	for (float v : env)
+		mean += v / m;
+	for (float& v : env)
+		v -= mean;
+	float fps = sr / FLUX_HOP; // envelope frames per second
+	// autocorrelation over 55..200 BPM, with the double lag helping (a beat repeats)
+	auto ac = [&](double lag) {
+		size_t L = (size_t) lag;
+		if (L < 1 || L >= m)
+			return 0.f;
+		float fr = (float) (lag - L), sum = 0.f;
+		for (size_t i = 0; i + L + 1 < m; i++)
+			sum += env[i] * (env[i + L] * (1.f - fr) + env[i + L + 1] * fr);
+		return sum / (float) (m - L);
+	};
+	float best = -1e9f, bestBpm = 0.f;
+	for (float bpm = 55.f; bpm <= 200.f; bpm += 0.5f) {
+		double lag = fps * 60.0 / bpm;
+		float sc = ac(lag) + 0.5f * ac(2.0 * lag) + 0.25f * ac(4.0 * lag);
+		if (sc > best)
+			best = sc, bestBpm = bpm;
+	}
+	if (bestBpm <= 0.f)
+		return 0.f;
+	while (bestBpm < 70.f)
+		bestBpm *= 2.f;
+	while (bestBpm >= 140.f)
+		bestBpm *= 0.5f;
+	// a loop of whole bars (4/4): its exact tempo, if close to what was heard
+	double secs = n / (double) sr;
+	float loop = 0.f, loopErr = 1.f;
+	for (int bars : {1, 2, 4, 8, 16, 32}) {
+		float b = (float) (240.0 * bars / secs);
+		if (b < 70.f || b >= 140.f)
+			continue;
+		float err = std::fabs(b - bestBpm) / bestBpm;
+		if (err < loopErr)
+			loopErr = err, loop = b;
+	}
+	if (loop > 0.f && loopErr < 0.06f)
+		return loop;
+	return std::round(bestBpm * 10.f) / 10.f;
+}
+
+int autoWarp(const ChopSet& cs) {
+	int n = cs.info.count, tonal = 0;
+	for (int i = 0; i < n; i++)
+		if (cs.info.chop[i].conf > 0.3f && cs.info.chop[i].kind != 2)
+			tonal++;
+	return (n > 0 && tonal * 100 >= n * 35) ? WARP_TONE : WARP_BEATS;
+}
+
+void warpBeats(const ChopSet& src, double ratio, SampleData& out) {
+	const SampleData& a = src.data;
+	size_t n = a.frames();
+	size_t outN = (size_t) std::llround(n * ratio);
+	out.sampleRate = a.sampleRate;
+	out.path = a.path;
+	out.name = a.name;
+	out.L.assign(outN, 0.f);
+	if (!a.R.empty())
+		out.R.assign(outN, 0.f);
+	int fade = std::max(8, (int) (0.004f * a.sampleRate));
+	// the pieces: before the first chop, then every chop
+	std::vector<size_t> st;
+	if (src.info.count <= 0 || src.cutStart[0] > 0)
+		st.push_back(0);
+	for (int i = 0; i < src.info.count; i++)
+		st.push_back(src.cutStart[i]);
+	for (size_t k = 0; k < st.size(); k++) {
+		size_t a0 = st[k], a1 = k + 1 < st.size() ? st[k + 1] : n;
+		size_t b0 = (size_t) std::llround(a0 * ratio), b1 = k + 1 < st.size() ? (size_t) std::llround(a1 * ratio) : outN;
+		if (b1 > outN)
+			b1 = outN;
+		if (b0 >= b1 || a0 >= a1)
+			continue;
+		size_t len = std::min(a1 - a0, b1 - b0);
+		bool cutShort = (a1 - a0) > (b1 - b0);
+		for (size_t i = 0; i < len; i++) {
+			float g = 1.f;
+			if (cutShort && len - i < (size_t) fade)
+				g = (float) (len - i) / fade; // shortened: a quick fade, no click
+			else if (!cutShort && len - i < (size_t) fade && b1 - b0 > len)
+				g = (float) (len - i) / fade; // a gap follows: fade into it
+			out.L[b0 + i] = a.L[a0 + i] * g;
+			if (!a.R.empty())
+				out.R[b0 + i] = a.R[a0 + i] * g;
+		}
+	}
+}
+
+void copyAnalysis(const ChopSet& from, ChopSet& to) {
+	to.mode = from.mode;
+	to.want = from.want;
+	to.info = from.info;
+	to.bpm = from.bpm;
+	for (int i = 0; i < PADS; i++) {
+		to.cutStart[i] = from.cutStart[i];
+		to.cutEnd[i] = from.cutEnd[i];
+		to.start[i] = from.cutStart[i];
+		to.end[i] = from.cutEnd[i];
+		for (int k = 0; k < 12; k++)
+			to.chroma[i][k] = from.chroma[i][k];
+	}
+	for (int v = 0; v < DRUMS; v++)
+		to.voicePad[v] = from.voicePad[v];
+	to.peaks = from.peaks;
+}
+
+void makeWarped(const ChopSet& orig, SampleData&& audio, double ratio, int how, ChopSet& out) {
+	copyAnalysis(orig, out);
+	out.data = std::move(audio);
+	size_t n = out.data.frames();
+	for (int i = 0; i < PADS; i++) {
+		if (i < out.info.count) {
+			out.cutStart[i] = std::min(n ? n - 1 : 0, (size_t) std::llround(orig.cutStart[i] * ratio));
+			out.cutEnd[i] = std::min(n, (size_t) std::llround(orig.cutEnd[i] * ratio));
+			if (out.cutEnd[i] <= out.cutStart[i])
+				out.cutEnd[i] = std::min(n, out.cutStart[i] + 1);
+			out.info.chop[i].seconds = orig.info.chop[i].seconds * (float) ratio;
+		}
+		out.start[i] = out.cutStart[i];
+		out.end[i] = out.cutEnd[i];
+	}
+	out.warpRatio = ratio;
+	out.warpHow = how;
+	computePeaks(out);
 }
 
 } // namespace hh

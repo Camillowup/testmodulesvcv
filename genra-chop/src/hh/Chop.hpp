@@ -6,6 +6,7 @@
 // chops the key. The audio thread only plays what is here.
 #pragma once
 #include "Core.hpp"
+#include <memory>
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -34,7 +35,13 @@ struct ChopSet {
 	SampleData data;
 	int mode = CM_TRANSIENT;
 	int want = DEFAULT_CHOPS; // how many chops were asked for (info.count: how many there are)
-	size_t start[PADS] = {}, end[PADS] = {};
+	size_t start[PADS] = {}, end[PADS] = {};       // as played (MOVE shifts these, in the audio thread)
+	size_t cutStart[PADS] = {}, cutEnd[PADS] = {}; // as cut (never moved)
+	float bpm = 0.f;                               // the sample's own tempo, as found (of the original, unwarped)
+	// WARP: a warped set keeps the original it was made from (to warp again or go back); the ratio is the new length
+	std::shared_ptr<const ChopSet> source;
+	double warpRatio = 1.0;
+	int warpHow = -1; // WARP_BEATS / WARP_TONE (-1: not warped)
 	SampleInfo info;
 	float chroma[PADS][12] = {};
 	std::vector<float> peaks; // for the display: max |x| in 512 parts
@@ -44,6 +51,22 @@ struct ChopSet {
 
 /** Cut (into `count` chops, 4..64) and analyse. */
 void analyse(ChopSet& cs, int mode, int count = DEFAULT_CHOPS);
+
+// ---------------------------------------------------------------- WARP
+enum WarpMode { WARP_AUTO, WARP_BEATS, WARP_TONE, NUM_WARP_MODES };
+extern const char* const WARP_MODES[NUM_WARP_MODES];
+/** The tempo of a sample: from the onsets (autocorrelation), folded into 70..140; a loop of whole bars wins. */
+float findTempo(const SampleData& s);
+/** AUTO: BEATS for hits and breaks, TONE for loops with chords. */
+int autoWarp(const ChopSet& cs);
+/** BEATS: every chop at its new place (start x ratio), played as it is (shortened or followed by a short fade). */
+void warpBeats(const ChopSet& src, double ratio, SampleData& out);
+/** Copy what was found (cut, chords, key, tempo) without the audio; start/end from the cut. */
+void copyAnalysis(const ChopSet& from, ChopSet& to);
+/** A warped set from the original and the new audio (ratio = new length / old length). */
+void makeWarped(const ChopSet& orig, SampleData&& audio, double ratio, int how, ChopSet& out);
+/** The waveform for the display. */
+void computePeaks(ChopSet& cs);
 /** The chords and the key again (after the cut is the same but e.g. nothing else changed): part of analyse(). */
 void findHarmony(ChopSet& cs);
 

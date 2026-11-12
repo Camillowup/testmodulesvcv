@@ -657,6 +657,33 @@ struct ChopAblauf : Module {
 		rows.insert(rows.begin() + at, r);
 		selRow = at;
 	}
+	/** Drag & drop: a pad into the song list at `at` (0 = before the first row). */
+	void insertSlotAt(int s, int at) {
+		if (s < 0 || s >= SLOTS || !slots[s].used || (int) rows.size() >= ROWS_MAX)
+			return;
+		snapshot();
+		std::lock_guard<std::mutex> lk(dataM);
+		Row r;
+		r.slot = s;
+		r.bars = slots[s].part >= 0 ? PART_BARS[slots[s].part] : 8;
+		at = clamp(at, 0, (int) rows.size());
+		rows.insert(rows.begin() + at, r);
+		selRow = at;
+	}
+	/** Drag & drop: a row to another place (`to`: the gap before that row, rows.size() = the end). */
+	void moveRow(int from, int to) {
+		int n = (int) rows.size();
+		if (from < 0 || from >= n || to < 0 || to > n || to == from || to == from + 1)
+			return;
+		snapshot();
+		std::lock_guard<std::mutex> lk(dataM);
+		Row r = rows[from];
+		rows.erase(rows.begin() + from);
+		if (to > from)
+			to--;
+		rows.insert(rows.begin() + to, r);
+		selRow = to;
+	}
 	void deleteRow(int r) {
 		if (r < 0 || r >= (int) rows.size())
 			return;
@@ -855,7 +882,14 @@ struct AList : widget::OpaqueWidget {
 	ChopAblauf* m = nullptr;
 	AblaufWidgetBase* w = nullptr;
 	int top = 0;
-	static constexpr float RH = 10.f;
+	int lastFocus = -1;
+	int dropAt = -1;     // drag & drop: where it would land (a gap between rows), -1: nothing over the list
+	int dragRow = -1;    // a row being dragged to another place
+	bool scrollDrag = false;
+	float edgeWait = 0.f; // dragging at the top / bottom edge: scroll now and then
+	static constexpr float RH = 10.f, SB = 5.f;
+	int visible() const { return std::max(1, (int) ((box.size.y - 9.f) / RH)); }
+	bool hasBar() const { return m && (int) m->rows.size() > visible(); }
 	void draw(const DrawArgs& args) override;
 	void onButton(const ButtonEvent& e) override;
 	void onHoverScroll(const HoverScrollEvent& e) override {
@@ -864,6 +898,22 @@ struct AList : widget::OpaqueWidget {
 		int d = e.scrollDelta.y > 0 ? -1 : (e.scrollDelta.y < 0 ? 1 : 0);
 		m->selRow = clamp(m->selRow.load() + d, 0, (int) m->rows.size() - 1);
 		e.consume(this);
+	}
+	/** The scroll bar: the list follows the mouse. */
+	void scrollTo(float y) {
+		int n = m ? (int) m->rows.size() : 0, vis = visible();
+		float h = box.size.y - 9.f;
+		top = clamp((int) std::round((y / h) * n - vis / 2.f), 0, std::max(0, n - vis));
+	}
+	void onDragHover(const DragHoverEvent& e) override;
+	void onDragLeave(const DragLeaveEvent& e) override {
+		dropAt = -1;
+	}
+	void onDragDrop(const DragDropEvent& e) override;
+	void onDragEnd(const DragEndEvent& e) override {
+		dragRow = -1;
+		scrollDrag = false;
+		dropAt = -1;
 	}
 };
 
@@ -915,9 +965,14 @@ struct AInfo : widget::Widget {
 			else if (!m->uiHost())
 				t = "SET GENRA CHOP NEXT TO ABLAUF";
 			else
-				t = "TAP AN EMPTY PAD: STORES WHAT GENRA CHOP PLAYS";
+				t = "TAP AN EMPTY PAD TO STORE";
 		}
-		label(args.vg, uiBold(), 2.f, box.size.y / 2, string::uppercase(t), 7.5f, C_CREAM, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		// never past the field: smaller if it has to, and cut at its edge
+		nvgSave(args.vg);
+		nvgIntersectScissor(args.vg, 0, 0, box.size.x, box.size.y);
+		labelFit(args.vg, uiBold(), 2.f, box.size.y / 2, string::uppercase(t), 7.5f, box.size.x - 4.f, C_CREAM,
+		         NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		nvgRestore(args.vg);
 	}
 };
 
@@ -1096,11 +1151,16 @@ void AList::draw(const DrawArgs& args) {
 	int vis = std::max(1, (int) ((box.size.y - 9.f) / RH));
 	int sel = m->selRow.load(), cur = m->playing ? m->curRow.load() : -1;
 	int focus = cur >= 0 ? cur : sel;
-	if (focus < top)
-		top = focus;
-	if (focus >= top + vis)
-		top = focus - vis + 1;
+	// the list follows the selected / playing row when it changes (else it stays where it was scrolled to)
+	if (focus != lastFocus) {
+		lastFocus = focus;
+		if (focus < top)
+			top = focus;
+		if (focus >= top + vis)
+			top = focus - vis + 1;
+	}
 	top = clamp(top, 0, std::max(0, n - vis));
+	float rightEdge = box.size.x - (n > vis ? SB + 2.f : 0.f);
 	if (n == 0)
 		label(vg, lcdFont(), 5.f, 8.f, "EMPTY: INS OR MAKE SONG", 8.5f, C_LCDINK, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 	int totalBars = 0, barsBefore = 0;
@@ -1131,7 +1191,29 @@ void AList::draw(const DrawArgs& args) {
 		std::string right = string::f("%s%2d BARS", r.fill ? "F  " : "", r.bars);
 		if (i == cur)
 			right = string::f("%d/%d  ", m->barInRow.load() + 1, r.bars) + right;
-		label(vg, lcdFont(), box.size.x - 4.f, y + RH / 2, right, 8.f, C_LCDINK, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+		label(vg, lcdFont(), rightEdge - 4.f, y + RH / 2, right, 8.f, C_LCDINK, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+	}
+	// drag & drop: a red line where it would land
+	if (dropAt >= 0) {
+		float y = 1.f + (dropAt - top) * RH;
+		y = clamp(y, 1.f, 1.f + vis * RH);
+		nvgBeginPath(vg);
+		nvgRect(vg, 1.5f, y - 0.8f, rightEdge - 3.f, 1.6f);
+		nvgFillColor(vg, C_RED);
+		nvgFill(vg);
+	}
+	// the scroll bar (when there are more rows than fit)
+	if (n > vis) {
+		float h = box.size.y - 9.f, x = box.size.x - SB - 1.f;
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, x, 1.f, SB, h - 1.f, 1.5f);
+		nvgFillColor(vg, nvgRGB(0x93, 0xa4, 0x76));
+		nvgFill(vg);
+		float th = std::max(6.f, (h - 1.f) * vis / n), ty = 1.f + (h - 1.f - th) * top / std::max(1, n - vis);
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, x, ty, SB, th, 1.5f);
+		nvgFillColor(vg, nvgRGB(0x3a, 0x4a, 0x2a));
+		nvgFill(vg);
 	}
 	// bottom line: bars and time
 	GenraChop* c = m->uiHost();
@@ -1149,10 +1231,20 @@ void AList::draw(const DrawArgs& args) {
 void AList::onButton(const ButtonEvent& e) {
 	if (!m || e.action != GLFW_PRESS)
 		return;
+	// the scroll bar
+	if (e.button == GLFW_MOUSE_BUTTON_LEFT && hasBar() && e.pos.x > box.size.x - SB - 2.f && e.pos.y < box.size.y - 9.f) {
+		scrollTo(e.pos.y);
+		scrollDrag = true;
+		e.consume(this);
+		return;
+	}
 	int i = top + (int) ((e.pos.y - 1.f) / RH);
 	if (i < 0 || i >= (int) m->rows.size())
 		return;
 	m->selRow = i;
+	lastFocus = i;
+	if (e.button == GLFW_MOUSE_BUTTON_LEFT)
+		dragRow = i; // dragging it moves it
 	if (e.button == GLFW_MOUSE_BUTTON_RIGHT) {
 		ChopAblauf* mm = m;
 		ui::Menu* menu = createMenu();
@@ -1206,6 +1298,44 @@ void AList::onButton(const ButtonEvent& e) {
 		}));
 		menu->addChild(createMenuItem("Delete", "", [=]() { mm->deleteRow(i); }));
 	}
+	e.consume(this);
+}
+
+void AList::onDragHover(const DragHoverEvent& e) {
+	if (!m)
+		return;
+	if (e.origin == this && scrollDrag) {
+		scrollTo(e.pos.y);
+		e.consume(this);
+		return;
+	}
+	bool fromPad = dynamic_cast<APad*>(e.origin) != nullptr;
+	bool fromRow = e.origin == this && dragRow >= 0;
+	if (!fromPad && !fromRow)
+		return;
+	int n = (int) m->rows.size(), vis = visible();
+	// at the edges: scroll on (a step every 0.12 s)
+	edgeWait -= APP->window->getLastFrameDuration();
+	if (edgeWait <= 0.f) {
+		if (e.pos.y < RH * 0.6f && top > 0)
+			top--, edgeWait = 0.12f;
+		else if (e.pos.y > 1.f + (vis - 0.4f) * RH && top < n - vis)
+			top++, edgeWait = 0.12f;
+	}
+	dropAt = clamp(top + (int) std::round((e.pos.y - 1.f) / RH), 0, n);
+	e.consume(this);
+}
+
+void AList::onDragDrop(const DragDropEvent& e) {
+	if (!m || dropAt < 0)
+		return;
+	if (APad* p = dynamic_cast<APad*>(e.origin))
+		m->insertSlotAt(p->slot(), dropAt);
+	else if (e.origin == this && dragRow >= 0)
+		m->moveRow(dragRow, dropAt);
+	lastFocus = m->selRow.load();
+	dropAt = -1;
+	dragRow = -1;
 	e.consume(this);
 }
 

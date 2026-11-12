@@ -52,6 +52,8 @@ const Info FX[NUM_FX] = {
 	{"TAPE START",    G_PERFORM, {"TIME", "CURVE", "MIX"},       {0.3f, 0.5f, 1.0f},  false},
 	{"DOWNER",        G_PERFORM, {"TIME", "DEPTH", "MIX"},       {0.4f, 0.5f, 1.0f},  false},
 	{"SUB OCTAVER",   G_PERFORM, {"SUB", "TONE", "OCT"},         {0.5f, 0.4f, 0.0f},  false},
+	{"LOW CUT",       G_FILTER,  {"TIME", "RANGE", "RESO"},      {0.4f, 0.6f, 0.3f},  false},
+	{"HIGH CUT",      G_FILTER,  {"TIME", "RANGE", "RESO"},      {0.4f, 0.6f, 0.3f},  false},
 };
 // clang-format on
 
@@ -215,6 +217,21 @@ std::string valueText(int f, int k, float v) {
 			if (k == 2)
 				return v < 0.5f ? "-1 OCT" : "-2 OCT";
 			break;
+		case LOWCUT:
+		case HIGHCUT:
+			if (k == 0) {
+				snprintf(b, sizeof(b), "%.1f S", 0.2f + 3.8f * v * v);
+				return b;
+			}
+			if (k == 1) {
+				float hz = f == LOWCUT ? 200.f * std::pow(20.f, v) : 3000.f * std::pow(0.05f, v);
+				if (hz >= 1000.f)
+					snprintf(b, sizeof(b), "%.1f KHZ", hz / 1000.f);
+				else
+					snprintf(b, sizeof(b), "%d HZ", (int) hz);
+				return b;
+			}
+			break;
 	}
 	return pct();
 }
@@ -231,9 +248,9 @@ void SVF::set(float fc, float q, float sr) {
 static const int REV_BASE[8] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
 static const int REV_AP[4] = {142, 107, 379, 277};
 
-Bus::Bus() {
-	ring[0].init(19);
-	ring[1].init(19);
+Bus::Bus(int ringPow) {
+	ring[0].init(ringPow);
+	ring[1].init(ringPow);
 	setSampleRate(44100.f);
 }
 
@@ -501,10 +518,24 @@ void Bus::prep(const Tempo& t) {
 				f[ch][1].set(60.f + 340.f * b, 0.707f, sr);
 			}
 			break;
+		case LOWCUT:
+		case HIGHCUT: {
+			// the sweep: from wide open to the RANGE target over TIME (t0: 0..1, from FX ON)
+			k1 = 1.f / ((0.2f + 3.8f * a * a) * sr);
+			float p = std::min(1.f, t0);
+			p = p * p * (3.f - 2.f * p);
+			float target = cur == LOWCUT ? 200.f * std::pow(20.f, b) : 3000.f * std::pow(0.05f, b);
+			float fc = cur == LOWCUT ? 20.f * std::pow(target / 20.f, p) : 20000.f * std::pow(target / 20000.f, p);
+			for (int ch = 0; ch < 2; ch++)
+				f[ch][0].set(fc, 0.6f + 6.f * d * d, sr);
+			break;
+		}
 	}
 }
 
-static bool alwaysPrep(int f) { return f == SUPERFILT || f == AUTOWAH || f == PHASER || f == RINGMOD; }
+static bool alwaysPrep(int f) {
+	return f == SUPERFILT || f == AUTOWAH || f == PHASER || f == RINGMOD || f == LOWCUT || f == HIGHCUT;
+}
 
 void Bus::process(float& L, float& R, const Tempo& t) {
 	// ---- the effect changes: out, change, in (5 ms each)
@@ -547,8 +578,10 @@ void Bus::process(float& L, float& R, const Tempo& t) {
 	float amt = g * sw;
 	if (on || amt > 0.f)
 		sleeping = false;
-	if (sleeping)
+	if (sleeping) {
+		keepNow = 1.f;
 		return;
+	}
 	// ---- coefficients
 	if (--blockLeft <= 0) {
 		blockLeft = 16;
@@ -561,6 +594,7 @@ void Bus::process(float& L, float& R, const Tempo& t) {
 		float mix = c[2];
 		float dry = 1.f - amt * std::max(0.f, 2.f * mix - 1.f);
 		float wet = std::min(1.f, 2.f * mix);
+		keepNow = dry;
 		L = L * dry + wL * wet;
 		R = R * dry + wR * wet;
 		if (!on) {
@@ -576,6 +610,7 @@ void Bus::process(float& L, float& R, const Tempo& t) {
 		return;
 	}
 	if (amt <= 0.f) {
+		keepNow = 1.f;
 		if (!on) {
 			sleeping = true;
 			if (frozen)
@@ -583,6 +618,7 @@ void Bus::process(float& L, float& R, const Tempo& t) {
 		}
 		return;
 	}
+	keepNow = 1.f - amt;
 	float yL = L, yR = R;
 	runInsert(yL, yR, t);
 	L += (yL - L) * amt;
@@ -987,6 +1023,20 @@ void Bus::runInsert(float& L, float& R, const Tempo& t) {
 			y[1] = lerp(x[1], out[1], d);
 			break;
 		}
+		case LOWCUT:
+		case HIGHCUT:
+			if (trig) {
+				trig = false;
+				t0 = 0.f;
+				prep(t);
+			}
+			t0 = std::min(1.f, t0 + k1);
+			for (int ch = 0; ch < 2; ch++) {
+				float l, bp, h;
+				f[ch][0].run(x[ch], l, bp, h);
+				y[ch] = cur == LOWCUT ? h : l;
+			}
+			break;
 		case SUBOCT:
 			for (int ch = 0; ch < 2; ch++) {
 				float l, bp, h;

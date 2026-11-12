@@ -184,6 +184,54 @@ static void genDrums(Pattern& p, const Style& st, Rng& rng) {
 		if (A[SNARE][g].vel == 0.f)
 			A[SNARE][g].vel = 0.35f, A[SNARE][g].prio = 0.65f;
 	}
+	// more with DENS, by the kind of style (only on voices the style leaves empty, all low priority: DENS to the
+	// right brings them): rim ghosts, a shaker / tambourine on PERC, open hats, a clap on the snare
+	{
+		bool trap = st.hatRoll > 0.f || st.bass == BM_808, funk = st.bass == BM_FUNK;
+		auto empty = [&](int v) {
+			for (int i = 0; i < STEPS; i++)
+				if (A[v][i].vel > 0.f)
+					return false;
+			return true;
+		};
+		auto add = [&](int v, int i, float vel, float prio) {
+			if (A[v][i].vel == 0.f)
+				A[v][i].vel = vel, A[v][i].prio = prio;
+		};
+		if (empty(RIM)) {
+			static const int BB[] = {3, 7, 11, 14}, TR[] = {6, 10, 14};
+			const int* at = trap ? TR : BB;
+			int n = trap ? 3 : 4;
+			for (int k = 0; k < n; k++)
+				if (rng.chance(0.5f))
+					add(RIM, at[k], rng.range(0.25f, 0.4f), rng.range(0.6f, 0.9f));
+		}
+		if (empty(PERC)) {
+			if (trap) {
+				static const int TP[] = {3, 7, 10, 13};
+				for (int i : TP)
+					if (rng.chance(0.5f))
+						add(PERC, i, rng.range(0.4f, 0.6f), rng.range(0.55f, 0.85f));
+			}
+			else {
+				for (int i = 2; i < STEPS; i += 4)
+					add(PERC, i, rng.range(0.25f, 0.4f), rng.range(0.6f, 0.85f)); // tambourine on the off-beats
+				if (rng.chance(0.5f))
+					for (int i = 0; i < STEPS; i += 2)
+						add(PERC, i, 0.18f, 0.92f); // a shaker on the eighths, last of all
+			}
+		}
+		if (funk || trap) {
+			static const int OHS[] = {6, 14};
+			for (int i : OHS)
+				if (rng.chance(0.5f))
+					add(OH, i, rng.range(0.45f, 0.65f), rng.range(0.6f, 0.85f));
+		}
+		if (empty(CLAP) && rng.chance(trap || funk ? 0.8f : 0.4f))
+			for (int i = 0; i < STEPS; i++)
+				if (A[SNARE][i].vel > 0.f && A[SNARE][i].prio <= 0.1f)
+					add(CLAP, i, rng.range(0.5f, 0.7f), rng.range(0.7f, 0.9f));
+	}
 	// the four bars: A A A A+fill (bar 2 a little different)
 	for (int b = 0; b < BARS; b++)
 		for (int v = 0; v < DRUMS; v++)
@@ -234,6 +282,18 @@ static void genDrums(Pattern& p, const Style& st, Rng& rng) {
 				t.vel = rng.range(0.6f, 0.9f), t.prio = 0.35f;
 			}
 		}
+	}
+	// with DENS far right: a tom fill into the next round (if bar 4 has none yet)
+	{
+		bool toms = false;
+		for (int i = 12; i < STEPS; i++)
+			toms = toms || p.drum[TOM][b4 + i].vel > 0.f;
+		if (!toms)
+			for (int i = 13; i < STEPS; i++)
+				if (rng.chance(0.7f)) {
+					Hit& t = p.drum[TOM][b4 + i];
+					t.vel = rng.range(0.5f, 0.8f), t.prio = 0.85f, t.off = 0.f;
+				}
 	}
 	// a crash-ish open hat at the top of bar 1 (in the next cycle) now and then
 	if (rng.chance(0.3f))

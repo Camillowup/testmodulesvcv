@@ -1,11 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// GENRA CHOP FX: two effect buses to play live, after the idea of the SP-404, in GENRA CHOP's look (22 HP).
+// GENRA CHOP FX: two effect buses to play live, after the idea of the SP-404, in GENRA CHOP's look (36 HP).
 //
-// Stereo in, stereo out. Each bus: an effect out of 37 in six groups (the field, the mouse wheel, or the FX jack),
-// CTRL 1-3 (the LCD says what they do for the effect), FX ON (tap: on / off, hold: only while held) and an ON gate.
-// ROUTE: 1 > 2, 2 > 1 or both side by side. Six quick keys put an effect on the bus last touched and switch it on
-// (right-click: which effect). PRESET: whole setups (the buses stay off until you play them). The tempo for the
-// echoes, the gater, the looper: 16ths at CLK, else the tempo in the menu. Everything can be MIDI learned.
+// Eight sources come in on their own (IN L/R, KICK, SNR, CH, OH, BASS, MEL L/R, PADS L/R); a selector over each says
+// where it goes: DRY, bus 1, bus 2 or both. Every source comes out again on its own jack (for WING-LINK: one fader each),
+// with the effects on the returns (RET 1 / RET 2): an effect that adds (echoes, reverb) leaves the source dry on its own
+// jack and puts what it adds on the return; an effect that changes the sound (filter, vinyl, looper …) takes the source
+// over to the return while it plays (crossfaded with FX ON). MIX = everything. ROUTE 1 > 2: what bus 1 makes goes on
+// through bus 2 (and 2 > 1 the other way); 1 + 2: side by side.
+// Each bus: an effect out of 39 in six groups, CTRL 1-3 with a little screen above each (what it does, its value),
+// CV under each, FX ON (tap: on / off, hold: only while held), an ON gate and an FX input. Eight quick keys put an
+// effect on the bus last touched. Eight DJ pads act on all the outputs while held (any effect, right-click). DJ FILTER
+// (low-pass left, high-pass right) on all the outputs. PRESET: whole setups. Tempo: 16ths at CLK, else the menu's.
 //
 // Prepared for later: where the sound and the clock come from is a choice of its own (today only the cables), saved
 // in the patch, with room on the panel for the light segments of a connection without cables.
@@ -18,10 +23,39 @@
 
 using namespace fx;
 
-static const int QUICKS = 6;
-static const int QUICK_DEFAULT[QUICKS] = {FILTDRIVE, RESONATOR, DELAY, ISOLATOR, LOOPER, STOPPER};
+static const int QUICKS = 8, DJS = 8, SOURCES = 8, GROUPS = 10;
+static const int QUICK_DEFAULT[QUICKS] = {FILTDRIVE, RESONATOR, DELAY, ISOLATOR, LOOPER, STOPPER, VINYL, REVERB};
+enum Src { S_IN, S_KICK, S_SNR, S_CH, S_OH, S_BASS, S_MEL, S_PADS };
+static const char* const SRC_NAMES[SOURCES] = {"IN", "KICK", "SNR", "CH", "OH", "BASS", "MEL", "PADS"};
+static const bool SRC_STEREO[SOURCES] = {true, false, false, false, false, false, true, true};
+enum Sel { SEL_DRY, SEL_1, SEL_2, SEL_12, NUM_SELS };
+static const char* const SEL_NAMES[NUM_SELS] = {"DRY", "1", "2", "1+2"};
 
-/** Names short enough for a quick key. */
+// the DJ pads: an effect with its three controls and a name
+struct DjPad {
+	int fx = DELAY;
+	float c[3] = {0.5f, 0.5f, 0.5f};
+	std::string name;
+};
+static DjPad djFactory(int i) {
+	DjPad p;
+	auto set = [&](int f, float a, float b, float d, const char* n) {
+		p.fx = f, p.c[0] = a, p.c[1] = b, p.c[2] = d, p.name = n;
+	};
+	switch (i) {
+		case 0: set(DELAY, 7.f / 11.f, 0.6f, 1.f, "ECHO OUT"); break; // MIX 1: only the echo while held
+		case 1: set(LOOPER, 3.f / 6.f, 0.5f, 1.f, "STUTTER 1/4"); break;
+		case 2: set(LOOPER, 2.f / 6.f, 0.5f, 1.f, "STUTTER 1/8"); break;
+		case 3: set(LOOPER, 1.f / 6.f, 0.5f, 1.f, "STUTTER 1/16"); break;
+		case 4: set(TAPESTOP, 0.3f, 0.5f, 1.f, "TAPE STOP"); break;
+		case 5: set(BACKSPIN, 0.3f, 0.5f, 1.f, "BACKSPIN"); break;
+		case 6: set(LOWCUT, 0.4f, 0.6f, 0.3f, "LOW CUT"); break;
+		default: set(HIGHCUT, 0.4f, 0.6f, 0.3f, "HIGH CUT"); break;
+	}
+	return p;
+}
+
+/** Names short enough for a key. */
 static std::string shortName(int f) {
 	switch (f) {
 		case CASSETTE: return "CASSETTE";
@@ -31,6 +65,7 @@ static std::string shortName(int f) {
 		case RESONATOR: return "RESO";
 		case TALK: return "TALK";
 		case SATURATOR: return "SATURATE";
+		case VINYL: return "VINYL";
 		default: break;
 	}
 	std::string s = FX[f].name;
@@ -43,24 +78,49 @@ static std::string shortName(int f) {
 }
 
 struct ChopFx : Module {
-	enum ParamId { IN_PARAM, OUT_PARAM, ENUMS(FX_PARAM, 2), ENUMS(C_PARAM, 6), NUM_PARAMS };
-	enum InputId { INL_INPUT, INR_INPUT, CLK_INPUT, RST_INPUT, ENUMS(BUS_INPUT, 10), NUM_INPUTS }; // per bus: CV 1-3, ON, FX
-	enum OutputId { OUTL_OUTPUT, OUTR_OUTPUT, NUM_OUTPUTS };
+	enum ParamId { IN_PARAM, OUT_PARAM, ENUMS(FX_PARAM, 2), ENUMS(C_PARAM, 6), FILT_PARAM, NUM_PARAMS };
+	enum InputId {
+		INL_INPUT, INR_INPUT, KICK_INPUT, SNR_INPUT, CH_INPUT, OH_INPUT, BASS_INPUT, MELL_INPUT, MELR_INPUT, PADSL_INPUT,
+		PADSR_INPUT, CLK_INPUT, RST_INPUT,
+		ENUMS(CV_INPUT, 6), // bus * 3 + k
+		ENUMS(ON_INPUT, 2),
+		ENUMS(FXCV_INPUT, 2),
+		NUM_INPUTS
+	};
+	enum OutputId {
+		INL_OUTPUT, INR_OUTPUT, KICK_OUTPUT, SNR_OUTPUT, CH_OUTPUT, OH_OUTPUT, BASS_OUTPUT, MELL_OUTPUT, MELR_OUTPUT,
+		PADSL_OUTPUT, PADSR_OUTPUT,
+		ENUMS(RET_OUTPUT, 4), // RET1 L/R, RET2 L/R
+		MIXL_OUTPUT, MIXR_OUTPUT,
+		NUM_OUTPUTS
+	};
+	// a source's first jack (in and out are in the same order); stereo sources have R right after
+	static int srcJack(int s) {
+		static const int J[SOURCES] = {0, 2, 3, 4, 5, 6, 7, 9};
+		return J[s];
+	}
 
 	// where the sound and the clock come from (saved): today the cables; later also GENRA CHOP without cables
-	enum Source { SRC_CABLES = 0, NUM_SOURCES };
+	enum Source { SRC_CABLES = 0, NUM_SOURCE_KINDS };
 	int audioSource = SRC_CABLES, clockSource = SRC_CABLES;
 
 	Bus bus[2];
-	std::atomic<bool> latch[2];      // FX ON (the panel, MIDI)
-	std::atomic<bool> busOn[2];      // what plays (for the panel)
-	std::atomic<int> fxNow[2];       // the effect playing (after the FX jack)
+	Bus dj[GROUPS] = {Bus(17), Bus(17), Bus(17), Bus(17), Bus(17), Bus(17), Bus(17), Bus(17), Bus(17), Bus(17)};
+	SVF djf[GROUPS][2];
+	std::atomic<bool> latch[2];
+	std::atomic<bool> busOn[2];
+	std::atomic<int> fxNow[2];
 	std::atomic<bool> retrig[2];
+	std::atomic<int> sel[SOURCES];
 	int route = ROUTE_12;
 	int quick[QUICKS];
+	DjPad djPad[DJS];
+	std::atomic<int> djHeld{-1}; // the DJ pad held (-1: none)
+	std::atomic<int> djTrig{0};  // +1 when a pad is pressed (the one-shots start again)
+	int djSeen = 0;
 	int preset = 1;
 	float freeBpm = 90.f;
-	std::atomic<int> activeBus{0};   // the quick keys and the LCD work on it (UI)
+	std::atomic<int> activeBus{0};
 	ml::CtrlIn ctrl[ml::CTRLS];
 
 	// the tempo
@@ -70,34 +130,56 @@ struct ChopFx : Module {
 	int pulse = -1;
 	bool clocked = false;
 	int block = 0;
+	float srSeen = 0.f;
+	float filtSeen = -1.f;
 
 	ChopFx() {
 		config(NUM_PARAMS, NUM_INPUTS, NUM_OUTPUTS, 0);
 		configParam(IN_PARAM, 0.f, 2.f, 1.f, "Input level", "%", 0.f, 100.f);
 		configParam(OUT_PARAM, 0.f, 2.f, 1.f, "Output level", "%", 0.f, 100.f);
+		configParam(FILT_PARAM, 0.f, 1.f, 0.5f, "DJ filter (left: low-pass, right: high-pass, centre: off)");
 		for (int b = 0; b < 2; b++) {
 			configParam(FX_PARAM + b, 0.f, (float) (NUM_FX - 1), b == 0 ? (float) VINYL : (float) TAPEECHO,
 			            string::f("Bus %d effect", b + 1))->snapEnabled = true;
-			for (int k = 0; k < 3; k++)
+			for (int k = 0; k < 3; k++) {
 				configParam<CtrlQuantity>(C_PARAM + b * 3 + k, 0.f, 1.f, 0.5f, string::f("Bus %d CTRL %d", b + 1, k + 1));
-			const char* IN[5] = {"CV 1", "CV 2", "CV 3", "ON (gate)", "Effect (0-10 V over the list)"};
-			for (int i = 0; i < 5; i++)
-				configInput(BUS_INPUT + b * 5 + i, string::f("Bus %d %s", b + 1, IN[i]));
+				configInput(CV_INPUT + b * 3 + k, string::f("Bus %d CTRL %d CV (±5 V = ±half the knob)", b + 1, k + 1));
+			}
+			configInput(ON_INPUT + b, string::f("Bus %d ON (gate)", b + 1));
+			configInput(FXCV_INPUT + b, string::f("Bus %d effect (0-10 V over the list)", b + 1));
 			latch[b] = false;
 			busOn[b] = false;
 			fxNow[b] = b == 0 ? VINYL : TAPEECHO;
 			retrig[b] = false;
 		}
-		configInput(INL_INPUT, "Left (mono: both)");
-		configInput(INR_INPUT, "Right");
+		for (int s = 0; s < SOURCES; s++) {
+			int j = srcJack(s);
+			if (SRC_STEREO[s]) {
+				configInput(j, string::f("%s left (mono: both)", SRC_NAMES[s]));
+				configInput(j + 1, string::f("%s right", SRC_NAMES[s]));
+				configOutput(j, string::f("%s left (dry, or through the bus while its effect replaces the sound)", SRC_NAMES[s]));
+				configOutput(j + 1, string::f("%s right", SRC_NAMES[s]));
+			}
+			else {
+				configInput(j, SRC_NAMES[s]);
+				configOutput(j, string::f("%s (dry, or through the bus while its effect replaces the sound)", SRC_NAMES[s]));
+			}
+			sel[s] = s == S_IN ? SEL_1 : SEL_DRY;
+		}
 		configInput(CLK_INPUT, "Clock (16ths, e.g. GENRA CHOP's CLK out)");
 		configInput(RST_INPUT, "Reset (the bar starts)");
-		configOutput(OUTL_OUTPUT, "Left");
-		configOutput(OUTR_OUTPUT, "Right");
-		configBypass(INL_INPUT, OUTL_OUTPUT);
-		configBypass(INR_INPUT, OUTR_OUTPUT);
+		configOutput(RET_OUTPUT + 0, "Return bus 1 left (what the effect makes)");
+		configOutput(RET_OUTPUT + 1, "Return bus 1 right");
+		configOutput(RET_OUTPUT + 2, "Return bus 2 left (what the effect makes)");
+		configOutput(RET_OUTPUT + 3, "Return bus 2 right");
+		configOutput(MIXL_OUTPUT, "Mix left (everything)");
+		configOutput(MIXR_OUTPUT, "Mix right (everything)");
+		configBypass(INL_INPUT, MIXL_OUTPUT);
+		configBypass(INR_INPUT, MIXR_OUTPUT);
 		for (int i = 0; i < QUICKS; i++)
 			quick[i] = QUICK_DEFAULT[i];
+		for (int i = 0; i < DJS; i++)
+			djPad[i] = djFactory(i);
 		applyPreset(1);
 	}
 
@@ -137,13 +219,16 @@ struct ChopFx : Module {
 		params[FX_PARAM + b].setValue((float) f);
 		for (int k = 0; k < 3; k++)
 			params[C_PARAM + b * 3 + k].setValue(FX[f].def[k]);
+		retrig[b] = true;
 	}
 
-	void readAudio(float& L, float& R) {
+	void readSource(int s, float& L, float& R) {
 		switch (audioSource) {
-			default: // SRC_CABLES
-				L = inputs[INL_INPUT].getVoltage() / 5.f;
-				R = inputs[INR_INPUT].isConnected() ? inputs[INR_INPUT].getVoltage() / 5.f : L;
+			default: { // SRC_CABLES
+				int j = srcJack(s);
+				L = inputs[j].getVoltage() / 5.f;
+				R = SRC_STEREO[s] && inputs[j + 1].isConnected() ? inputs[j + 1].getVoltage() / 5.f : L;
+			}
 		}
 	}
 	/** A 16th from the clock (true on its edge); connected: is there a clock at all. */
@@ -155,16 +240,7 @@ struct ChopFx : Module {
 		}
 	}
 
-	float srSeen = 0.f;
-
-	void process(const ProcessArgs& args) override {
-		float sr = args.sampleRate;
-		if (sr != srSeen) {
-			srSeen = sr;
-			for (Bus& b : bus)
-				b.setSampleRate(sr);
-		}
-		// ---- the tempo: 16ths at CLK (the bar follows the pulses), else the tempo of the menu
+	void stepTempo(float sr) {
 		bool conn = false;
 		bool edge = readClock(conn);
 		if (rstTrig.process(inputs[RST_INPUT].getVoltage(), 0.1f, 1.f)) {
@@ -196,54 +272,170 @@ struct ChopFx : Module {
 			if (tempo.barPos >= 1.0)
 				tempo.barPos -= 1.0;
 		}
-		// ---- the controls (every 16 samples)
+	}
+
+	void readControls(float sr) {
+		for (int b = 0; b < 2; b++) {
+			int f = (int) std::round(params[FX_PARAM + b].getValue());
+			Input& fxIn = inputs[FXCV_INPUT + b];
+			if (fxIn.isConnected())
+				f = (int) std::round(clamp(fxIn.getVoltage(), 0.f, 10.f) / 10.f * (NUM_FX - 1));
+			f = clamp(f, 0, NUM_FX - 1);
+			bus[b].want = f;
+			fxNow[b] = f;
+			for (int k = 0; k < 3; k++) {
+				float v = params[C_PARAM + b * 3 + k].getValue();
+				Input& cv = inputs[CV_INPUT + b * 3 + k];
+				if (cv.isConnected())
+					v += cv.getVoltage() / 10.f;
+				bus[b].c[k] = clamp(v, 0.f, 1.f);
+			}
+			Input& gate = inputs[ON_INPUT + b];
+			bool on = latch[b].load() || (gate.isConnected() && gate.getVoltage() >= 1.f);
+			bus[b].on = on;
+			busOn[b] = on;
+			if (retrig[b].exchange(false))
+				bus[b].retrigger = true;
+		}
+		// the DJ pads: one effect on every group of outputs while a pad is held
+		int held = djHeld.load();
+		int tr = djTrig.load();
+		bool again = tr != djSeen;
+		djSeen = tr;
+		for (int g = 0; g < GROUPS; g++) {
+			if (held >= 0) {
+				dj[g].want = djPad[held].fx;
+				for (int k = 0; k < 3; k++)
+					dj[g].c[k] = djPad[held].c[k];
+			}
+			dj[g].on = held >= 0;
+			if (again && held >= 0)
+				dj[g].retrigger = true;
+		}
+		// DJ FILTER: low-pass left of the centre, high-pass right of it
+		float fk = params[FILT_PARAM].getValue();
+		if (fk != filtSeen) {
+			filtSeen = fk;
+			float d = (fk - 0.5f) * 2.f;
+			float fc = d < 0.f ? 20000.f * std::pow(100.f / 20000.f, -d) : 20.f * std::pow(5000.f / 20.f, d);
+			for (int g = 0; g < GROUPS; g++)
+				for (int c = 0; c < 2; c++)
+					djf[g][c].set(fc, 1.1f, sr);
+		}
+	}
+
+	void process(const ProcessArgs& args) override {
+		float sr = args.sampleRate;
+		if (sr != srSeen) {
+			srSeen = sr;
+			for (Bus& b : bus)
+				b.setSampleRate(sr);
+			for (Bus& b : dj)
+				b.setSampleRate(sr);
+			filtSeen = -1.f;
+		}
+		stepTempo(sr);
 		if (--block <= 0) {
 			block = 16;
+			readControls(sr);
+		}
+		// ---- the sources, and what goes to the buses
+		float gin = params[IN_PARAM].getValue();
+		float src[SOURCES][2];
+		int sl[SOURCES];
+		for (int s = 0; s < SOURCES; s++) {
+			readSource(s, src[s][0], src[s][1]);
+			src[s][0] *= gin, src[s][1] *= gin;
+			sl[s] = sel[s].load();
+		}
+		bool serial = route != ROUTE_PAR;
+		int first = route == ROUTE_21 ? 1 : 0, second = 1 - first;
+		float in[2][2] = {{0.f, 0.f}, {0.f, 0.f}};
+		for (int s = 0; s < SOURCES; s++) {
+			int x = sl[s];
+			bool to[2] = {x == SEL_1 || x == SEL_12, x == SEL_2 || x == SEL_12};
+			if (serial && x == SEL_12)
+				to[first] = true, to[second] = false; // in a chain, "both" is: through the first, then the second
+			for (int b = 0; b < 2; b++)
+				if (to[b])
+					in[b][0] += src[s][0], in[b][1] += src[s][1];
+		}
+		float ret[2][2], keep[2];
+		if (!serial) {
 			for (int b = 0; b < 2; b++) {
-				int f = (int) std::round(params[FX_PARAM + b].getValue());
-				Input& fxIn = inputs[BUS_INPUT + b * 5 + 4];
-				if (fxIn.isConnected())
-					f = (int) std::round(clamp(fxIn.getVoltage(), 0.f, 10.f) / 10.f * (NUM_FX - 1));
-				f = clamp(f, 0, NUM_FX - 1);
-				bus[b].want = f;
-				fxNow[b] = f;
-				for (int k = 0; k < 3; k++) {
-					float v = params[C_PARAM + b * 3 + k].getValue();
-					Input& cv = inputs[BUS_INPUT + b * 5 + k];
-					if (cv.isConnected())
-						v += cv.getVoltage() / 10.f;
-					bus[b].c[k] = clamp(v, 0.f, 1.f);
-				}
-				Input& gate = inputs[BUS_INPUT + b * 5 + 3];
-				bool on = latch[b].load() || (gate.isConnected() && gate.getVoltage() >= 1.f);
-				bus[b].on = on;
-				busOn[b] = on;
-				if (retrig[b].exchange(false))
-					bus[b].retrigger = true;
+				float L = in[b][0], R = in[b][1];
+				bus[b].process(L, R, tempo);
+				keep[b] = bus[b].keep();
+				ret[b][0] = L - in[b][0] * keep[b];
+				ret[b][1] = R - in[b][1] * keep[b];
 			}
 		}
-		// ---- the sound
-		float L, R;
-		readAudio(L, R);
-		float gin = params[IN_PARAM].getValue();
-		L *= gin, R *= gin;
-		if (route == ROUTE_PAR) {
-			float l1 = L, r1 = R, l2 = L, r2 = R;
-			bus[0].process(l1, r1, tempo);
-			bus[1].process(l2, r2, tempo);
-			L = l1 + l2 - L;
-			R = r1 + r2 - R;
-		}
 		else {
-			int first = route == ROUTE_21 ? 1 : 0;
+			// first bus, then what it made on through the second
+			float L = in[first][0], R = in[first][1];
 			bus[first].process(L, R, tempo);
-			bus[1 - first].process(L, R, tempo);
+			keep[first] = bus[first].keep();
+			float ra[2] = {L - in[first][0] * keep[first], R - in[first][1] * keep[first]};
+			float ib[2] = {in[second][0] + ra[0], in[second][1] + ra[1]};
+			float L2 = ib[0], R2 = ib[1];
+			bus[second].process(L2, R2, tempo);
+			keep[second] = bus[second].keep();
+			ret[second][0] = L2 - ib[0] * keep[second];
+			ret[second][1] = R2 - ib[1] * keep[second];
+			ret[first][0] = ra[0] * keep[second];
+			ret[first][1] = ra[1] * keep[second];
 		}
+		// ---- the groups of outputs: the sources (dry, or what is left while an effect replaces them), the returns
+		float g[GROUPS][2];
+		for (int s = 0; s < SOURCES; s++) {
+			int x = sl[s];
+			float k = 1.f;
+			if (!serial)
+				k = (x == SEL_1 ? keep[0] : x == SEL_2 ? keep[1] : x == SEL_12 ? keep[0] * keep[1] : 1.f);
+			else if (x == SEL_1 || x == SEL_2 || x == SEL_12) {
+				int b = x == SEL_12 ? first : (x == SEL_1 ? 0 : 1);
+				k = keep[b];
+			}
+			g[s][0] = src[s][0] * k;
+			g[s][1] = src[s][1] * k;
+		}
+		for (int b = 0; b < 2; b++)
+			g[SOURCES + b][0] = ret[b][0], g[SOURCES + b][1] = ret[b][1];
+		// ---- the DJ pads and the DJ filter, on every group alike
+		bool filt = std::fabs(filtSeen - 0.5f) > 0.02f;
+		bool lp = filtSeen < 0.5f;
+		for (int i = 0; i < GROUPS; i++) {
+			bool mono = i < SOURCES && !SRC_STEREO[i];
+			if (mono)
+				g[i][1] = g[i][0];
+			dj[i].process(g[i][0], g[i][1], tempo);
+			if (filt)
+				for (int c = 0; c < 2; c++) {
+					float l, bp, h;
+					djf[i][c].run(g[i][c], l, bp, h);
+					g[i][c] = lp ? l : h;
+				}
+		}
+		// ---- out
 		float gout = params[OUT_PARAM].getValue() * 5.f;
-		// a soft ceiling: above about 8 V it rounds off instead of clipping hard
-		auto ceil = [](float v) { return std::fabs(v) < 8.f ? v : (v > 0.f ? 1.f : -1.f) * (8.f + 3.f * std::tanh((std::fabs(v) - 8.f) / 3.f)); };
-		outputs[OUTL_OUTPUT].setVoltage(ceil(L * gout));
-		outputs[OUTR_OUTPUT].setVoltage(ceil(R * gout));
+		auto ceil = [](float v) {
+			return std::fabs(v) < 8.f ? v : (v > 0.f ? 1.f : -1.f) * (8.f + 3.f * std::tanh((std::fabs(v) - 8.f) / 3.f));
+		};
+		float mixL = 0.f, mixR = 0.f;
+		for (int s = 0; s < SOURCES; s++) {
+			int j = srcJack(s);
+			outputs[j].setVoltage(ceil(g[s][0] * gout));
+			if (SRC_STEREO[s])
+				outputs[j + 1].setVoltage(ceil(g[s][1] * gout));
+			mixL += g[s][0], mixR += g[s][1];
+		}
+		for (int b = 0; b < 2; b++) {
+			outputs[RET_OUTPUT + b * 2].setVoltage(ceil(g[SOURCES + b][0] * gout));
+			outputs[RET_OUTPUT + b * 2 + 1].setVoltage(ceil(g[SOURCES + b][1] * gout));
+			mixL += g[SOURCES + b][0], mixR += g[SOURCES + b][1];
+		}
+		outputs[MIXL_OUTPUT].setVoltage(ceil(mixL * gout));
+		outputs[MIXR_OUTPUT].setVoltage(ceil(mixR * gout));
 	}
 
 	json_t* dataToJson() override {
@@ -260,6 +452,15 @@ struct ChopFx : Module {
 		for (int i = 0; i < QUICKS; i++)
 			json_array_append_new(q, json_integer(quick[i]));
 		json_object_set_new(r, "quick", q);
+		json_t* s = json_array();
+		for (int i = 0; i < SOURCES; i++)
+			json_array_append_new(s, json_integer(sel[i].load()));
+		json_object_set_new(r, "sel", s);
+		json_t* d = json_array();
+		for (int i = 0; i < DJS; i++)
+			json_array_append_new(d, json_pack("{s:i,s:f,s:f,s:f,s:s}", "fx", djPad[i].fx, "c1", djPad[i].c[0], "c2",
+			                                   djPad[i].c[1], "c3", djPad[i].c[2], "name", djPad[i].name.c_str()));
+		json_object_set_new(r, "dj", d);
 		return r;
 	}
 	void dataFromJson(json_t* r) override {
@@ -271,19 +472,40 @@ struct ChopFx : Module {
 		preset = clamp(gi("preset", 1), 0, NUM_PRESETS - 1);
 		if (json_t* j = json_object_get(r, "freeBpm"))
 			freeBpm = clamp((float) json_number_value(j), 40.f, 240.f);
-		audioSource = clamp(gi("audioSource", SRC_CABLES), 0, NUM_SOURCES - 1);
-		clockSource = clamp(gi("clockSource", SRC_CABLES), 0, NUM_SOURCES - 1);
+		audioSource = clamp(gi("audioSource", SRC_CABLES), 0, NUM_SOURCE_KINDS - 1);
+		clockSource = clamp(gi("clockSource", SRC_CABLES), 0, NUM_SOURCE_KINDS - 1);
 		latch[0] = json_is_true(json_object_get(r, "on1"));
 		latch[1] = json_is_true(json_object_get(r, "on2"));
 		activeBus = clamp(gi("activeBus", 0), 0, 1);
 		json_t* q = json_object_get(r, "quick");
 		for (int i = 0; i < QUICKS && i < (int) json_array_size(q); i++)
 			quick[i] = clamp((int) json_integer_value(json_array_get(q, i)), 0, NUM_FX - 1);
+		json_t* s = json_object_get(r, "sel");
+		for (int i = 0; i < SOURCES && i < (int) json_array_size(s); i++)
+			sel[i] = clamp((int) json_integer_value(json_array_get(s, i)), 0, NUM_SELS - 1);
+		json_t* d = json_object_get(r, "dj");
+		for (int i = 0; i < DJS && i < (int) json_array_size(d); i++) {
+			json_t* o = json_array_get(d, i);
+			DjPad p = djFactory(i);
+			if (json_t* j = json_object_get(o, "fx"))
+				p.fx = clamp((int) json_integer_value(j), 0, NUM_FX - 1);
+			const char* ck[3] = {"c1", "c2", "c3"};
+			for (int k = 0; k < 3; k++)
+				if (json_t* j = json_object_get(o, ck[k]))
+					p.c[k] = clamp((float) json_number_value(j), 0.f, 1.f);
+			if (json_t* j = json_object_get(o, "name"))
+				p.name = json_string_value(j);
+			djPad[i] = p;
+		}
 	}
 	void onReset(const ResetEvent& e) override {
 		Module::onReset(e);
 		for (int i = 0; i < QUICKS; i++)
 			quick[i] = QUICK_DEFAULT[i];
+		for (int i = 0; i < DJS; i++)
+			djPad[i] = djFactory(i);
+		for (int s = 0; s < SOURCES; s++)
+			sel[s] = s == S_IN ? SEL_1 : SEL_DRY;
 		applyPreset(1);
 		freeBpm = 90.f;
 	}
@@ -301,30 +523,68 @@ struct FxLcd : widget::Widget {
 		nvgFillColor(vg, C_LCD);
 		nvgFill(vg);
 		auto f = lcdFont();
-		std::string l[2], l3;
+		std::string l1, l2, l3;
 		int act = m ? m->activeBus.load() : 0;
 		for (int b = 0; b < 2; b++) {
 			int fx = m ? m->fxNow[b].load() : (b == 0 ? VINYL : TAPEECHO);
 			bool on = m && m->busOn[b].load();
-			std::string tag;
-			if (m && m->inputs[ChopFx::BUS_INPUT + b * 5 + 4].isConnected())
-				tag = " CV";
-			l[b] = string::f("%c%d %s%s", b == act ? '>' : ' ', b + 1, FX[fx].name, tag.c_str());
-			l[b] += std::string(std::max(1, 21 - (int) l[b].size()), ' ') + (on ? "ON" : "--");
+			std::string cv = (m && m->inputs[ChopFx::FXCV_INPUT + b].isConnected()) ? " CV" : "";
+			l1 += string::f("%c%d %s%s %s   ", b == act ? '>' : ' ', b + 1, FX[fx].name, cv.c_str(), on ? "ON" : "--");
 		}
-		int fx = m ? m->fxNow[act].load() : VINYL;
-		for (int k = 0; k < 3; k++) {
-			float v = m ? m->params[ChopFx::C_PARAM + act * 3 + k].getValue() : FX[fx].def[k];
-			l3 += string::f("%s %s  ", FX[fx].ctrl[k], valueText(fx, k, v).c_str());
+		for (int s = 0; s < SOURCES; s++) {
+			int x = m ? m->sel[s].load() : (s == S_IN ? SEL_1 : SEL_DRY);
+			if (x != SEL_DRY)
+				l2 += string::f("%s>%s  ", SRC_NAMES[s], SEL_NAMES[x]);
+		}
+		if (l2.empty())
+			l2 = "ALL DRY";
+		if (m) {
+			float bpm = 60.f * APP->engine->getSampleRate() / std::max(1.f, m->tempo.spb);
+			l3 = string::f("TEMPO %.0f BPM (%s)", bpm, m->clocked ? "CLK" : "MENU");
+			int h = m->djHeld.load();
+			if (h >= 0)
+				l3 += "   DJ: " + m->djPad[h].name;
 		}
 		if (msg && msgTime && *msgTime > 0.f)
 			l3 = string::uppercase(*msg);
-		label(vg, f, 5.f, 9.5f, l[0], 11.5f, C_LCDINK, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
-		label(vg, f, 5.f, 20.5f, l[1], 11.5f, C_LCDINK, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		nvgSave(vg);
 		nvgIntersectScissor(vg, 0, 0, box.size.x - 3.f, box.size.y);
-		label(vg, f, 5.f, 30.5f, l3, 9.5f, nvgRGB(0x3a, 0x4a, 0x2a), NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		label(vg, f, 5.f, 8.5f, l1, 11.f, C_LCDINK, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		label(vg, f, 5.f, 18.5f, l2, 10.f, C_LCDINK, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
+		label(vg, f, 5.f, 27.5f, l3, 9.f, nvgRGB(0x3a, 0x4a, 0x2a), NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE);
 		nvgRestore(vg);
+	}
+};
+
+/** The little screen above a knob (as on the MPC X): what it does for the effect, its value, a bar. */
+struct FxOled : widget::Widget {
+	ChopFx* m = nullptr;
+	int b = 0, k = 0;
+	void draw(const DrawArgs& args) override {
+		NVGcontext* vg = args.vg;
+		float w = box.size.x, h = box.size.y;
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, 0, 0, w, h, 1.5f);
+		nvgFillColor(vg, nvgRGB(0x14, 0x14, 0x13));
+		nvgFill(vg);
+		nvgStrokeColor(vg, nvgRGB(0x55, 0x53, 0x4f));
+		nvgStrokeWidth(vg, 0.8f);
+		nvgStroke(vg);
+		int fx = m ? m->fxNow[b].load() : (b == 0 ? VINYL : TAPEECHO);
+		float v = m ? m->params[ChopFx::C_PARAM + b * 3 + k].getValue() : FX[fx].def[k];
+		if (m && m->inputs[ChopFx::CV_INPUT + b * 3 + k].isConnected())
+			v = clamp(v + m->inputs[ChopFx::CV_INPUT + b * 3 + k].getVoltage() / 10.f, 0.f, 1.f);
+		NVGcolor lit = nvgRGB(0x9f, 0xd3, 0xff);
+		labelFit(vg, uiBold(), w / 2, h * 0.27f, FX[fx].ctrl[k], 7.f, w - 4.f, nvgRGB(0xe8, 0xf4, 0xff));
+		labelFit(vg, uiBold(), w / 2, h * 0.6f, valueText(fx, k, v), 7.5f, w - 4.f, lit);
+		nvgBeginPath(vg);
+		nvgRect(vg, 3.f, h - 3.4f, w - 6.f, 1.4f);
+		nvgFillColor(vg, nvgRGB(0x2c, 0x2c, 0x2a));
+		nvgFill(vg);
+		nvgBeginPath(vg);
+		nvgRect(vg, 3.f, h - 3.4f, (w - 6.f) * v, 1.4f);
+		nvgFillColor(vg, lit);
+		nvgFill(vg);
 	}
 };
 
@@ -354,7 +614,7 @@ struct FxField : HHField {
 	}
 };
 
-/** The bus's title bar: a click makes it the bus the quick keys and the LCD work on (a red line under it). */
+/** A bus's title bar: a click makes it the bus the quick keys work on (a red line under it). */
 struct BusSel : widget::OpaqueWidget {
 	ChopFx* m = nullptr;
 	int b = 0;
@@ -374,7 +634,17 @@ struct BusSel : widget::OpaqueWidget {
 	}
 };
 
-/** A small light in the corner of a button while its bus plays or rings out. */
+/** Adds an effect list (in its groups) to a menu. */
+static void effectMenu(ui::Menu* menu, std::function<int()> cur, std::function<void(int)> choose) {
+	for (int g = 0; g < NUM_GROUPS; g++) {
+		menu->addChild(createMenuLabel(GROUP_NAMES[g]));
+		for (int f = 0; f < NUM_FX; f++)
+			if (FX[f].group == g)
+				menu->addChild(createCheckMenuItem(std::string("   ") + FX[f].name, "", [=]() { return cur() == f; },
+				                                   [=]() { choose(f); }));
+	}
+}
+
 struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 	ml::Learner learn;
 	ml::Learner* learner() override { return &learn; }
@@ -384,6 +654,10 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 	double pressAt[2 + QUICKS] = {};
 	bool turnedOn[2 + QUICKS] = {};
 	int pressBus[2 + QUICKS] = {};
+	HHButton* quickBtn[QUICKS] = {};
+	HHButton* djBtn[DJS] = {};
+	HHButton* selBtn[SOURCES] = {};
+	float seen[2][3] = {{-1.f, -1.f, -1.f}, {-1.f, -1.f, -1.f}};
 
 	void say(const std::string& s) {
 		msg = s;
@@ -409,6 +683,10 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 		t.btn = b;
 		learn.targets.push_back(t);
 		b->learning = [=]() { return learn.learning == id; };
+		b->rightMenu = [=](ui::Menu* mn) {
+			mn->addChild(createMenuLabel(lab));
+			learn.appendTargetMenu(mn, id);
+		};
 		return b;
 	}
 	void learnField(HHField* f, const std::string& id, const std::string& lab) {
@@ -450,6 +728,7 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 			}
 			m->setFx(b, f);
 			m->latch[b] = true;
+			m->retrig[b] = true;
 			turnedOn[k] = true;
 			return;
 		}
@@ -482,6 +761,7 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 			learn.restorePorts();
 		using M = ChopFx;
 		knob<HHKnobSmall>(cfx::IN, m, M::IN_PARAM, "IN");
+		knob<HHKnobSmall>(cfx::FILT, m, M::FILT_PARAM, "DJ FILTER");
 		knob<HHKnobSmall>(cfx::OUT, m, M::OUT_PARAM, "OUT");
 		FxLcd* lcd = at<FxLcd>(cfx::LCD);
 		lcd->m = m;
@@ -505,7 +785,8 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 		rt->count = []() { return 3; };
 		rt->current = [=]() { return m ? m->route : 0; };
 		rt->item = [](int i) {
-			const char* T[3] = {"1 > 2 (bus 1 first)", "2 > 1 (bus 2 first)", "1 + 2 (side by side)"};
+			const char* T[3] = {"1 > 2 (bus 1's effect on through bus 2)", "2 > 1 (bus 2's effect on through bus 1)",
+			                    "1 + 2 (side by side)"};
 			return std::string(T[i]);
 		};
 		rt->choose = [=](int i) {
@@ -514,14 +795,19 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 		};
 		learnField(rt, "route", "ROUTE");
 		// the buses
-		const float* SEL[2] = {cfx::SEL0, cfx::SEL1};
 		const float* FXF[2] = {cfx::FX0, cfx::FX1};
 		const float* CK[2][3] = {{cfx::C0_0, cfx::C0_1, cfx::C0_2}, {cfx::C1_0, cfx::C1_1, cfx::C1_2}};
+		const float* OL[2][3] = {{cfx::OLED0_0, cfx::OLED0_1, cfx::OLED0_2}, {cfx::OLED1_0, cfx::OLED1_1, cfx::OLED1_2}};
+		const float* CVJ[2][3] = {{cfx::CV0_0_IN, cfx::CV0_1_IN, cfx::CV0_2_IN}, {cfx::CV1_0_IN, cfx::CV1_1_IN, cfx::CV1_2_IN}};
 		const float* ONB[2] = {cfx::ON0, cfx::ON1};
 		for (int b = 0; b < 2; b++) {
-			BusSel* s = at<BusSel>(SEL[b]);
+			// the title bar above the field: select the bus
+			float tr[4] = {FXF[b][0] - 4.7f, FXF[b][1] - 19.f, FXF[b][2] + 9.4f, 14.f};
+			BusSel* s = new BusSel;
+			s->box = rectOf(tr);
 			s->m = m;
 			s->b = b;
+			addChild(s);
 			FxField* ff = at<FxField>(FXF[b]);
 			ff->m = m;
 			ff->b = b;
@@ -536,19 +822,72 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 				}
 			};
 			learnField(ff, string::f("fx%d", b), string::f("BUS %d effect", b + 1));
-			for (int k = 0; k < 3; k++)
+			for (int k = 0; k < 3; k++) {
+				FxOled* o = at<FxOled>(OL[b][k]);
+				o->m = m;
+				o->b = b;
+				o->k = k;
 				knob<HHKnob>(CK[b][k], m, M::C_PARAM + b * 3 + k, string::f("BUS %d CTRL %d", b + 1, k + 1));
+				addInput(createInputCentered<PJ301MPort>(Vec(CVJ[b][k][0], CVJ[b][k][1]), m, M::CV_INPUT + b * 3 + k));
+			}
 			HHButton* on = button(ONB[b], "FX ON", nvgRGB(0x55, 0x53, 0x4f), [=]() { press(m, b); }, string::f("on%d", b),
 			                      string::f("BUS %d FX ON", b + 1));
 			on->release = [=]() { release(m, b); };
 			on->colOf = [=]() { return m && m->busOn[b].load() ? C_RED : nvgRGB(0x55, 0x53, 0x4f); };
-			on->rightMenu = [=](ui::Menu* mn) {
-				mn->addChild(createMenuLabel(string::f("BUS %d FX ON", b + 1)));
-				learn.appendTargetMenu(mn, string::f("on%d", b));
+		}
+		// the DJ pads: while held, on every output
+		const float* DJR[DJS] = {cfx::DJ0, cfx::DJ1, cfx::DJ2, cfx::DJ3, cfx::DJ4, cfx::DJ5, cfx::DJ6, cfx::DJ7};
+		for (int i = 0; i < DJS; i++) {
+			std::string id = string::f("dj%d", i);
+			HHButton* d = button(DJR[i], "", C_PAD, [=]() {
+				if (!m)
+					return;
+				m->djHeld = i;
+				m->djTrig.fetch_add(1);
+			}, id, string::f("DJ PAD %d", i + 1));
+			d->textCol = C_INK;
+			d->fontSize = 8.f;
+			d->release = [=]() {
+				if (m && m->djHeld.load() == i)
+					m->djHeld = -1;
 			};
+			d->colOf = [=]() { return m && m->djHeld.load() == i ? nvgRGB(0xf2, 0xc9, 0x6a) : C_PAD; };
+			d->rightMenu = [=](ui::Menu* mn) {
+				if (!m)
+					return;
+				ChopFx* mm = m;
+				mn->addChild(createMenuLabel(string::f("DJ pad %d", i + 1)));
+				mn->addChild(createSubmenuItem("Effect", FX[m->djPad[i].fx].name, [=](ui::Menu* sub) {
+					sub->addChild(createMenuLabel("DJ: the factory pads"));
+					for (int k = 0; k < DJS; k++) {
+						DjPad f = djFactory(k);
+						sub->addChild(createMenuItem(std::string("   ") + f.name, "", [=]() { mm->djPad[i] = f; }));
+					}
+					effectMenu(sub, [=]() { return mm->djPad[i].fx; }, [=](int f) {
+						DjPad p;
+						p.fx = f;
+						for (int c = 0; c < 3; c++)
+							p.c[c] = FX[f].def[c];
+						p.name = FX[f].name;
+						mm->djPad[i] = p;
+					});
+				}));
+				for (int b = 0; b < 2; b++)
+					mn->addChild(createMenuItem(string::f("Copy settings from BUS %d", b + 1), "", [=]() {
+						DjPad p;
+						p.fx = mm->fxNow[b].load();
+						for (int c = 0; c < 3; c++)
+							p.c[c] = mm->params[ChopFx::C_PARAM + b * 3 + c].getValue();
+						p.name = FX[p.fx].name;
+						mm->djPad[i] = p;
+					}));
+				mn->addChild(createMenuItem("Back to the factory pad", djFactory(i).name, [=]() { mm->djPad[i] = djFactory(i); }));
+				learn.appendTargetMenu(mn, id);
+			};
+			djBtn[i] = d;
 		}
 		// the quick keys
-		const float* QK[QUICKS] = {cfx::Q0, cfx::Q1, cfx::Q2, cfx::Q3, cfx::Q4, cfx::Q5};
+		const float* QK[QUICKS] = {cfx::Q0, cfx::Q1, cfx::Q2, cfx::Q3, cfx::Q4, cfx::Q5, cfx::Q6, cfx::Q7};
 		for (int i = 0; i < QUICKS; i++) {
 			std::string id = string::f("quick%d", i);
 			HHButton* q = button(QK[i], shortName(QUICK_DEFAULT[i]), nvgRGB(0x55, 0x53, 0x4f), [=]() { press(m, 2 + i); }, id,
@@ -565,37 +904,61 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 			q->rightMenu = [=](ui::Menu* mn) {
 				if (!m)
 					return;
-				mn->addChild(createMenuLabel(string::f("Quick key %d", i + 1)));
 				ChopFx* mm = m;
+				mn->addChild(createMenuLabel(string::f("Quick key %d", i + 1)));
 				mn->addChild(createSubmenuItem("Effect", FX[m->quick[i]].name, [=](ui::Menu* sub) {
-					for (int g = 0; g < NUM_GROUPS; g++) {
-						sub->addChild(createMenuLabel(GROUP_NAMES[g]));
-						for (int f = 0; f < NUM_FX; f++)
-							if (FX[f].group == g)
-								sub->addChild(createCheckMenuItem(std::string("   ") + FX[f].name, "", [=]() { return mm->quick[i] == f; },
-								                                  [=]() { mm->quick[i] = f; }));
-					}
+					effectMenu(sub, [=]() { return mm->quick[i]; }, [=](int f) { mm->quick[i] = f; });
 				}));
 				mn->addChild(createMenuItem("Back to the factory key", FX[QUICK_DEFAULT[i]].name,
 				                            [=]() { mm->quick[i] = QUICK_DEFAULT[i]; }));
 				learn.appendTargetMenu(mn, id);
 			};
 		}
-		// jacks
+		// the sources: the selector (DRY / 1 / 2 / 1+2), the jacks in, the jacks out
+		const float* SELR[SOURCES] = {cfx::SEL_IN, cfx::SEL_KICK, cfx::SEL_SNR, cfx::SEL_CH,
+		                              cfx::SEL_OH, cfx::SEL_BASS, cfx::SEL_MEL, cfx::SEL_PADS};
+		for (int s = 0; s < SOURCES; s++) {
+			std::string id = string::f("sel%d", s);
+			HHButton* sb = button(SELR[s], "DRY", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+				if (m)
+					m->sel[s] = (m->sel[s].load() + 1) % NUM_SELS;
+			}, id, string::f("%s goes to", SRC_NAMES[s]));
+			sb->fontSize = 7.5f;
+			sb->colOf = [=]() { return m && m->sel[s].load() != SEL_DRY ? C_RED : nvgRGB(0x55, 0x53, 0x4f); };
+			sb->rightMenu = [=](ui::Menu* mn) {
+				if (!m)
+					return;
+				ChopFx* mm = m;
+				mn->addChild(createMenuLabel(string::f("%s goes to", SRC_NAMES[s])));
+				const char* T[NUM_SELS] = {"DRY (straight out)", "Bus 1", "Bus 2", "Bus 1 and bus 2"};
+				for (int x = 0; x < NUM_SELS; x++)
+					mn->addChild(createCheckMenuItem(T[x], "", [=]() { return mm->sel[s].load() == x; }, [=]() { mm->sel[s] = x; }));
+				learn.appendTargetMenu(mn, id);
+			};
+			selBtn[s] = sb;
+		}
 		auto in = [&](const float* p, int id) { addInput(createInputCentered<PJ301MPort>(Vec(p[0], p[1]), m, id)); };
-		in(cfx::INL_IN, M::INL_INPUT);
-		in(cfx::INR_IN, M::INR_INPUT);
+		auto out = [&](const float* p, int id) { addOutput(createOutputCentered<PJ301MPort>(Vec(p[0], p[1]), m, id)); };
+		const float* JIN[11] = {cfx::INL_IN, cfx::INR_IN, cfx::KICK_IN, cfx::SNR_IN, cfx::CH_IN, cfx::OH_IN,
+		                        cfx::BASS_IN, cfx::MELL_IN, cfx::MELR_IN, cfx::PADSL_IN, cfx::PADSR_IN};
+		const float* JOUT[11] = {cfx::INL_OUT, cfx::INR_OUT, cfx::KICK_OUT, cfx::SNR_OUT, cfx::CH_OUT, cfx::OH_OUT,
+		                         cfx::BASS_OUT, cfx::MELL_OUT, cfx::MELR_OUT, cfx::PADSL_OUT, cfx::PADSR_OUT};
+		for (int j = 0; j < 11; j++) {
+			in(JIN[j], M::INL_INPUT + j);
+			out(JOUT[j], M::INL_OUTPUT + j);
+		}
 		in(cfx::CLK_IN, M::CLK_INPUT);
 		in(cfx::RST_IN, M::RST_INPUT);
-		const float* BI[2][5] = {{cfx::B0_0_IN, cfx::B0_1_IN, cfx::B0_2_IN, cfx::B0_3_IN, cfx::B0_4_IN},
-		                         {cfx::B1_0_IN, cfx::B1_1_IN, cfx::B1_2_IN, cfx::B1_3_IN, cfx::B1_4_IN}};
-		for (int b = 0; b < 2; b++)
-			for (int i = 0; i < 5; i++)
-				in(BI[b][i], M::BUS_INPUT + b * 5 + i);
-		addOutput(createOutputCentered<PJ301MPort>(Vec(cfx::OUTL_OUT[0], cfx::OUTL_OUT[1]), m, M::OUTL_OUTPUT));
-		addOutput(createOutputCentered<PJ301MPort>(Vec(cfx::OUTR_OUT[0], cfx::OUTR_OUT[1]), m, M::OUTR_OUTPUT));
+		in(cfx::B0_ON_IN, M::ON_INPUT + 0);
+		in(cfx::B0_FX_IN, M::FXCV_INPUT + 0);
+		in(cfx::B1_ON_IN, M::ON_INPUT + 1);
+		in(cfx::B1_FX_IN, M::FXCV_INPUT + 1);
+		const float* RT[4] = {cfx::RET0_OUT, cfx::RET1_OUT, cfx::RET2_OUT, cfx::RET3_OUT};
+		for (int i = 0; i < 4; i++)
+			out(RT[i], M::RET_OUTPUT + i);
+		out(cfx::OUTL_OUT, M::MIXL_OUTPUT);
+		out(cfx::OUTR_OUT, M::MIXR_OUTPUT);
 	}
-	HHButton* quickBtn[QUICKS] = {};
 
 	void step() override {
 		ChopFx* m = dynamic_cast<ChopFx*>(module);
@@ -604,7 +967,13 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 			for (int i = 0; i < QUICKS; i++)
 				if (quickBtn[i])
 					quickBtn[i]->text = shortName(m->quick[i]);
-			// a knob turned: its bus is the one the LCD shows
+			for (int i = 0; i < DJS; i++)
+				if (djBtn[i])
+					djBtn[i]->text = m->djPad[i].name;
+			for (int s = 0; s < SOURCES; s++)
+				if (selBtn[s])
+					selBtn[s]->text = SEL_NAMES[m->sel[s].load()];
+			// a knob turned: its bus is the one the quick keys work on
 			for (int b = 0; b < 2; b++)
 				for (int k = 0; k < 3; k++) {
 					float v = m->params[ChopFx::C_PARAM + b * 3 + k].getValue();
@@ -623,7 +992,6 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 		}
 		ModuleWidget::step();
 	}
-	float seen[2][3] = {{-1.f, -1.f, -1.f}, {-1.f, -1.f, -1.f}};
 
 	void appendContextMenu(Menu* menu) override {
 		ChopFx* m = dynamic_cast<ChopFx*>(module);
@@ -643,6 +1011,14 @@ struct ChopFxWidget : ModuleWidget, ml::LearnHost {
 		menu->addChild(createMenuItem("Quick keys back to the factory", "", [=]() {
 			for (int i = 0; i < QUICKS; i++)
 				m->quick[i] = QUICK_DEFAULT[i];
+		}));
+		menu->addChild(createMenuItem("DJ pads back to the factory", "", [=]() {
+			for (int i = 0; i < DJS; i++)
+				m->djPad[i] = djFactory(i);
+		}));
+		menu->addChild(createMenuItem("All sources DRY", "", [=]() {
+			for (int s = 0; s < SOURCES; s++)
+				m->sel[s] = SEL_DRY;
 		}));
 		learn.appendModuleMenu(menu, [=](const std::string& s) { say(s); });
 	}

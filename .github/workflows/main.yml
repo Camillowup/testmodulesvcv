@@ -127,6 +127,7 @@ jobs:
           test -f $D/res/GenraChop.svg
           test -f $D/res/ChopFx.svg
           test -f $D/res/HHKnob.svg
+          test -f $D/licenses/RubberBand-COPYING.txt
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
 
       - uses: actions/upload-artifact@v4

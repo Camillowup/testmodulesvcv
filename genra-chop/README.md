@@ -4,7 +4,7 @@ Ein Hip-Hop-Beat-Generator im Look einer alten Production Center (beiges Gehäus
 Eigenes Plugin (**GENRA CHOP**, Slug `GenraChop`; bis 2.1.0 hiess es GENRA HipHop) unter der Marke **Genra**, liegt
 im Repo von GENRA Test im Unterordner `genra-chop/`. Vier Module in einer Datei: **GENRA CHOP** (38 HP),
 **GENRA CHOP GRID** (der Grid-Editor, 44 HP), ab 2.2.0 **GENRA CHOP ABLAUF** (der Song-Arranger, 26 HP) und ab 2.3.0
-**GENRA CHOP FX** (zwei Effekt-Busse zum Live-Spielen nach Vorbild SP-404, 22 HP).
+**GENRA CHOP FX** (zwei Effekt-Busse zum Live-Spielen nach Vorbild SP-404, 36 HP).
 Patches mit dem alten GENRA HipHop laden nicht mehr (neuer Slug).
 
 ![Panel](docs/genra_chop.png)
@@ -34,9 +34,9 @@ Takt 1 (ohne Kabel im RUN-Eingang). **BPM**, **SWING** (50 % gerade bis 75 %), *
 Ein neuer Stil setzt BPM und Swing auf seine Werte und würfelt alles neu (mit UNDO zurück). **KEY Auto** nimmt die
 Tonart aus dem Sample; eine Tonart von Hand würfelt Akkorde, Bass, Melodie und Pads neu.
 
-**Pads (1–64):** 16 Pads auf dem Panel, darunter die **Banks A–D** (Klick wählt; eine Bank ohne Chops ist
+**Pads (1–64):** 16 Pads auf dem Panel (ab 2.4.0 wie bei der MPC: 1–4 in der untersten Reihe, 13–16 oben), darunter die **Banks A–D** (Klick wählt; eine Bank ohne Chops ist
 blass). Jedes Pad ist ein Chop des Samples, mit dem erkannten Akkord (rot = von Hand gesetzt, HIT = ohne
-Tonhöhe). **Klick** spielt das Pad. **Rechtsklick:** Lock (bleibt bei NEW und MUTATE stehen), Reverse, Pitch
+Tonhöhe; lange Akkordnamen werden kleiner, damit sie aufs Pad passen). **Klick** spielt das Pad. **Rechtsklick:** Lock (bleibt bei NEW und MUTATE stehen), Reverse, Pitch
 (−12 bis +12) und Akkord (wie erkannt, keiner, oder von Hand). Unten auf dem Pad: L = Lock, R = Reverse, Pitch.
 Über MIDI spielbar (Rechtsklick › MIDI input; C1 = Pad 1 bis Pad 64, mit Anschlagstärke; die Banks wechseln am
 Controller nichts).
@@ -56,6 +56,16 @@ Controller nichts).
 - **LOAD SAMPLE** (gelb, rechts neben dem Wellenform-Fenster): WAV laden (Windows-Fenster, öffnet im Hauptordner: Rechtsklick › Sample root folder). Oder die WAV-Datei
   aufs Modul ziehen. Die Analyse läuft im Hintergrund: Chops, Akkord pro Chop, Tonart. Ohne Sample zeigt das Display
   den letzten Schritt (gelesen, analysiert, übergeben, in Gebrauch) oder den Fehler; dasselbe steht in Racks `log.txt`.
+- **SAMPLE** (ab 2.4.0, links unter dem Wellenform-Fenster, bündig mit STOP / PLAY darunter): spielt das ganze
+  Sample (so wie es nach WARP klingt), eine gelbe Linie läuft im Wellenform-Fenster mit; nochmal drücken = Stopp.
+- **WARP** (ab 2.4.0, die Leiste unter dem Wellenform-Fenster): passt das Sample ans Tempo des Beats an (nur das
+  Sample, nicht den Break). **WARP** schaltet ein / aus. **Modus:** AUTO (wählt selbst: viele tonale Chops = TONE,
+  sonst BEATS), **BEATS** (jeder Chop bleibt unverändert und rückt nur an seinen neuen Platz: knackig, keine
+  Artefakte; wie Ableton „Beats“), **TONE** (echtes Time-Stretching, Tonhöhe bleibt). Das Display zeigt
+  „87 > 92 BPM“ (gefundenes Tempo > Tempo des Beats); **x2** und **/2** korrigieren das gefundene Tempo, wenn es
+  halb oder doppelt erkannt wurde. Oben rechts im Wellenform-Fenster **RUBBER | SIGNAL**: welches Stretching TONE
+  nimmt (Rubber Band R3: beste Qualität, etwa 1 s Rechenzeit für 6 s Sample; Signalsmith Stretch: schneller). Ändert
+  sich BPM, wird nach einer kurzen Pause neu gewarpt (im Hintergrund, die Chops und das Pattern bleiben).
 - **REC:** was du auf den Pads spielst (Maus oder MIDI), landet auf dem nächsten Schritt in der Chop-Spur (ein
   UNDO-Schritt pro Aufnahme).
 - **CLEAR:** kurz drücken = das ganze Chop-Pattern leer (Sample, Chops und die anderen Spuren bleiben). **CLEAR
@@ -65,13 +75,17 @@ Controller nichts).
 - **UNDO:** bis zu acht Schritte zurück (vor jedem NEW, CLEAR, jeder Aufnahme, MOVE-Drehung, Stil- und Sample-Wechsel).
 - **SAVE:** speichert die Chops als WAV-Dateien in einen Ordner (ohne Dateifenster; Standard
   `Dokumente/Chops from Genra/<Datum>_<Sample>/`). Rechtsklick: mit Pitch und Reverse der Pads oder roh (Standard).
-- **NEW ALL:** alles neu (auch über den NEW-Eingang). Die Chop-Spur hat keinen eigenen NEW mehr: Bass und Melodie
+- **NEW ALL:** alles neu (auch über den NEW-Eingang). Ab 2.4.0 wird dabei auch das Sample frisch geschnitten: CHOPS
+  zurück auf 16, alle MOVE-Verschiebungen 0, Schnitt im eingestellten MODE. Die Chop-Spur hat keinen eigenen NEW mehr: Bass und Melodie
   richten sich ohnehin nach den Chops.
 
-**Spuren:** je ein Feld für die Spielart, **DENS** (Dichte) und **NEW**.
+**Spuren:** je ein Feld für die Spielart, **DENS** (Dichte), **NEW** und (ab 2.4.0) **CLEAR**: die Spur leer, die
+Akkorde bleiben; NEW oder NEW ALL füllt sie wieder.
 - **DRUMS:** KIT (nur Trigger), BREAK (nur der Break), BOTH. **CHOP** = MIDI-Chop (Beats wiederholen, stottern,
   auslassen, umdrehen). Einen Break lädst du per Rechtsklick › Load break: die Hits werden nach Helligkeit auf Kick,
-  Snare, Hats … verteilt und von den Drum-Hits gespielt (Ausgang BRK L/R).
+  Snare, Hats … verteilt und von den Drum-Hits gespielt (Ausgang BRK L/R). Ab 2.4.0 bringt **DENS** nach rechts
+  stiltypische Extras auf Stimmen, die der Stil leer lässt: Rim-Ghosts, Tamburin/Shaker auf PERC (bei Trap
+  synkopiert), offene Hats bei Funk und Trap, Clap auf der Snare, ein Tom-Fill am Ende von Takt 4.
 - **BASS:** FOLLOW (Stil, folgt den Akkorden der Chops), ROOT+5, WALK, 808. **OCT** statt CHOP (kein MIDI-Chop).
   DENS ganz links: nur die Grundtöne (mindestens zwei pro Takt); nach rechts kommen Vorschläge vor der Snare,
   Oktavsprünge, Läufe in den nächsten Akkord und 16tel-Ghosts dazu. Die Grundtöne klingen bis kurz vor den nächsten
@@ -79,8 +93,8 @@ Controller nichts).
 - **MELODY:** STAB, LEAD, ARP, RIFF; **CHOP** = MIDI-Chop. Wo ein Chop einsetzt, tritt die Melodie zurück.
 - **PADS:** SUSTAIN, STAB, SWELL (MOD-Ausgang steigt an); **CHOP** = MIDI-Chop.
 
-**Buchsen:** CLK (16tel; 24 / 48 PPQN im Menü), RST, RUN, NEW. Drums: 8 Trigger (Spannung = Velocity) in GENRAs
-Reihenfolge; Break L/R; CLK, RST, BAR (Trigger auf jeder Eins). Bass und Melodie: V/OCT, GATE, VEL, ACC, SLIDE.
+**Buchsen:** CLK (16tel; 24 / 48 PPQN im Menü), RST, RUN, NEW. Drums: 8 Trigger (Spannung = Velocity), ab 2.4.0
+in der Reihenfolge **Kick, Snare, CH, OH, Clap, Rim, Tom, Perc** (nur in GENRA CHOP und GRID; ABLAUF unverändert); Break L/R; CLK, RST, BAR (Trigger auf jeder Eins). Bass und Melodie: V/OCT, GATE, VEL, ACC, SLIDE.
 Pads: V/OCT und GATE poly 4, VEL, MOD. Chop L/R.
 
 **Rechtsklick:** Sample und Break laden, Break löschen, Chop-Ordner, **Export MIDI** (vier Takte, fünf Spuren: Drums
@@ -118,7 +132,8 @@ setzen (LINK leuchtet grün) oder Rechtsklick › *Connect to…*.
 - **NOTES:** VEL, LEN, CHANCE für neue Noten. **SNAP** schaltet AUS / SCALE / CHORD (mit Shift: die ganze Spur
   einrasten). **FOLLOW:** bearbeitete Bass-, Melodie- und Pad-Noten wandern mit neuen Akkorden mit.
 - **EDIT:** UNDO, REDO (64 Schritte), COPY / PASTE BAR (erster sichtbarer Takt), CLEAR TRACK, GEN TRACK (Spur wieder
-  generativ), **REC** (Noten vom MIDI-Eingang an der Abspielposition; Rechtsklick › MIDI input).
+  generativ), **REC** (Noten vom MIDI-Eingang an der Abspielposition; Rechtsklick › MIDI input; ab 2.4.0: ist dort
+  nichts gewählt, nimmt das GRID den MIDI-Eingang von GENRA CHOP).
 - **Raster (Drums, Chop):** Klick setzt / löscht, Ziehen malt / radiert, Mausrad = Velocity. Klick auf den Zeilennamen
   wählt die Stimme für die VEL/CHANCE-Spur.
 - **Piano-Roll:** Klick setzt eine Note (Ziehen nach rechts = Länge), Note ziehen = verschieben, rechter Rand =
@@ -167,6 +182,9 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   belegt sind). **UNDO** holt beides zurück. Beide per MIDI learn steuerbar.
 - **SONG:** die Song-Liste (Zeile: Pattern, Takte, F = Übergang am Ende). Klick wählt, Mausrad blättert, Rechtsklick:
   Takte, Übergang an/aus, Pattern = gewähltes Pad, hoch/runter, duplizieren, löschen. Unten: Takte und Spieldauer.
+  Ab 2.4.0: **ein Pad in die Liste ziehen** fügt es dort ein (eine rote Linie zeigt die Stelle), **eine Zeile ziehen**
+  verschiebt sie. Bei langen Songs ein **Scrollbalken** rechts (klicken oder ziehen); beim Ziehen an den oberen oder
+  unteren Rand scrollt die Liste von selbst.
   **INS** fügt das gewählte Pad nach der gewählten Zeile ein, **DEL** löscht die Zeile, **UNDO** nimmt Schritte
   zurück (Pads und Liste), **MIDI** schreibt den ganzen Song als MIDI (ohne Dateifenster, ein Marker pro Zeile).
 - **PATT | SONG:** der Modus. **PLAY** im SONG ab der gewählten Zeile (läuft GENRA CHOP schon: ab dem nächsten Takt),
@@ -198,34 +216,40 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   Audio-Thread, was der nächste Takt ist, und gibt GENRA CHOP dessen Pattern; eine neue Zeile startet GENRA CHOPs
   Loop wieder bei Schritt 1. Ein hängendes Dateifenster lässt also keine Zeile zu spät kommen.
 
-## GENRA CHOP FX: zwei Effekt-Busse zum Live-Spielen (22 HP, ab 2.3.0)
+## GENRA CHOP FX: zwei Effekt-Busse zum Live-Spielen (36 HP, ab 2.3.0; ab 2.4.0 mit Einzel-Ein- und -Ausgängen)
 
-Nach Vorbild des SP-404: Stereo rein (IN L, IN R; nur IN L = mono auf beide), zwei Busse mit je einem Effekt,
-Stereo raus. Alles im Retro-Look von GENRA CHOP. Verbunden wird vorerst nur mit Kabeln (z. B. CHOP L/R von GENRA
-CHOP, und GENRA CHOPs CLK-Ausgang an CLK).
+Nach Vorbild des SP-404, im Retro-Look von GENRA CHOP. Ab 2.4.0 kommen die Spuren einzeln herein und einzeln wieder
+heraus (gedacht für WING-LINK am Behringer X: ein Fader pro Spur, 16 Mono-Kanäle), die Effekte liegen auf eigenen
+Returns. Verbunden wird vorerst nur mit Kabeln (Spur-Ausgänge von GENRA CHOP, sein CLK-Ausgang an CLK).
+**2.3.0-Patches mit GENRA CHOP FX laden die Kabel nicht mehr richtig** (das Panel ist neu, 22 → 36 HP).
 
 ![Panel](docs/genra_chop_fx.png)
 
-- **Kopf:** **IN** und **OUT** (Pegel, bis +6 dB). Über etwa 8 V rundet der Ausgang weich ab statt hart zu clippen.
-- **Display:** Zeile 1 und 2 = Bus 1 und 2 (Effekt, **ON** oder `--`, `CV` wenn der FX-Eingang steckt; `>` zeigt den
-  gewählten Bus); Zeile 3 = was CTRL 1–3 beim gewählten Bus gerade tun, mit ihren Werten (z. B. `NOISE 35% WOW 20%
-  AGE 60%`, `TIME 1/8D`). Ein Bus wird gewählt durch Klick auf seinen Titel (rote Linie), sein Effektfeld, seinen
-  FX-ON-Taster oder einen seiner Regler.
-- **PRESET:** ganze Setups (beide Effekte, alle Regler, ROUTE); die Busse bleiben aus, bis du sie spielst.
-  Dusty Basement, Lo-Fi Tape, Boom Bap Crunch, Telephone Hook, Dilla Wobble, Underwater, Spaced Out, Stutter Break,
-  Chopped & Screwed, Trap Gate, Robot Talk, Tape Death, Phase Dreams, Bitcrushed, Scatterbrain, Sub Bump, Backspin
-  Drop, Resonant Keys, Two Worlds (und Init).
-- **ROUTE:** 1 > 2 (Bus 1 zuerst), 2 > 1, 1 + 2 (beide nebeneinander am selben Eingang).
-- **BUS 1 / BUS 2:** das **Effektfeld** (Klick = Liste in sechs Gruppen, Mausrad = blättern; ein neuer Effekt setzt
-  CTRL 1–3 auf seine Grundwerte), **CTRL 1–3** (Tooltip und Display sagen, was sie tun) und **FX ON**:
-  **antippen** = an / aus, **gedrückt halten** = nur solange du hältst. Rot = der Bus spielt.
-- **Schnelltasten (6):** legen ihren Effekt auf den gewählten Bus und schalten ihn ein (antippen = bleibt an, halten
-  = nur solange gehalten; nochmal antippen = aus). Rot = dieser Effekt spielt gerade. **Rechtsklick:** welcher Effekt
-  (alle 37), zurück auf die Werksbelegung. Ab Werk: FILTER, RESO, DELAY, ISOLATOR, LOOPER, STOPPER.
-- **Buchsen:** IN L/R, **CLK** (16tel, z. B. GENRA CHOPs CLK-Ausgang: Delays, Gater, Stopper, Looper, Scatter laufen
-  im Tempo; ohne Clock im Tempo aus dem Menü, Standard 90 BPM), **RST** (der Takt beginnt). Pro Bus: **CV 1–3**
-  (±5 V = ±halber Regelweg), **ON** (Gate, zusätzlich zum Taster), **FX** (0–10 V über die 37 Effekte). OUT L/R.
-- **MIDI learn:** wie bei GENRA CHOP (Rechtsklick auf Regler, Taster, Felder; Controller im Modul-Menü).
+- **Eingänge (8 Quellen):** IN L/R, KICK, SNR, CH, OH, BASS, MEL L/R, PADS L/R (bei Stereo: nur L = mono auf beide).
+  Über jeder Quelle ein **Wähler DRY / 1 / 2 / 1+2**: wohin sie geht (Klick = weiter, Mausrad, Rechtsklick = Liste).
+  Keine Pegelregler: den Pegel macht das Pult.
+- **Ausgänge:** unter jedem Eingang sein Ausgang. Dazu **RET 1 L/R**, **RET 2 L/R** und **MIX L/R** (alles zusammen).
+  - Ein Effekt, der **dazukommt** (Echos, Hall), lässt die Quelle trocken auf ihrem Ausgang und legt nur, was er
+    dazutut, auf den Return.
+  - Ein Effekt, der **den Klang ändert** (Filter, Vinyl, Looper, Stopps …), nimmt die Quelle mit FX ON weich vom
+    eigenen Ausgang auf den Return hinüber und bei FX OFF wieder zurück.
+- **Kopf:** **IN** und **OUT** (Pegel, bis +6 dB; über etwa 8 V rundet der Ausgang weich ab), **PRESET** (ganze
+  Setups, die Busse bleiben aus, bis du sie spielst), **ROUTE**: 1 > 2 (was Bus 1 macht, geht weiter durch Bus 2;
+  „1+2“ heisst dann: durch beide), 2 > 1, 1 + 2 (nebeneinander).
+- **BUS 1 / BUS 2:** das **Effektfeld** (Klick = Liste in sechs Gruppen, Mausrad = blättern), **CTRL 1–3** mit je
+  einem kleinen **OLED-Display** darüber (wie bei der MPC X: was der Regler tut und sein Wert), darunter ihre
+  CV-Buchsen. **FX ON:** antippen = an / aus, gedrückt halten = nur solange du hältst. Ein Bus wird gewählt durch
+  Klick auf seinen Titel (rote Linie), sein Effektfeld, FX ON oder einen seiner Regler.
+- **Schnelltasten (8):** legen ihren Effekt auf den gewählten Bus und schalten ihn ein (antippen = bleibt an, halten
+  = nur solange gehalten). Rechtsklick: welcher Effekt, zurück auf die Werksbelegung. Ab Werk: FILTER+DRIVE,
+  RESONATOR, DELAY, ISOLATOR, LOOPER, STOPPER, VINYL, REVERB.
+- **DJ-Pads (8):** wirken auf **alle Ausgänge**, solange du sie hältst. Ab Werk: ECHO OUT, STUTTER 1/4, 1/8, 1/16,
+  TAPE STOP, BACKSPIN, LOW CUT, HIGH CUT. **Rechtsklick:** jeder Effekt der Liste, *Copy settings from BUS 1 / 2*
+  (Effekt und CTRL-Stellungen des Busses), zurück aufs Werks-Pad.
+- **DJ FILTER:** ein Regler für alle Ausgänge: links Tiefpass, rechts Hochpass, Mitte = aus.
+- **Buchsen unten in zwei Reihen:** **CLK** (16tel; ohne Clock das Tempo aus dem Menü, Standard 90 BPM), **RST**,
+  pro Bus **CV 1–3** (±5 V = ±halber Regelweg), **ON** (Gate) und **FX** (0–10 V über die Effektliste).
+- **MIDI learn:** wie bei GENRA CHOP (Rechtsklick auf Regler, Taster, Felder, DJ-Pads; Controller im Modul-Menü).
 
 **Die Effekte** (CTRL 1 · CTRL 2 · CTRL 3):
 
@@ -244,6 +268,7 @@ CHOP, und GENRA CHOPs CLK-Ausgang an CLK).
 | | RESONATOR | TUNE (C2–C4, Grundton, Quinte, Oktave) · RING · MIX |
 | | TALK FILTER | VOWEL (A–E–I–O–U) · RESO · MIX |
 | | AUTO WAH | SENS · RANGE · RESO |
+| | LOW CUT · HIGH CUT (ab 2.4.0) | TIME (Sweep ab FX ON) · RANGE · RESO |
 | DRIVE | SATURATOR | DRIVE · TONE · MIX |
 | | FUZZ | FUZZ · TONE · LEVEL |
 | | WAVEFOLDER | FOLD · BIAS · MIX |
@@ -276,8 +301,7 @@ CHOP, und GENRA CHOPs CLK-Ausgang an CLK).
   Im Test (48 kHz) kostet ein laufender Effekt unter 0,2 % eines Prozessorkerns (Vinyl, Hall und Saturator am
   meisten).
 - **Vorbereitet, noch nicht drin:** kabellos verbinden (Sound und Clock von GENRA CHOP ohne Kabel). Im Code ist die
-  Quelle schon eine eigene Wahl (heute nur „Kabel“, im Patch gespeichert), über IN L/R und CLK ist Platz für die
-  Leuchtsegmente.
+  Quelle schon eine eigene Wahl (heute nur „Kabel“, im Patch gespeichert).
 
 ## Noch nicht drin (Merkliste)
 
@@ -301,9 +325,12 @@ CHOP, und GENRA CHOPs CLK-Ausgang an CLK).
   Song-Arranger, `src/MidiLearn.hpp`: MIDI learn, `src/Export.*`: MIDI-Datei (auch ganze Songs) und Ordner.
 - `tools/grid_panel.py` schreibt `res/ChopGrid.svg` und `src/ChopGridLayout.hpp`; `tools/ablauf_panel.py` schreibt
   `res/ChopAblauf.svg` und `src/ChopAblaufLayout.hpp`.
-- `src/fx/FxEngine.*`: die 37 Effekte und die Presets von GENRA CHOP FX (ohne Rack testbar: `test/fx_test.cpp`, läuft
+- `src/fx/FxEngine.*`: die 39 Effekte und die Presets von GENRA CHOP FX (ohne Rack testbar: `test/fx_test.cpp`, läuft
   im Build mit: jeder Effekt an, aus, ausklingen, schlafen, endlich und im Pegel, Effektwechsel im Lauf, was er kostet);
   `src/ChopFx.cpp`: Modul und Panel; `tools/fx_panel.py` schreibt `res/ChopFx.svg` und `src/ChopFxLayout.hpp`
   (Vorschau: `--preview docs/genra_chop_fx.png`).
+- `src/warp/Stretch.*`: WARP mit Rubber Band (R3) oder Signalsmith Stretch, beide unverändert in `dep/`; Herkunft und
+  Lizenzen in `licenses/` (Rubber Band GPL-2.0-or-later, Signalsmith MIT). Tempo-Erkennung in `src/hh/Chop.*`
+  (`findTempo`, im Test).
 - `tools/chop_panel.py` schreibt `res/GenraChop.svg`, die Knöpfe und `src/GenraChopLayout.hpp`; prüft, dass sich
   keine Schrift überlappt. Vorschau: `python3 tools/chop_panel.py --preview docs/genra_chop.png`.

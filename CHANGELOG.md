@@ -2,6 +2,28 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### GENRA CHOP 2.4.0 (eigenes Plugin in `genra-chop/`)
+- **GENRA CHOP:**
+  - **WARP** (Leiste unter dem Wellenform-Fenster): das Sample ans Tempo des Beats anpassen, Modus AUTO / BEATS /
+    TONE, Tempo-Anzeige „87 > 92 BPM“ mit x2 und /2, oben rechts im Wellenform-Fenster RUBBER | SIGNAL (Rubber Band R3
+    oder Signalsmith Stretch). Nur das Sample, nicht der Break; ein neues BPM warpt nach kurzer Pause neu.
+  - **SAMPLE** spielt das ganze Sample (nochmal = Stopp), mit Laufzeile im Wellenform-Fenster.
+  - **CLEAR pro Spur** neben NEW (Akkorde bleiben).
+  - **Pads in MPC-Reihenfolge** (1–4 unten); lange Akkordnamen werden kleiner.
+  - **Drums:** Reihenfolge Kick, Snare, CH, OH, Clap, Rim, Tom, Perc (Ausgänge und GRID); DENS bringt stiltypische
+    Extras (Rim-Ghosts, Tamburin/Shaker, offene Hats, Clap-Layer, Tom-Fill in Takt 4).
+  - **NEW ALL** schneidet frisch: CHOPS auf 16, MOVE zurück, neuer Schnitt im eingestellten MODE.
+- **GENRA CHOP GRID:** ohne eigenen MIDI-Eingang nimmt REC den von GENRA CHOP.
+- **GENRA CHOP FX** neu auf **36 HP**: acht Quellen einzeln rein (IN L/R, KICK, SNR, CH, OH, BASS, MEL L/R, PADS L/R)
+  mit Wähler DRY / 1 / 2 / 1+2, jede einzeln wieder raus, dazu RET 1 L/R, RET 2 L/R und MIX L/R (für WING-LINK am X).
+  OLED-Displays über den Reglern, CV darunter, Buchsen in zwei Reihen; acht DJ-Pads (halten = wirkt auf alle
+  Ausgänge, Rechtsklick: jeder Effekt oder *Copy settings from BUS*), DJ FILTER, acht Schnelltasten; neue Effekte
+  LOW CUT und HIGH CUT (39). 2.3.0-Patches mit GENRA CHOP FX laden die Kabel nicht mehr richtig.
+- **GENRA CHOP ABLAUF:** die Hinweiszeile unter den Pads passt in ihr Feld; Pads per Drag & Drop in die Song-Liste
+  (rote Linie zeigt die Stelle), Zeilen per Ziehen verschieben, Scrollbalken und Auto-Scroll am Rand.
+- **Fremder Code:** Rubber Band Library 4.0.0 (GPL-2.0-or-later) und Signalsmith Stretch / Linear (MIT) in `dep/`,
+  Herkunft und Lizenzen in `licenses/`.
+
 ### GENRA CHOP 2.3.0 (eigenes Plugin in `genra-chop/`)
 - **GENRA CHOP FX** (neu, 22 HP): zwei Effekt-Busse zum Live-Spielen nach Vorbild SP-404, 37 Effekte in sechs Gruppen
   (TEXTURE, FILTER, DRIVE, SPACE, MOD, PERFORM), CTRL 1–3 pro Bus, FX ON (antippen = an/aus, halten = solange

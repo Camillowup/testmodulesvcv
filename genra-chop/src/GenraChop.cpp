@@ -47,7 +47,7 @@ struct HHPad : widget::OpaqueWidget {
 		}
 		else
 			snprintf(name, sizeof(name), "%s", c->info.chop[idx].kind == 2 ? "HIT" : "-");
-		label(vg, uiBold(), box.size.x / 2, box.size.y / 2 + 2.f, name, 10.5f, ps.chordQ >= 0 ? C_RED : C_INK);
+		labelFit(vg, uiBold(), box.size.x / 2, box.size.y / 2 + 2.f, name, 10.5f, box.size.x - 5.f, ps.chordQ >= 0 ? C_RED : C_INK);
 		std::string tags;
 		if (ps.lock)
 			tags += "L ";
@@ -56,7 +56,7 @@ struct HHPad : widget::OpaqueWidget {
 		if (ps.pitch)
 			tags += string::f("%+d", ps.pitch);
 		if (!tags.empty())
-			label(vg, uiBold(), box.size.x / 2, box.size.y - 6.f, tags, 7.f, C_RED);
+			labelFit(vg, uiBold(), box.size.x / 2, box.size.y - 6.f, tags, 7.f, box.size.x - 5.f, C_RED);
 	}
 	void onButton(const ButtonEvent& e) override {
 		if (!module)
@@ -207,6 +207,14 @@ struct HHWave : widget::OpaqueWidget {
 		}
 		nvgFillColor(vg, C_LCD);
 		nvgFill(vg);
+		// SAMPLE: where the whole sample is playing
+		float sp2 = module->samplePos.load();
+		if (sp2 >= 0.f && sp2 <= 1.f) {
+			nvgBeginPath(vg);
+			nvgRect(vg, w * sp2 - 0.6f, 0, 1.2f, h);
+			nvgFillColor(vg, C_YELLOW);
+			nvgFill(vg);
+		}
 		for (int p = 0; p < c->info.count; p++) {
 			float x = total ? w * c->start[p] / total : 0.f;
 			nvgBeginPath(vg);
@@ -232,6 +240,30 @@ struct HHBars : widget::Widget {
 	}
 };
 
+/** WARP's tempo: the sample's (found, x2 / /2) > the beat's; while working "WARPING". */
+struct WarpBpm : widget::Widget {
+	GenraChop* module = nullptr;
+	void draw(const DrawArgs& args) override {
+		NVGcontext* vg = args.vg;
+		nvgBeginPath(vg);
+		nvgRoundedRect(vg, 0, 0, box.size.x, box.size.y, 1.5f);
+		nvgFillColor(vg, C_LCD);
+		nvgFill(vg);
+		std::string t = "-- BPM";
+		if (module) {
+			const ChopSet* c = module->uiChops.load();
+			float src = c ? (c->source ? c->source->bpm : c->bpm) * module->warpMul : 0.f;
+			if (module->loader->busy && module->warpOn)
+				t = "WARPING...";
+			else if (src > 0.f && module->warpOn)
+				t = string::f("%.0f > %.0f BPM", src, module->bpmNow());
+			else if (src > 0.f)
+				t = string::f("%.1f BPM", src);
+		}
+		labelFit(vg, lcdFont(), box.size.x / 2, box.size.y / 2 + 0.5f, t, 11.f, box.size.x - 6.f, C_LCDINK);
+	}
+};
+
 struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 	ml::Learner learn;
 	HHLcd* lcd = nullptr;
@@ -240,6 +272,7 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 	float lastStop = -10.f;
 	int chopsSeen = -1;
 	float chopsRest = 0.f;
+	float warpSeen = -1.f, warpRest = 0.f;
 	std::string note; // last export message
 	float noteTime = 0.f;
 
@@ -321,6 +354,13 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		play->symbol = 1;
 		play->lit = [=]() { return m && m->running; };
 		learnButton(play, "play", "PLAY");
+		HHButton* smp = button(hhl::SPLAY, "SAMPLE", C_YELLOW, [=]() {
+			if (m)
+				m->reqSample = m->samplePlaying ? 2 : 1;
+		});
+		smp->textCol = C_YELLOWINK;
+		smp->lit = [=]() { return m && m->samplePlaying; };
+		learnButton(smp, "sample", "SAMPLE");
 		knob<HHKnobSmall>(hhl::BPM, m, M::BPM_PARAM, "BPM");
 		knob<HHKnobSmall>(hhl::SWING, m, M::SWING_PARAM, "SWING");
 		knob<HHKnobSmall>(hhl::VOL, m, M::VOL_PARAM, "CHOP level");
@@ -400,8 +440,8 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 			                 : i == 14 ? hhl::PAD14 : hhl::PAD15;
 			HHPad* p = at<HHPad>(r);
 			p->module = m;
-			p->slot = i;
-			p->idx = i;
+			p->slot = (3 - i / 4) * 4 + i % 4; // as on an MPC (and the MPD218): pad 1 bottom left
+			p->idx = p->slot;
 		}
 		// the pad banks A-D: 64 chops at most
 		const float* BK[4] = {hhl::BANK0, hhl::BANK1, hhl::BANK2, hhl::BANK3};
@@ -487,16 +527,90 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		clr->lit = [=]() { return m && m->clearHeld; };
 		learnButton(clr, "clear", "CLEAR");
 		learnButton(button(hhl::NEWALL, "NEW ALL", C_RED, [=]() {
-			if (m)
-				m->reqNew.fetch_or(1 << 5);
+			if (!m)
+				return;
+			m->freshCut(); // the sample cut fresh (CHOPS 16, MOVE 0), as if just loaded
+			m->reqNew.fetch_or(1 << 5);
 		}), "newall", "NEW ALL");
 		// the waveform and the tracks
 		HHWave* wave = at<HHWave>(hhl::WAVE);
 		wave->module = m;
+		// WARP: the strip under the waveform, the stretcher top right in it
+		HHButton* warp = button(hhl::WARP, "WARP", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+			if (!m)
+				return;
+			m->warpOn = !m->warpOn;
+			m->rewarp();
+		});
+		warp->colOf = [=]() { return m && m->warpOn ? C_RED : nvgRGB(0x55, 0x53, 0x4f); };
+		learnButton(warp, "warp", "WARP");
+		HHField* wmode = at<HHField>(hhl::WMODE);
+		wmode->count = []() { return (int) NUM_WARP_MODES; };
+		wmode->current = [=]() { return m ? m->warpMode : 0; };
+		wmode->item = [](int i) {
+			const char* T[NUM_WARP_MODES] = {"AUTO (BEATS or TONE, from the sample)", "BEATS (the chops on the grid)",
+			                                 "TONE (stretched, for loops)"};
+			return std::string(T[i]);
+		};
+		wmode->value = [=]() {
+			if (!m)
+				return std::string("AUTO");
+			std::string v = WARP_MODES[m->warpMode];
+			const ChopSet* c = m->uiChops.load();
+			if (m->warpMode == WARP_AUTO && c && c->warpHow >= 0)
+				v += c->warpHow == WARP_BEATS ? " B" : " T";
+			return v;
+		};
+		wmode->choose = [=](int i) {
+			if (!m || i == m->warpMode)
+				return;
+			m->warpMode = i;
+			if (m->warpOn)
+				m->rewarp();
+		};
+		learnField(wmode, "warpmode", "WARP mode");
+		WarpBpm* wb = at<WarpBpm>(hhl::WBPM);
+		wb->module = m;
+		HHButton* x2 = button(hhl::WX2, "x2", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+			if (!m)
+				return;
+			m->warpMul = std::min(4.f, m->warpMul * 2.f);
+			if (m->warpOn)
+				m->rewarp();
+		});
+		learnButton(x2, "warpx2", "WARP x2");
+		HHButton* d2 = button(hhl::WD2, "/2", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+			if (!m)
+				return;
+			m->warpMul = std::max(0.25f, m->warpMul * 0.5f);
+			if (m->warpOn)
+				m->rewarp();
+		});
+		learnButton(d2, "warpd2", "WARP /2");
+		for (int e = 0; e < hhw::NUM_ENGINES; e++) {
+			float r[4] = {hhl::WALGO[0] + e * hhl::WALGO[2] / 2.f + (e ? 0.6f : 0.f), hhl::WALGO[1], hhl::WALGO[2] / 2.f - 0.6f,
+			              hhl::WALGO[3]};
+			HHButton* ab = new HHButton();
+			ab->box = rectOf(r);
+			addChild(ab);
+			ab->text = hhw::ENGINE_NAMES[e];
+			ab->fontSize = 7.f;
+			ab->act = [=]() {
+				if (!m || m->warpEngine == e)
+					return;
+				m->warpEngine = e;
+				if (m->warpOn)
+					m->rewarp();
+			};
+			ab->colOf = [=]() { return m && m->warpEngine == e ? C_YELLOW : nvgRGB(0x55, 0x53, 0x4f); };
+			ab->textColOf = [=]() { return m && m->warpEngine == e ? C_YELLOWINK : C_CREAM; };
+			learnButton(ab, string::f("stretch%d", e), string::f("STRETCHER %s", hhw::ENGINE_NAMES[e]));
+		}
 		const float* TM[4] = {hhl::TMODE0, hhl::TMODE1, hhl::TMODE2, hhl::TMODE3};
 		const float* DN[4] = {hhl::DENS0, hhl::DENS1, hhl::DENS2, hhl::DENS3};
 		const float* K2[4] = {hhl::TK2_0, hhl::TK2_1, hhl::TK2_2, hhl::TK2_3};
 		const float* NW[4] = {hhl::TNEW0, hhl::TNEW1, hhl::TNEW2, hhl::TNEW3};
+		const float* CL[4] = {hhl::TCLR0, hhl::TCLR1, hhl::TCLR2, hhl::TCLR3};
 		for (int t = 0; t < 4; t++) {
 			HHField* f = at<HHField>(TM[t]);
 			f->count = [t]() { return t == 0 ? 3 : t == 1 ? 4 : t == 2 ? 4 : 3; };
@@ -524,6 +638,12 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 				if (m)
 					m->reqNew.fetch_or(1 << t);
 			}), string::f("new%d", t), string::f("%s NEW", TN[t]));
+			HHButton* clrT = button(CL[t], "CLEAR", C_GRAPH, [=]() {
+				if (m)
+					m->reqClearTrack.fetch_or(1 << t);
+			});
+			clrT->fontSize = 8.f;
+			learnButton(clrT, string::f("clear%d", t), string::f("%s CLEAR", TN[t]));
 		}
 		HHBars* bars = at<HHBars>(hhl::BARS);
 		bars->module = m;
@@ -582,6 +702,28 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		if (GenraChop* m = dynamic_cast<GenraChop*>(module)) {
 			m->collectTrash();
 			learn.step();
+			if (m->warpPending && !m->loader->busy)
+				m->rewarp();
+			// NEW at the jack: the sample cut fresh, as with the button
+			if (m->freshReq.exchange(false))
+				m->freshCut();
+			// WARP follows the tempo: when it rests a moment on a new one, the sample is warped again
+			if (m->warpOn && m->uiChops.load()) {
+				float now = m->bpmNow();
+				if (std::fabs(now - m->warpFor) > 0.05f) {
+					if (std::fabs(now - warpSeen) > 0.01f) {
+						warpSeen = now;
+						warpRest = 0.4f;
+					}
+					else if (warpRest > 0.f) {
+						warpRest -= APP->window->getLastFrameDuration();
+						if (warpRest <= 0.f && !m->loader->busy)
+							m->rewarp();
+						else if (warpRest <= 0.f)
+							warpRest = 0.1f;
+					}
+				}
+			}
 			// CHOPS: when it rests a moment on a new number, the sample is cut anew
 			int want = m->chopsWanted();
 			if (want != chopsSeen) {

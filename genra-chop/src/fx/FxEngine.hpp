@@ -24,6 +24,7 @@ enum Id {
 	DELAY, TAPEECHO, PINGPONG, REVDELAY, REVERB,                   // SPACE
 	CHORUS, FLANGER, PHASER, RINGMOD, TREMOLO, VIBRATO,            // MOD
 	LOOPER, SCATTER, STOPPER, TAPESTOP, BACKSPIN, TAPESTART, DOWNER, SUBOCT, // PERFORM
+	LOWCUT, HIGHCUT,                                               // FILTER (2.4.0: the DJ sweeps)
 	NUM_FX
 };
 
@@ -109,9 +110,13 @@ struct Bus {
 	float c[3] = {0.5f, 0.5f, 0.5f};
 	bool retrigger = false; // the one-shots (stops, spins) start again (a quick key on the same effect)
 
-	Bus();
+	/** ringPow: the ring for loops and echoes, 2^ringPow samples per side (19: 11 s at 48 kHz). */
+	explicit Bus(int ringPow = 19);
 	void setSampleRate(float sr);
 	void process(float& L, float& R, const Tempo& t);
+	/** After process(): how much of the input is still in the output as it was (1: all, the effect off or only
+	 *  added on top; 0: all replaced). The rest of the output is the effect's: output - input x keep(). */
+	float keep() const { return keepNow; }
 	/** Running (or ringing out): for the panel's light. */
 	bool busy() const { return !sleeping; }
 	int current() const { return cur; }
@@ -119,6 +124,7 @@ struct Bus {
   private:
 	float sr = 44100.f;
 	int cur = -1;
+	float keepNow = 1.f;
 	float g = 0.f, sw = 1.f; // on/off fade, effect-change fade
 	bool sleeping = true, wasOn = false, trig = false;
 	int quiet = 0, blockLeft = 0;

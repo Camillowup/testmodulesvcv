@@ -5,6 +5,7 @@
 #include "Export.hpp"
 #include "hh/Core.hpp"
 #include "hh/Chop.hpp"
+#include "warp/Stretch.hpp"
 #include "MidiLearn.hpp"
 #include <osdialog.h>
 #include <algorithm>
@@ -23,6 +24,7 @@ struct Loader {
 	std::string err;    // under m
 	std::string status; // under m: what happened last (shown when there is no sample)
 	bool keepPattern = false;
+	bool keepMove = false; // WARP: the MOVE offsets stay
 	void say(const std::string& s, bool isErr) {
 		std::lock_guard<std::mutex> lk(m);
 		(isErr ? err : status) = s;
@@ -35,11 +37,61 @@ struct Loader {
 	~Loader() { delete done.exchange(nullptr); }
 };
 
-inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, bool keepPattern, int count = DEFAULT_CHOPS) {
+/** WARP as asked for: on, how (AUTO / BEATS / TONE), which stretcher, the tempo to warp to, x2 / /2 of the found one. */
+struct WarpCfg {
+	bool on = false;
+	int mode = WARP_AUTO;
+	int engine = hhw::ENGINE_RUBBER;
+	float dst = 92.f;
+	float mul = 1.f;
+};
+
+/** With WARP on: the warped set made from the original `src` (which it keeps); else nullptr. Worker thread. */
+inline ChopSet* warped(std::shared_ptr<const ChopSet> src, const WarpCfg& w, std::string& err) {
+	if (!w.on || !src || src->bpm <= 0.f || w.dst <= 0.f)
+		return nullptr;
+	double ratio = std::max(0.25, std::min(4.0, (double) src->bpm * w.mul / w.dst));
+	int how = w.mode == WARP_AUTO ? autoWarp(*src) : w.mode;
+	SampleData audio;
+	if (how == WARP_BEATS)
+		warpBeats(*src, ratio, audio);
+	else if (!hhw::stretch(src->data, ratio, w.engine, audio, err))
+		return nullptr;
+	ChopSet* out = new ChopSet();
+	makeWarped(*src, std::move(audio), ratio, how, *out);
+	out->source = src;
+	return out;
+}
+
+/** Cut and analyse `cs` (owned), then WARP it if asked; hands the result over (or says what went wrong). */
+inline void finishSet(std::shared_ptr<Loader> L, ChopSet* cs, const WarpCfg& w) {
+	std::string err;
+	if (w.on) {
+		std::shared_ptr<const ChopSet> src(cs);
+		if (ChopSet* wcs = warped(src, w, err)) {
+			delete L->done.exchange(wcs);
+			L->say(string::f("warped x%.3f", wcs->warpRatio), false);
+			return;
+		}
+		// WARP failed: the original after all
+		ChopSet* copy = new ChopSet();
+		copyAnalysis(*src, *copy);
+		copy->data = src->data;
+		delete L->done.exchange(copy);
+		if (!err.empty())
+			L->say("WARP: " + err, true);
+		return;
+	}
+	delete L->done.exchange(cs);
+}
+
+inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, bool keepPattern, int count = DEFAULT_CHOPS,
+                      WarpCfg w = WarpCfg()) {
 	L->busy = true;
 	L->keepPattern = keepPattern;
+	L->keepMove = false;
 	L->say("loading " + path, false);
-	std::thread([L, path, mode, count]() {
+	std::thread([L, path, mode, count, w]() {
 		ChopSet* cs = new ChopSet();
 		std::string err;
 		bool ok = false;
@@ -51,12 +103,16 @@ inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, boo
 				cs->data.path = path;
 				cs->data.name = system::getStem(path);
 				analyse(*cs, mode, count);
-				L->say(string::f("analysed: %d chops, %.1f s", cs->info.count, cs->data.frames() / cs->data.sampleRate), false);
+				L->say(string::f("analysed: %d chops, %.1f s, %.1f BPM", cs->info.count, cs->data.frames() / cs->data.sampleRate,
+				                 cs->bpm),
+				       false);
 				if (cs->info.count <= 0) {
 					ok = false;
 					err = "no chops found";
 				}
 			}
+			if (ok)
+				finishSet(L, cs, w);
 		}
 		catch (Exception& e) {
 			ok = false;
@@ -70,9 +126,7 @@ inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, boo
 			ok = false;
 			err = "unknown error";
 		}
-		if (ok)
-			delete L->done.exchange(cs);
-		else {
+		if (!ok) {
 			delete cs;
 			L->say(err.empty() ? std::string("could not read the file") : err, true);
 		}
@@ -80,18 +134,55 @@ inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, boo
 	}).detach();
 }
 
-/** Re-cut a loaded sample in another mode / into another number of chops (a copy of its audio). */
-inline void startRecut(std::shared_ptr<Loader> L, const ChopSet* from, int mode, int count) {
+/** Re-cut a loaded sample in another mode / into another number of chops (from its original audio, warped again
+ *  if WARP is on). */
+inline void startRecut(std::shared_ptr<Loader> L, const ChopSet* from, int mode, int count, WarpCfg w = WarpCfg()) {
 	if (!from)
 		return;
 	L->busy = true;
 	L->keepPattern = false;
-	SampleData data = from->data;
-	std::thread([L, data, mode, count]() {
+	L->keepMove = false;
+	SampleData data = from->source ? from->source->data : from->data;
+	std::thread([L, data, mode, count, w]() {
 		ChopSet* cs = new ChopSet();
 		cs->data = data;
 		analyse(*cs, mode, count);
-		delete L->done.exchange(cs);
+		finishSet(L, cs, w);
+		L->busy = false;
+	}).detach();
+}
+
+/** WARP turned on / off / changed: from the original (kept in a warped set, else a copy of the live one); the cut, the
+ *  pattern and the MOVE offsets stay. */
+inline void startWarp(std::shared_ptr<Loader> L, const ChopSet* from, WarpCfg w) {
+	if (!from)
+		return;
+	std::shared_ptr<const ChopSet> src = from->source;
+	if (!w.on && !src)
+		return; // not warped, nothing to undo
+	L->busy = true;
+	L->keepPattern = true;
+	L->keepMove = true;
+	ChopSet* copy = nullptr;
+	if (!src) {
+		// the live set, copied here (UI thread) while it cannot go away: its audio and what was found
+		copy = new ChopSet();
+		copyAnalysis(*from, *copy);
+		copy->data = from->data;
+	}
+	std::thread([L, src, copy, w]() {
+		std::shared_ptr<const ChopSet> s = src ? src : std::shared_ptr<const ChopSet>(copy);
+		std::string err;
+		ChopSet* out = w.on ? warped(s, w, err) : nullptr;
+		if (!out) {
+			// WARP off (or failed): the original again
+			out = new ChopSet();
+			copyAnalysis(*s, *out);
+			out->data = s->data;
+			if (!err.empty())
+				L->say("WARP: " + err, true);
+		}
+		delete L->done.exchange(out);
 		L->busy = false;
 	}).detach();
 }
@@ -247,9 +338,13 @@ struct SVoice {
 	float gain = 1.f, env = 0.f, envTarget = 1.f, envStep = 0.f;
 	int remain = 0; // samples until it lets go (-1: to the end of the chop)
 	void start(const ChopSet* c, int pad, float vel, int semis, bool reverse, float engineSr, int lenSamples) {
+		startRange(c, (double) c->start[pad], (double) c->end[pad], vel, semis, reverse, engineSr, lenSamples);
+	}
+	/** Any part of the sample (SAMPLE plays it all). */
+	void startRange(const ChopSet* c, double from, double to, float vel, int semis, bool reverse, float engineSr, int lenSamples) {
 		cs = c;
-		a = (double) c->start[pad];
-		b = (double) c->end[pad];
+		a = from;
+		b = to;
 		inc = std::pow(2.0, semis / 12.0) * c->data.sampleRate / engineSr;
 		rev = reverse;
 		pos = rev ? b - 2.0 : a;
@@ -309,6 +404,16 @@ struct Gate {
 	int left = 0; // samples
 	float v = 0.f;
 };
+
+/** GENRA CHOP's own order of the drum outputs (and of the drum rows in CHOP GRID): position -> voice. Only GENRA
+ *  CHOP; inside, the voices keep GENRA's order (the styles, the patterns, MIDI). */
+static const int DRUM_AT[DRUMS] = {KICK, SNARE, CH, OH, CLAP, RIM, TOM, PERC};
+inline int drumPos(int voice) {
+	for (int i = 0; i < DRUMS; i++)
+		if (DRUM_AT[i] == voice)
+			return i;
+	return voice;
+}
 
 struct GenraChop;
 // every GENRA CHOP alive (GENRA CHOP ABLAUF checks its host here; the epoch changes when one goes)
@@ -427,6 +532,19 @@ struct GenraChop : Module {
 	std::atomic<bool> reqClearAll{false};
 	std::atomic<int> bank{0}; // the pads on the panel: bank A-D (16 each)
 	int cutCount = DEFAULT_CHOPS; // UI thread: the CHOPS the sample was last cut into
+	// WARP (saved; the panel starts the work, see GenraChop.cpp)
+	bool warpOn = false;
+	int warpMode = WARP_AUTO, warpEngine = hhw::ENGINE_RUBBER;
+	float warpMul = 1.f;   // x2 / /2 on the tempo found
+	float warpFor = 0.f;   // UI: the tempo the set was warped to
+	// SAMPLE: the whole sample, from the start (the audio thread plays it; posPub for the line in the waveform)
+	std::atomic<int> reqSample{0}; // 1 start, 2 stop
+	std::atomic<bool> samplePlaying{false};
+	std::atomic<float> samplePos{-1.f};
+	SVoice sv;
+	// CLEAR per track (bit per track), NEW ALL from the jack (the panel cuts the sample fresh)
+	std::atomic<int> reqClearTrack{0};
+	std::atomic<bool> freshReq{false};
 	// MOVE: per pad, how far its start is moved (ms); the cut as analysed is kept to move from
 	float moveMs[PADS] = {};
 	size_t baseStart[PADS] = {}, baseEnd[PADS] = {};
@@ -485,9 +603,9 @@ struct GenraChop : Module {
 		configInput(RST_INPUT, "Reset");
 		configInput(RUN_INPUT, "Run (gate)");
 		configInput(NEW_INPUT, "New all (trigger)");
-		const char* DN[8] = {"Kick", "Snare", "Clap", "Rim", "Closed hat", "Open hat", "Tom", "Perc"};
+		const char* DN[8] = {"Kick", "Snare", "Clap", "Rim", "Closed hat", "Open hat", "Tom", "Perc"}; // by voice
 		for (int i = 0; i < 8; i++)
-			configOutput(DRUM_OUTPUT + i, string::f("%s trigger (voltage = velocity)", DN[i]));
+			configOutput(DRUM_OUTPUT + i, string::f("%s trigger (voltage = velocity)", DN[DRUM_AT[i]]));
 		const char* NL[5] = {"V/OCT", "Gate", "Velocity", "Accent", "Slide"};
 		for (int i = 0; i < 5; i++) {
 			configOutput(BASS_OUTPUT + i, string::f("Bass %s", NL[i]));
@@ -749,12 +867,15 @@ struct GenraChop : Module {
 			chops = c;
 			uiChops = c;
 			for (int p = 0; p < PADS; p++) {
-				baseStart[p] = c->start[p];
-				baseEnd[p] = c->end[p];
+				baseStart[p] = c->cutStart[p];
+				baseEnd[p] = c->cutEnd[p];
 			}
-			if (moveLoad && loader->keepPattern)
-				moveLoad = false; // the patch's offsets fit this sample
-			else
+			sv.active = false;
+			samplePlaying = false;
+			// the offsets stay for WARP, and for the patch's own sample; else they start at 0
+			bool keepMove = loader->keepMove || (moveLoad && loader->keepPattern);
+			moveLoad = false;
+			if (!keepMove)
 				for (float& m : moveMs)
 					m = 0.f;
 			applyMove();
@@ -786,8 +907,10 @@ struct GenraChop : Module {
 			dirty = true;
 		}
 		int rq = reqNew.exchange(0);
-		if (newTrig.process(inputs[NEW_INPUT].getVoltage(), 0.1f, 1.f))
+		if (newTrig.process(inputs[NEW_INPUT].getVoltage(), 0.1f, 1.f)) {
 			rq |= 1 << 5;
+			freshReq = true; // the panel cuts the sample fresh (as the NEW ALL button)
+		}
 		if (rq & (1 << 5))
 			newTrack(-1);
 		else if (rq & (1 << 6))
@@ -811,6 +934,32 @@ struct GenraChop : Module {
 		}
 		if (reqRender.exchange(false))
 			dirty = true;
+		int ct = reqClearTrack.exchange(0);
+		if (ct) {
+			// CLEAR of a track: its notes go, the chords stay (NEW / NEW ALL fill it again)
+			pushUndo();
+			for (int s = 0; s < LEN; s++) {
+				if (ct & (1 << T_DRUMS))
+					for (int v = 0; v < DRUMS; v++)
+						pat.drum[v][s] = Hit();
+				if (ct & (1 << T_BASS))
+					pat.bass[s] = Note();
+				if (ct & (1 << T_MEL))
+					pat.mel[s] = Note();
+				if (ct & (1 << T_PAD))
+					pat.pad[s] = PadEv();
+			}
+			dirty = true;
+		}
+		int rs = reqSample.exchange(0);
+		if (rs == 1 && chops) {
+			sv.startRange(chops, 0.0, (double) chops->data.frames(), 1.f, (int) params[PITCH_PARAM].getValue(), false, sr, -1);
+			samplePlaying = true;
+		}
+		else if (rs == 2) {
+			sv.release(sr);
+			samplePlaying = false;
+		}
 		uint64_t rc = reqClearPads.exchange(0);
 		bool rcAll = reqClearAll.exchange(false);
 		if (rc || rcAll) {
@@ -967,7 +1116,7 @@ struct GenraChop : Module {
 		// ---- outputs: drums
 		for (int v = 0; v < DRUMS; v++) {
 			Gate& g = drumGate[v];
-			outputs[DRUM_OUTPUT + v].setVoltage(g.left > 0 ? g.v : 0.f);
+			outputs[DRUM_OUTPUT + drumPos(v)].setVoltage(g.left > 0 ? g.v : 0.f);
 			if (g.left > 0)
 				g.left--;
 		}
@@ -1003,6 +1152,15 @@ struct GenraChop : Module {
 		float L = 0.f, R = 0.f;
 		for (SVoice& v : cv)
 			v.next(sr, L, R);
+		if (sv.active) {
+			sv.next(sr, L, R);
+			if ((tick & 63) == 0 && chops && chops->data.frames())
+				samplePos = (float) (sv.pos / (double) chops->data.frames());
+		}
+		else if (samplePlaying.load() || samplePos.load() >= 0.f) {
+			samplePlaying = false;
+			samplePos = -1.f;
+		}
 		if (rootHeld) {
 			float f = 440.f * std::pow(2.f, (48 + set.key.root - 69) / 12.f);
 			rootPhase += f / sr;
@@ -1168,6 +1326,10 @@ struct GenraChop : Module {
 		json_object_set_new(r, "drumMode", json_integer(set.drumMode));
 		json_object_set_new(r, "chopMode", json_integer(chopMode));
 		json_object_set_new(r, "bank", json_integer(bank.load()));
+		json_object_set_new(r, "warpOn", json_boolean(warpOn));
+		json_object_set_new(r, "warpMode", json_integer(warpMode));
+		json_object_set_new(r, "warpEngine", json_integer(warpEngine));
+		json_object_set_new(r, "warpMul", json_real(warpMul));
 		json_object_set_new(r, "lockChords", json_boolean(lockChords));
 		json_object_set_new(r, "clockDiv", json_integer(clockDiv));
 		json_object_set_new(r, "bakeChops", json_boolean(bakeChops));
@@ -1210,6 +1372,11 @@ struct GenraChop : Module {
 		set.drumMode = clamp(geti(r, "drumMode", 0), 0, 2);
 		chopMode = clamp(geti(r, "chopMode", 0), 0, NUM_CHOP_MODES - 1);
 		bank = clamp(geti(r, "bank", 0), 0, PADS / 16 - 1);
+		warpOn = getb(r, "warpOn", false);
+		warpMode = clamp(geti(r, "warpMode", WARP_AUTO), 0, NUM_WARP_MODES - 1);
+		warpEngine = clamp(geti(r, "warpEngine", hhw::ENGINE_RUBBER), 0, hhw::NUM_ENGINES - 1);
+		if (json_t* j = json_object_get(r, "warpMul"))
+			warpMul = clamp((float) json_number_value(j), 0.25f, 4.f);
 		if (!json_object_get(r, "bank"))
 			params[CHOPS_PARAM].setValue((float) DEFAULT_CHOPS); // a patch from before CHOPS: this knob was DUST
 		lockChords = getb(r, "lockChords", false);
@@ -1241,7 +1408,7 @@ struct GenraChop : Module {
 		samplePath = js ? json_string_value(js) : "";
 		if (!samplePath.empty() && system::isFile(samplePath)) {
 			cutCount = chopsWanted();
-			startLoad(loader, samplePath, chopMode, true, cutCount);
+			startLoad(loader, samplePath, chopMode, true, cutCount, warpCfg());
 		}
 		json_t* jb = json_object_get(r, "break");
 		breakPath = jb ? json_string_value(jb) : "";
@@ -1273,7 +1440,7 @@ struct GenraChop : Module {
 		samplePath = p;
 		std::free(p);
 		cutCount = chopsWanted();
-		startLoad(loader, samplePath, chopMode, false, cutCount);
+		startLoad(loader, samplePath, chopMode, false, cutCount, warpCfg());
 	}
 	void loadBreak() {
 		std::string dir = breakPath.empty() ? (samplePath.empty() ? hhx::sampleFolder() : system::getDirectory(samplePath))
@@ -1297,7 +1464,43 @@ struct GenraChop : Module {
 		}
 		samplePath = p;
 		cutCount = chopsWanted();
-		startLoad(loader, samplePath, chopMode, false, cutCount);
+		startLoad(loader, samplePath, chopMode, false, cutCount, warpCfg());
+	}
+	/** WARP as set on the panel, to the tempo playing now. UI thread. */
+	WarpCfg warpCfg() {
+		WarpCfg w;
+		w.on = warpOn;
+		w.mode = warpMode;
+		w.engine = warpEngine;
+		w.dst = bpmNow();
+		w.mul = warpMul;
+		warpFor = w.dst;
+		return w;
+	}
+	/** WARP changed (on/off, mode, stretcher, x2 / /2, the tempo): warp the sample again. UI thread. */
+	void rewarp() {
+		if (loader->busy) {
+			warpPending = true; // after the work that runs now
+			return;
+		}
+		warpPending = false;
+		if (const ChopSet* c = uiChops.load())
+			startWarp(loader, c, warpCfg());
+	}
+	bool warpPending = false;
+	/** NEW ALL: the sample cut fresh, as if just loaded (CHOPS back to 16, MOVE back to 0); then everything is rolled
+	 *  anew. Only when something differs from a fresh cut (else the pads' settings stay). UI thread. */
+	void freshCut() {
+		params[CHOPS_PARAM].setValue((float) DEFAULT_CHOPS);
+		const ChopSet* c = uiChops.load();
+		bool moved = false;
+		for (float m : moveMs)
+			moved = moved || m != 0.f;
+		if (c && (cutCount != DEFAULT_CHOPS || moved || c->want != DEFAULT_CHOPS)) {
+			cutCount = DEFAULT_CHOPS;
+			startRecut(loader, c, chopMode, DEFAULT_CHOPS, warpCfg());
+		}
+		cutCount = DEFAULT_CHOPS;
 	}
 	int chopsWanted() { return clamp((int) std::round(params[CHOPS_PARAM].getValue()), MIN_CHOPS, PADS); }
 	void setChopMode(int m) {
@@ -1306,7 +1509,7 @@ struct GenraChop : Module {
 		chopMode = m;
 		cutCount = chopsWanted();
 		if (const ChopSet* c = uiChops.load())
-			startRecut(loader, c, m, cutCount);
+			startRecut(loader, c, m, cutCount, warpCfg());
 	}
 	/** UI thread: CHOPS turned (and resting): cut the sample anew into that many. */
 	void setChopCount(int n) {
@@ -1314,7 +1517,7 @@ struct GenraChop : Module {
 			return;
 		cutCount = n;
 		if (const ChopSet* c = uiChops.load())
-			startRecut(loader, c, chopMode, n);
+			startRecut(loader, c, chopMode, n, warpCfg());
 	}
 	std::string saveChops() {
 		const ChopSet* c = uiChops.load();
