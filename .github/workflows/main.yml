@@ -45,55 +45,11 @@ jobs:
           echo "Version $VER"
           make RACK_DIR=sdk/Rack-SDK SLUG=GenraTest VERSION=$VER -j4 dist
 
-      - name: Test the cores (without Rack)
-        run: |
-          gcc -std=gnu11 -O2 -w test/mathcore_test.c -o mt.exe -lm && cp res/mathcore.dll . 
-          ./mt.exe ./mathcore.dll
-          gcc -std=gnu11 -O2 -w test/kurbelcore_test.c -o kt.exe -lm && cp res/kurbelcore.dll .
-          ./kt.exe ./kurbelcore.dll
-          gcc -std=gnu11 -O2 -w test/swarmcore_test.c -o st.exe -lm && cp res/swarmcore.dll .
-          ./st.exe ./swarmcore.dll
-          gcc -std=gnu11 -O2 -w test/liedcore_test.c -o lt.exe -lm && cp res/liedcore.dll .
-          ./lt.exe ./liedcore.dll res/espeak-ng-data
-          g++ -std=c++11 -O2 -w test/lied_test.cpp -o lst.exe
-          ./lst.exe ./liedcore.dll res/espeak-ng-data
-          gcc -std=gnu11 -O2 -w test/cantacore_test.c -o ct.exe -lm && cp res/cantacore.dll .
-          ./ct.exe ./cantacore.dll
-          gcc -std=gnu11 -O2 -w test/miaoucore_test.c miaoucore/miaoucore.c -o mct.exe -lm
-          ./mct.exe
-          gcc -std=gnu11 -O2 -w test/sauruscore_test.c -o sat.exe -lm && cp res/sauruscore.dll .
-          ./sat.exe ./sauruscore.dll
-          gcc -std=gnu11 -O2 -w test/fumicore_test.c -o ft.exe -lm && cp res/fumicore.dll .
-          ./ft.exe ./fumicore.dll
-          gcc -std=gnu11 -O2 -w test/kesselcore_test.c -o kst.exe -lm && cp res/kesselcore.dll .
-          ./kst.exe ./kesselcore.dll
-
       - name: Check the package
         run: |
           D=dist/GenraTest
           ls -la $D $D/res
           test -f $D/plugin.dll
-          test -f $D/res/mathcore.dll
-          test -f $D/res/Math.svg
-          test -f $D/res/kurbelcore.dll
-          test -f $D/res/Kurbel.svg
-          test -f $D/res/swarmcore.dll
-          test -f $D/res/Swarm.svg
-          test -f $D/res/liedcore.dll
-          test -f $D/res/Lied.svg
-          test -f $D/res/cantacore.dll
-          test -f $D/res/Canta.svg
-          test -f $D/res/Miaou.svg
-          test -f $D/res/sauruscore.dll
-          test -f $D/res/Saurus.svg
-          test -f $D/res/fumicore.dll
-          test -f $D/res/Fumi.svg
-          test -f $D/res/kesselcore.dll
-          test -f $D/res/Kessel.svg
-          test -f $D/res/KesselFx.svg
-          test -f $D/res/espeak-ng-data/phondata
-          test -f $D/res/espeak-ng-data/de_dict
-          test -d "$D/res/espeak-ng-data/voices/!v"
           test -f $D/res/knob/small.svg
           objdump -p $D/plugin.dll | grep "DLL Name"
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
@@ -155,10 +111,8 @@ jobs:
           D=dist/GenraTest
           ls -la $D $D/res
           test -f $D/plugin.dylib
-          for c in mathcore kurbelcore swarmcore liedcore cantacore sauruscore fumicore kesselcore; do test -f $D/res/$c.dylib; done
-          test -f $D/res/espeak-ng-data/phondata
           test -f $D/res/knob/small.svg
-          for f in $D/plugin.dylib $D/res/*core.dylib; do
+          for f in $D/plugin.dylib; do
             echo "$f: $(lipo -archs $f)"
             lipo -archs "$f" | grep -qw "$WANT" || { echo "$f is not $WANT"; exit 1; }
           done
@@ -197,7 +151,7 @@ jobs:
           name: GENRA Test ${{ env.RELVER }}
           files: files/*.vcvplugin
           body: |
-            GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL). Appears under the
+            GENRA Test: new instruments of the GENRA family to try out (no modules at the moment). Appears under the
             brand "Genra" in Rack's browser; the modules follow GENRA without cables when the GENRA plugin is installed.
 
             Files: `win-x64` = Windows, `mac-arm64` = Mac with Apple chip (M1 and later), `mac-x64` = Intel Mac.

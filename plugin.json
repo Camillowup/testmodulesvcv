@@ -1,7 +1,7 @@
 {
   "slug": "GenraTest",
   "name": "GENRA Test",
-  "version": "2.7.0",
+  "version": "2.8.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -12,105 +12,5 @@
   "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
   "donateUrl": "",
   "changelogUrl": "",
-  "modules": [
-    {
-      "slug": "Math",
-      "name": "MATH",
-      "description": "The JIANT FM firmware's MATH engine: bytebeat and floatbeat formulas played as an instrument (KEYS) or running on by themselves (THRU), MOTION SYNC to the clock, with its being drawn live",
-      "tags": [
-        "Synth voice",
-        "Polyphonic",
-        "Oscillator",
-        "Noise"
-      ]
-    },
-    {
-      "slug": "Kurbel",
-      "name": "KURBEL",
-      "description": "ESTAMPIE's hurdy-gurdy (GHOULBOX's GURDY: melody string, drones, buzzing trompette, a crank you turn by knob and CV) and its shawm, with medieval temperaments",
-      "tags": [
-        "Synth voice",
-        "Physical modeling",
-        "Drone"
-      ]
-    },
-    {
-      "slug": "Swarm",
-      "name": "SWARM",
-      "description": "The JIANT FM firmware's SWARM: a drone made of the devices around, here virtual ones (no radio): their addresses, makers, bytes and clocks become notes, timbres, FM and rhythm; VOICES, BUSY, MOVE, NEAR, ARRIVE and NEW; THRU or played (KEYS), drawn live",
-      "tags": [
-        "Synth voice",
-        "Drone",
-        "Random"
-      ]
-    },
-    {
-      "slug": "Lied",
-      "name": "LIED",
-      "description": "A text singer: four lines of lyrics typed on the panel, spoken by eSpeak NG (12 languages, 14 voices) and sung syllable by syllable at the notes of V/OCT, the vowel held while the gate is; choir, vibrato, echo and reverb",
-      "tags": [
-        "Synth voice",
-        "Speech"
-      ]
-    },
-    {
-      "slug": "Canta",
-      "name": "CANTA",
-      "description": "MIKU-FM's singing voice: a formant voice that sings Japanese syllables, each gate the next syllable of lyrics typed on the panel; ANIMAL babble, SCAT and VOWELS, five characters, a harmony voice, chorus, delay, reverb, drive; four pixel singers sing along",
-      "tags": [
-        "Synth voice",
-        "Speech"
-      ]
-    },
-    {
-      "slug": "Miaou",
-      "name": "MIAOU",
-      "description": "MIAOU's toy keyboard: a chip piano, FM bells, a square organ, a plucked banjo and a meow through moving formants, polyphonic; PAW makes every key meow; decay, tone, the meow's length, swoop, breath and kitten, the toy's little speaker; chorus, delay, reverb; a pixel cat that watches the notes",
-      "tags": [
-        "Synth voice",
-        "Polyphonic"
-      ]
-    },
-    {
-      "slug": "Saurus",
-      "name": "SAURUS",
-      "description": "PALEOTONE's creature calls: a buzzing throat through three formants, sized from a bird to a sauropod; eleven call shapes (ROAR, BARK, HOOT, TRILL, CHIRP ..., KEYS: a creature a key), twenty creatures as presets; SIZE, SWOOP, LEN, GROWL, BRTH, MOUTH, WILD with CV; eight pixel creatures call along",
-      "tags": [
-        "Synth voice",
-        "Polyphonic",
-        "Physical modeling"
-      ]
-    },
-    {
-      "slug": "Fumi",
-      "name": "FUMI",
-      "description": "FuMi-1's shigin koto after the Suiko ST-50: the ST-50's measured just tuning, honsuu keys and the in, yo and min'yo scales, a trill that plays in pairs as a hand does, the koto's left-hand ornaments, six FM instruments (kotos, harp, wood blocks)",
-      "tags": [
-        "Synth voice",
-        "Polyphonic",
-        "Physical modeling"
-      ]
-    },
-    {
-      "slug": "Kessel",
-      "name": "KESSEL",
-      "description": "A drum machine voice from the open-source LXR firmware's sound engine (Erica Synths, GPL-3.0; not affiliated): three drum voices, snare (with REPEAT its clap), cymbal and hi-hat on GENRA's drum triggers, each lane alone and a mix, 25 kits, kit macros",
-      "tags": [
-        "Drum",
-        "Synth voice"
-      ]
-    },
-    {
-      "slug": "KesselFx",
-      "name": "KESSEL FX",
-      "description": "KESSEL's effect bus as an expander: delay (in divisions of the clock), ping pong, reverb, tube, fold and rat distortion, ring mod, bit crush and DJ filter, one at a time, with a CV on the parameter you pick",
-      "tags": [
-        "Effect",
-        "Expander",
-        "Delay",
-        "Reverb",
-        "Distortion"
-      ]
-    }
-  ]
+  "modules": []
 }

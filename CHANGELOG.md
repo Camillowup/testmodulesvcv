@@ -2,6 +2,14 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### 2.8.0 – Alle Module nach GENRA Instruments umgezogen
+- MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL und KESSEL FX sind getestet (Look und Klang i. O.) und
+  mit GENRA 2.38.0 nach GENRA Instruments umgezogen (Repo Camillowup/Genra-for-Vcv, Ordner `instruments/`), mit Code,
+  Kernen, Firmware-Schnappschüssen, Panels, Tests, Panel-Skripten und Lizenztexten. Hier sind sie im selben Schritt
+  entfernt, damit sie in Rack nicht doppelt stehen.
+- GENRA Test ist damit leer und bleibt die Ablage für neue Test-Module (gemeinsame Teile, Panel-Werkzeuge `tools/gpanel.py`,
+  `jpanel.py`, `panellib.py`).
+
 ### GENRA CHOP: umgezogen
 - GENRA CHOP (2.2.0 bis 2.4.0, Ordner `genra-chop/`) liegt jetzt im eigenen Repo `Camillowup/Genra-Chop`, mit
   seiner Geschichte und seinem CHANGELOG. Der Ordner und seine Build-Schritte sind hier entfernt.

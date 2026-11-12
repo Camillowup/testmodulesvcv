@@ -1,24 +1,14 @@
-# GENRA Test: new instruments of the GENRA family to try out (MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI,
-# KESSEL with KESSEL FX). Build:
+# GENRA Test: new instruments of the GENRA family to try out before they join GENRA Instruments (empty since 2.8.0:
+# MATH … KESSEL FX moved to GENRA Instruments). Build:
 #   make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 
 SOURCES += $(wildcard src/*.cpp)
-SOURCES += $(wildcard src/math/*.cpp)
-SOURCES += $(wildcard src/kurbel/*.cpp)
-SOURCES += $(wildcard src/swarm/*.cpp)
-SOURCES += $(wildcard src/lied/*.cpp)
-SOURCES += $(wildcard src/canta/*.cpp)
-SOURCES += $(wildcard src/miaou/*.cpp)
-# MIAOU's engine (miaoucore/: MIAOU's toy.c with its voices in a struct) is plain C, built into the plugin itself
-SOURCES += miaoucore/miaoucore.c
-SOURCES += $(wildcard src/saurus/*.cpp)
-SOURCES += $(wildcard src/fumi/*.cpp)
-SOURCES += $(wildcard src/kessel/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)
 DISTRIBUTABLES += licenses
+SOURCES += $(wildcard src/*/*.cpp)
 
 include $(RACK_DIR)/arch.mk
 
@@ -41,185 +31,10 @@ $(error GENRA's shared parts are missing: run "make genra-src" first)
 endif
 endif
 
-# ---------------------------------------------------------------- the MATH core
-# The JIANT FM firmware (jiant.tar.gz, a snapshot: jiant/SNAPSHOT.txt) with mathcore/mathcore.c on top, built as its
-# own small shared library. Plain C with no Rack dependency; every module instance loads a private copy of the
-# library, since the firmware keeps its state in static variables (as GENRA Instruments' VOICE and ANIMAL).
-CORE_CC ?= $(CC)
-CORE_FLAGS := -std=gnu11 -O2 -w -ffp-contract=off -DFELUCCA_VERSION='"VCV"' -Ijiant/build/gen -Ijiant/firmware/src
-ifdef ARCH_LIN
-	CORE_EXT := so
-	CORE_FLAGS += -fPIC -fvisibility=hidden -shared
-	CORE_LIBS := -lm
-endif
-ifdef ARCH_MAC
-	CORE_EXT := dylib
-	# the firmwares put some buffers into FM1 linker sections, which Mach-O does not take: mathcore/compat/mac_section.h
-	CORE_FLAGS += -fPIC -fvisibility=hidden -dynamiclib -include mathcore/compat/mac_section.h
-	CORE_LIBS := -lm
-endif
-ifdef ARCH_WIN
-	CORE_CC := gcc
-	CORE_EXT := dll
-	# the firmware's host build includes <sys/wait.h> (its test harness, unused here): mathcore/compat stands in
-	CORE_FLAGS += -shared -Imathcore/compat -static
-	CORE_LIBS := -lm -lwinpthread
-endif
-CORES := res/mathcore.$(CORE_EXT) res/kurbelcore.$(CORE_EXT) res/swarmcore.$(CORE_EXT) res/liedcore.$(CORE_EXT) res/cantacore.$(CORE_EXT) \
-	res/sauruscore.$(CORE_EXT) res/fumicore.$(CORE_EXT) res/kesselcore.$(CORE_EXT)
-
-JIANT_STAMP := jiant/.unpacked
-$(JIANT_STAMP): jiant.tar.gz
-	tar xzf jiant.tar.gz
-	touch $@
-
-res/mathcore.$(CORE_EXT): mathcore/mathcore.c mathcore/mathcore.h $(JIANT_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(CORE_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
-
-# ---------------------------------------------------------------- the SWARM core
-# The same JIANT snapshot with swarmcore/swarmcore.c on top (SWARM: eng_input.c, with virtual devices instead of a radio).
-res/swarmcore.$(CORE_EXT): swarmcore/swarmcore.c swarmcore/swarmcore.h $(JIANT_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(CORE_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
-
-# ---------------------------------------------------------------- the KURBEL core
-# ESTAMPIE's firmware (estampie.tar.gz, a snapshot: estampie/SNAPSHOT.txt) with kurbelcore/kurbelcore.c on top, built
-# the same way (its own includes instead of JIANT's).
-KURBEL_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Iestampie/build/gen -Iestampie/firmware/src,$(CORE_FLAGS))
-ESTAMPIE_STAMP := estampie/.unpacked
-$(ESTAMPIE_STAMP): estampie.tar.gz
-	tar xzf estampie.tar.gz
-	touch $@
-
-res/kurbelcore.$(CORE_EXT): kurbelcore/kurbelcore.c kurbelcore/kurbelcore.h $(ESTAMPIE_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(KURBEL_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
-
-# ---------------------------------------------------------------- the LIED core
-# eSpeak NG 1.52.0 (espeak.tar.gz, a snapshot of its library sources: espeak/SNAPSHOT.txt) with liedcore/liedcore.c on
-# top, as one small shared library. Loaded once per process (eSpeak's state is static; LIED calls it under a lock).
-# Its language data (compiled from the same release) is in res/espeak-ng-data.
-ESPEAK_STAMP := espeak/.unpacked
-$(ESPEAK_STAMP): espeak.tar.gz
-	tar xzf espeak.tar.gz
-	touch $@
-
-ESPEAK_LIB := espeak/src/libespeak-ng
-ESPEAK_C := common mnemonics error ieee80 compiledata compiledict dictionary encoding intonation langopts numbers \
-	phoneme phonemelist readclause setlengths soundicon spect ssml synthdata synthesize tr_languages translate \
-	translateword voices wavegen speech espeak_api klatt
-UCD_C := case categories ctype proplist scripts tostring
-LIED_SRC := liedcore/liedcore.c $(addprefix $(ESPEAK_LIB)/,$(addsuffix .c,$(ESPEAK_C))) \
-	$(addprefix espeak/src/ucd-tools/src/,$(addsuffix .c,$(UCD_C)))
-LIED_FLAGS := -std=gnu11 -O2 -w -DLIBESPEAK_NG_EXPORT=1 -Iliedcore -Iespeak/src/include -Iespeak/src/include/compat \
-	-Iespeak/src/ucd-tools/src/include \
-	-I$(ESPEAK_LIB) -DPATH_ESPEAK_DATA='"espeak-ng-data"' \
-	-Wno-error=int-conversion -Wno-error=incompatible-pointer-types -Wno-error=implicit-function-declaration
-# (PATH_ESPEAK_DATA: what eSpeak's CMake defines; LIED always passes its own path. The -Wno-error: GCC 14 made these
-#  errors, eSpeak's Windows code still has one)
-ifdef ARCH_LIN
-	LIED_FLAGS += -fPIC -fvisibility=hidden -shared
-	LIED_LIBS := -lm
-endif
-ifdef ARCH_MAC
-	LIED_FLAGS += -fPIC -fvisibility=hidden -dynamiclib
-	LIED_LIBS := -lm
-endif
-ifdef ARCH_WIN
-	LIED_FLAGS += -shared -static
-	LIED_LIBS := -lm -ladvapi32
-endif
-
-res/liedcore.$(CORE_EXT): liedcore/liedcore.c liedcore/liedcore.h liedcore/config.h $(ESPEAK_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(LIED_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(LIED_SRC) $(LIED_LIBS)
-
-# ---------------------------------------------------------------- the CANTA core
-# MIKU-FM's singing voice (canta.tar.gz, a snapshot of the voice's code only: canta/SNAPSHOT.txt) with
-# cantacore/cantacore.c on top, as its own small shared library; every instance loads a private copy (the effects keep
-# their buffers in static variables). Plain C, no libc.
-CANTA_STAMP := canta/.unpacked
-$(CANTA_STAMP): canta.tar.gz
-	tar xzf canta.tar.gz
-	touch $@
-
-CANTA_SRC := cantacore/cantacore.c canta/firmware/audio/fvoice/fvoice.c canta/firmware/audio/vfx/vfx.c \
-	canta/firmware/song/mora.c canta/firmware/song/lyrics.c
-CANTA_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Icanta,$(CORE_FLAGS))
-
-res/cantacore.$(CORE_EXT): cantacore/cantacore.c cantacore/cantacore.h $(CANTA_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(CANTA_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(CANTA_SRC) $(CORE_LIBS)
-
-# ---------------------------------------------------------------- the SAURUS core
-# PALEOTONE's firmware (paleotone.tar.gz, a snapshot of what its host build needs: paleotone/SNAPSHOT.txt) with
-# sauruscore/sauruscore.c on top, built the same way (its own includes). Every instance loads a private copy.
-SAURUS_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Ipaleotone/build/gen -Ipaleotone/firmware/src,$(CORE_FLAGS))
-PALEOTONE_STAMP := paleotone/.unpacked
-$(PALEOTONE_STAMP): paleotone.tar.gz
-	tar xzf paleotone.tar.gz
-	touch $@
-
-res/sauruscore.$(CORE_EXT): sauruscore/sauruscore.c sauruscore/sauruscore.h $(PALEOTONE_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(SAURUS_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
-# ---------------------------------------------------------------- the FUMI core
-# FuMi-1's instrument (fumi.tar.gz, a snapshot of its firmware/src/dsp: fumi/SNAPSHOT.txt; the patch table reduced to
-# FuMi-1's own six) with fumicore/fumicore.c on top, as its own small shared library; every instance loads a private
-# copy (the instrument's state is static). Plain C, no libm calls (fastmath.h).
-FUMI_STAMP := fumi/.unpacked
-$(FUMI_STAMP): fumi.tar.gz
-	tar xzf fumi.tar.gz
-	touch $@
-
-FUMI_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-DFM_HOST -Ifumicore -Ifumi/firmware/src -Ifumi/firmware/src/dsp,$(CORE_FLAGS))
-
-res/fumicore.$(CORE_EXT): fumicore/fumicore.c fumicore/fumicore.h $(FUMI_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(FUMI_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $< $(CORE_LIBS)
-
-# ---------------------------------------------------------------- the KESSEL core
-# The LXR firmware's sound engine (Erica Synths; kessel.tar.gz, a snapshot of its headers and sound engine sources,
-# with two reads past a table's end put right: kessel/SNAPSHOT.txt) with kesselcore/ on top (kesselcore.c, kc_cc.c: the firmware's parameter handler), as its own
-# small shared library; every instance loads a private copy (the voices are static). kesselcore/compat stands in for
-# the STM32 HAL; kc_sections.h turns the firmware's memory sections into plain ones (forced in on every system).
-KESSEL_STAMP := kessel/.unpacked
-$(KESSEL_STAMP): kessel.tar.gz
-	tar xzf kessel.tar.gz
-	touch $@
-
-KESSEL_SRC := kesselcore/kesselcore.c kesselcore/kc_cc.c \
-	kessel/Core/Src/Preset/initKit.c kessel/Core/Src/Soundengine/DSPAudio/1PoleLp.c \
-	kessel/Core/Src/Soundengine/DSPAudio/BufferTools.c \
-	kessel/Core/Src/Soundengine/DSPAudio/CymbalVoice.c kessel/Core/Src/Soundengine/DSPAudio/Decay.c \
-	kessel/Core/Src/Soundengine/DSPAudio/DrumVoice.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/Compressor.c kessel/Core/Src/Soundengine/DSPAudio/FX/Delay.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/Distortion.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/FxRamBuffer.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/Reverb.c kessel/Core/Src/Soundengine/DSPAudio/FX/Ringmod.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/AllpassDelay.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/VerbDelay.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/VerbModDelay.c \
-	kessel/Core/Src/Soundengine/DSPAudio/FX/VerbTools/sinCos.c \
-	kessel/Core/Src/Soundengine/DSPAudio/HiHat.c kessel/Core/Src/Soundengine/DSPAudio/Oscillator.c \
-	kessel/Core/Src/Soundengine/DSPAudio/ResonantFilter.c kessel/Core/Src/Soundengine/DSPAudio/Samples.c \
-	kessel/Core/Src/Soundengine/DSPAudio/SlopeEg2.c kessel/Core/Src/Soundengine/DSPAudio/Snare.c \
-	kessel/Core/Src/Soundengine/DSPAudio/TiltEq.c kessel/Core/Src/Soundengine/DSPAudio/distortion.c \
-	kessel/Core/Src/Soundengine/DSPAudio/dither.c kessel/Core/Src/Soundengine/DSPAudio/lfo.c \
-	kessel/Core/Src/Soundengine/DSPAudio/random.c kessel/Core/Src/Soundengine/DSPAudio/snapEg.c \
-	kessel/Core/Src/Soundengine/DSPAudio/squareRootLut.c \
-	kessel/Core/Src/Soundengine/DSPAudio/transientGenerator.c \
-	kessel/Core/Src/Soundengine/DSPAudio/transientTables.c \
-	kessel/Core/Src/Soundengine/DSPAudio/wavetable.c kessel/Core/Src/Soundengine/FxBus.c
-KESSEL_FLAGS := $(subst -Ijiant/build/gen -Ijiant/firmware/src,-Ikesselcore/compat -Ikesselcore -Ikessel/Core/Inc \
-	-include kesselcore/compat/kc_sections.h,$(CORE_FLAGS))
-KESSEL_FLAGS := $(subst -include mathcore/compat/mac_section.h,,$(KESSEL_FLAGS))
-
-res/kesselcore.$(CORE_EXT): kesselcore/kesselcore.c kesselcore/kesselcore.h kesselcore/kc_cc.c kesselcore/kc_lxr.h $(KESSEL_STAMP)
-	@mkdir -p res
-	$(CORE_CC) $(KESSEL_FLAGS) $(filter --target% -arch% -march% -mmacosx-version-min%,$(FLAGS)) -o $@ $(KESSEL_SRC) $(CORE_LIBS)
-
+# ---------------------------------------------------------------- cores of new test modules
+# None at the moment. A new module's engine (a firmware as its own small shared library, as GENRA Instruments builds
+# them: see instruments/Makefile in the GENRA repo) goes here, with its file in CORES.
+CORES :=
 all: $(CORES)
 dist: $(CORES)
 

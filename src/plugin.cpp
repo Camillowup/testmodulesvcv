@@ -10,14 +10,4 @@ void GenraKnob::load(const char* n) {
 
 void init(Plugin* p) {
 	pluginInstance = p;
-	p->addModel(modelMath);
-	p->addModel(modelKurbel);
-	p->addModel(modelSwarm);
-	p->addModel(modelLied);
-	p->addModel(modelCanta);
-	p->addModel(modelMiaou);
-	p->addModel(modelSaurus);
-	p->addModel(modelFumi);
-	p->addModel(modelKessel);
-	p->addModel(modelKesselFx);
 }

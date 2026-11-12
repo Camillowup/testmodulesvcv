@@ -5,13 +5,5 @@
 #pragma once
 #include "../genra/plugin.hpp"
 
-extern Model* modelMath;
-extern Model* modelKurbel;
-extern Model* modelSwarm;
-extern Model* modelLied;
-extern Model* modelCanta;
-extern Model* modelMiaou;
-extern Model* modelSaurus;
-extern Model* modelFumi;
-extern Model* modelKessel;
-extern Model* modelKesselFx;
+// No modules at the moment (2.8.0): MATH … KESSEL FX moved to GENRA Instruments with 2.38.0. A new test module adds
+// its `extern Model* model…;` here and its addModel in plugin.cpp.
