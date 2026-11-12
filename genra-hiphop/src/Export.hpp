@@ -22,6 +22,7 @@ std::string cleanName(const std::string& s);
 
 /** A type-1 MIDI file of the four bars as rendered: drums (channel 10, GM notes), bass, melody, pads, chop (pad 1 =
  *  C1; a chop's pitch as pitch bend over ±12 semitones, set by RPN; reverse as CC 20). */
-std::vector<uint8_t> midiFile(const hh::Render& r, float bpm, float swing, const hh::PadSet* pads, int globalPitch);
+std::vector<uint8_t> midiFile(const hh::Render& r, float bpm, float swing, const hh::PadSet* pads, int globalPitch,
+                              const hh::Pattern& pat, int onlyTrack = -1);
 
 } // namespace hhx

@@ -6,6 +6,7 @@ using namespace rack;
 
 extern Plugin* pluginInstance;
 extern Model* modelGenraHipHop;
+extern Model* modelGridHH;
 
 // the knobs of the production-center look (res/HHKnob*.svg, from tools/hiphop_panel.py)
 struct HHKnob : app::SvgKnob {

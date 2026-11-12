@@ -102,6 +102,17 @@ static int snapScale(int n, int scale, int keyRoot) {
 	return n;
 }
 
+int scaleOf(const Settings& set) { return scaleFor(STYLES[std::max(0, std::min(NUM_STYLES - 1, set.style))], set.key); }
+bool inScale(int note, int scale, int keyRoot) {
+	int rel = pcOf(note - keyRoot);
+	for (int i = 0; i < 7; i++)
+		if (SCALES[scale][i] == rel)
+			return true;
+	return false;
+}
+int snapToScale(int note, int scale, int keyRoot) { return snapScale(note, scale, keyRoot); }
+int tonesOf(const Chord& c, int* out) { return chordTones(c, out); }
+
 Chord padChord(const SampleInfo& si, const PadSet* ps, int pad) {
 	Chord c;
 	c.quality = Q_NONE;
@@ -791,28 +802,59 @@ void generate(Pattern& p, int track, const Settings& set, const SampleInfo& si, 
 	Rng rng;
 	rng.seed(seed * 2654435761u + (uint32_t) (track + 7) * 40503u);
 	bool all = track < 0;
-	if (track == T_HARMONY) { // a new key: the chords and what plays them
-		if (!lockChords)
-			genChords(p, st, set, si, pads, rng);
-		genBass(p, st, set, si, pads, rng);
-		genMel(p, st, set, si, pads, rng);
-		genPad(p, st, set, si, pads, rng);
-		return;
-	}
-	if (all || track == T_DRUMS)
+	bool harmony = track == T_HARMONY;
+	// edited tracks (GRID HH) keep their notes, unless their own NEW / GEN asks
+	auto may = [&](int t) { return track == t || !p.edited[t]; };
+	Chord before[BARS];
+	for (int b = 0; b < BARS; b++)
+		before[b] = p.bar[b];
+	if (track == T_DRUMS || (all && may(T_DRUMS)))
 		genDrums(p, st, rng);
-	if (all || track == T_CHOP) {
+	if ((all || track == T_CHOP) && may(T_CHOP))
 		genChop(p, st, set, si, pads, rng, bpm);
-		if (!lockChords)
-			genChords(p, st, set, si, pads, rng);
-	}
+	if ((all || harmony || track == T_CHOP) && !lockChords)
+		genChords(p, st, set, si, pads, rng);
 	// the bass leans on the kicks and the chops' chords; the pads on the chords
-	if (all || track == T_BASS || track == T_CHOP || track == T_DRUMS)
+	if ((all || harmony || track == T_BASS || track == T_CHOP || track == T_DRUMS) && may(T_BASS))
 		genBass(p, st, set, si, pads, rng);
-	if (all || track == T_MEL)
+	if ((all || harmony || track == T_MEL) && may(T_MEL))
 		genMel(p, st, set, si, pads, rng);
-	if (all || track == T_PAD || track == T_CHOP)
+	if ((all || harmony || track == T_PAD || track == T_CHOP) && may(T_PAD))
 		genPad(p, st, set, si, pads, rng);
+	if (track >= 0 && track < NUM_TRACKS) {
+		p.edited[track] = false; // generated again: follows the loop, DENS works again
+		p.lenTrack[track] = 0;
+		if (track == T_DRUMS)
+			for (int v = 0; v < DRUMS; v++)
+				p.lenDrum[v] = 0;
+	}
+	// CHORD FOLLOW: edited tone tracks move with the new chords (roots to roots, the rest along the scale)
+	if (p.chordFollow) {
+		int scale = scaleFor(st, set.key);
+		for (int b = 0; b < BARS; b++) {
+			int d = pcOf(p.bar[b].root - before[b].root);
+			if (d > 6)
+				d -= 12;
+			if (!d)
+				continue;
+			for (int s = b * STEPS; s < (b + 1) * STEPS; s++) {
+				auto mv = [&](int8_t& n) {
+					if (n < 0)
+						return;
+					bool root = pcOf(n) == pcOf(before[b].root);
+					int m = root ? n + d : snapScale(n + d, scale, set.key.root);
+					n = (int8_t) std::max(0, std::min(127, m));
+				};
+				if (p.edited[T_BASS] && track != T_BASS)
+					mv(p.bass[s].pitch);
+				if (p.edited[T_MEL] && track != T_MEL)
+					mv(p.mel[s].pitch);
+				if (p.edited[T_PAD] && track != T_PAD)
+					for (int k = 0; k < PAD_VOICES; k++)
+						mv(p.pad[s].pitch[k]);
+			}
+		}
+	}
 }
 
 void mutateChops(Pattern& p, const Settings& set, const SampleInfo& si, const PadSet* pads, uint32_t seed, float amount,
@@ -935,7 +977,7 @@ void render(const Pattern& p, const Knobs& k, Render& r) {
 	for (int v = 0; v < DRUMS; v++)
 		for (int s = 0; s < LEN; s++) {
 			Hit h = p.drum[v][s];
-			if (h.vel > 0.f && h.prio > k.dens[T_DRUMS])
+			if (h.vel > 0.f && h.prio > k.dens[T_DRUMS] && !p.edited[T_DRUMS])
 				h = Hit();
 			if (h.ratchet > 1 && k.dens[T_DRUMS] < 0.25f)
 				h.ratchet = 1;
@@ -943,21 +985,21 @@ void render(const Pattern& p, const Knobs& k, Render& r) {
 		}
 	for (int s = 0; s < LEN; s++) {
 		Note b = p.bass[s];
-		if (b.pitch >= 0 && b.prio > k.dens[T_BASS])
+		if (b.pitch >= 0 && b.prio > k.dens[T_BASS] && !p.edited[T_BASS])
 			b = Note();
 		if (b.pitch >= 0)
 			b.pitch = (int8_t) std::max(0, std::min(127, b.pitch + 12 * k.bassOct));
 		r.bass[s] = b;
 		Note m = p.mel[s];
-		if (m.pitch >= 0 && m.prio > k.dens[T_MEL])
+		if (m.pitch >= 0 && m.prio > k.dens[T_MEL] && !p.edited[T_MEL])
 			m = Note();
 		r.mel[s] = m;
 		PadEv e = p.pad[s];
-		if (e.pitch[0] >= 0 && e.prio > k.dens[T_PAD])
+		if (e.pitch[0] >= 0 && e.prio > k.dens[T_PAD] && !p.edited[T_PAD])
 			e = PadEv();
 		r.pad[s] = e;
 		ChopEv c = p.chop[s];
-		if (c.pad >= 0 && c.prio > k.dens[T_CHOP])
+		if (c.pad >= 0 && c.prio > k.dens[T_CHOP] && !p.edited[T_CHOP])
 			c = ChopEv();
 		r.chop[s] = c;
 	}

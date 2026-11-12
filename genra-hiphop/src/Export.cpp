@@ -154,36 +154,60 @@ struct TrackW {
 };
 } // namespace
 
-std::vector<uint8_t> midiFile(const hh::Render& r, float bpm, float swing, const hh::PadSet* pads, int globalPitch) {
+std::vector<uint8_t> midiFile(const hh::Render& r, float bpm, float swing, const hh::PadSet* pads, int globalPitch,
+                              const hh::Pattern& pat, int onlyTrack) {
 	using namespace hh;
 	const int PPQ = 96, STEP = PPQ / 4;
+	// each track (drum voice) in its own length and swing, over the 64 steps of the loop
+	auto lenOf = [&](int t, int v) {
+		int L = pat.lenTrack[t];
+		if (t == T_DRUMS && v >= 0 && pat.lenDrum[v])
+			L = pat.lenDrum[v];
+		return (L > 0 && L < LEN) ? L : LEN;
+	};
+	auto swOf = [&](int t, int v) {
+		float s = pat.swTrack[t];
+		if (t == T_DRUMS && v >= 0 && pat.swDrum[v] > 0.f)
+			s = pat.swDrum[v];
+		return s > 0.f ? s : swing;
+	};
+	int curT = 0, curV = -1;
 	auto at = [&](int s, float off) {
-		float sw = (s % 2) ? (2.f * swing - 1.f) : 0.f;
+		int L = lenOf(curT, curV);
+		float sw = ((s % L) % 2) ? (2.f * swOf(curT, curV) - 1.f) : 0.f;
 		return (int) std::lround((s + sw + off) * STEP);
 	};
+	auto want = [&](int t) { return onlyTrack < 0 || onlyTrack == t; };
 	static const int GM[DRUMS] = {36, 38, 39, 37, 42, 46, 45, 56};
 	TrackW tempo, drums, bass, mel, pad, chop;
 	uint32_t us = (uint32_t) (60000000.f / std::max(20.f, bpm));
 	tempo.add(0, 1, {0xff, 0x51, 0x03, (uint8_t) (us >> 16), (uint8_t) (us >> 8), (uint8_t) us});
 	tempo.add(0, 1, {0xff, 0x58, 0x04, 4, 2, 24, 8});
-	for (int v = 0; v < DRUMS; v++)
+	for (int v = 0; v < DRUMS && want(T_DRUMS); v++)
 		for (int s = 0; s < LEN; s++) {
-			const Hit& h = r.drum[v][s];
+			curT = T_DRUMS, curV = v;
+			const Hit& h = r.drum[v][s % lenOf(T_DRUMS, v)];
 			if (h.vel <= 0.f)
 				continue;
 			int n = std::max(1, (int) h.ratchet);
 			for (int k = 0; k < n; k++)
 				drums.note(at(s, h.off) + k * STEP / n, STEP / n / 2 + 1, 9, GM[v], (int) (h.vel * 127.f));
 		}
-	auto line = [&](TrackW& t, const Note* ln, int ch) {
-		for (int s = 0; s < LEN; s++)
-			if (ln[s].pitch >= 0)
-				t.note(at(s, ln[s].off), (int) (ln[s].len * STEP), ch, ln[s].pitch, std::min(127, (int) (ln[s].vel * 127.f) + (ln[s].acc ? 20 : 0)));
+	auto line = [&](TrackW& t, const Note* ln, int ch, int tr) {
+		if (!want(tr))
+			return;
+		curT = tr, curV = -1;
+		for (int s = 0; s < LEN; s++) {
+			const Note& n = ln[s % lenOf(tr, -1)];
+			if (n.pitch >= 0)
+				t.note(at(s, n.off), (int) (n.len * STEP), ch, n.pitch, std::min(127, (int) (n.vel * 127.f) + (n.acc ? 20 : 0)));
+		}
 	};
-	line(bass, r.bass, 0);
-	line(mel, r.mel, 1);
-	for (int s = 0; s < LEN; s++) {
-		const PadEv& e = r.pad[s];
+	line(bass, r.bass, 0, T_BASS);
+	line(mel, r.mel, 1, T_MEL);
+	curT = T_PAD, curV = -1;
+	for (int s = 0; s < LEN && want(T_PAD); s++) {
+		const PadEv& e = r.pad[s % lenOf(T_PAD, -1)];
 		for (int i = 0; i < PAD_VOICES; i++)
 			if (e.pitch[i] >= 0)
 				pad.note(at(s, e.off), (int) (e.len * STEP), 2, e.pitch[i], (int) (e.vel * 127.f));
@@ -193,8 +217,9 @@ std::vector<uint8_t> midiFile(const hh::Render& r, float bpm, float swing, const
 	chop.add(0, 1, {0xb3, 100, 0});
 	chop.add(0, 1, {0xb3, 6, 12});
 	chop.add(0, 1, {0xb3, 38, 0});
-	for (int s = 0; s < LEN; s++) {
-		const ChopEv& e = r.chop[s];
+	curT = T_CHOP, curV = -1;
+	for (int s = 0; s < LEN && want(T_CHOP); s++) {
+		const ChopEv& e = r.chop[s % lenOf(T_CHOP, -1)];
 		if (e.pad < 0)
 			continue;
 		int semis = clamp(e.pitch + (pads ? pads[e.pad].pitch : 0) + globalPitch, -12, 12);

@@ -2,7 +2,7 @@
 
 Ein Hip-Hop-Beat-Generator im Look einer alten Production Center (beiges Gehäuse, graue Pads, Akai-Rot, grünes LCD).
 Eigenes Plugin (**GENRA HipHop**, Slug `GenraHipHop`) unter der Marke **Genra**, liegt im Repo von GENRA Test im
-Unterordner `genra-hiphop/`. Stand 2.0.2: Transport mit STOP, Bass mit echter Dichte-Schicht, Laden per Klick aufs leere Display.
+Unterordner `genra-hiphop/`. Stand 2.1.0: dazu **GENRA GRID HH**, der Grid-Editor (44 HP). Beide Module kommen mit derselben Datei.
 
 ![Panel](docs/hiphop.png)
 
@@ -71,6 +71,35 @@ Pads: V/OCT und GATE poly 4, VEL, MOD. Chop L/R.
 auf Kanal 10 mit GM-Noten, Bass, Melodie, Pads, Chop mit Pad 1 = C1, Pitch als Pitch-Bend ±12, Reverse als CC 20;
 ohne Dateifenster in den MIDI-Ordner aller GENRA-Module), MIDI-Eingang, Clock-Auflösung.
 
+## GENRA GRID HH: der Grid-Editor (44 HP)
+
+Bearbeitet das Pattern von GENRA HIP-HOP Note für Note. **Verbindung:** direkt links oder rechts neben GENRA HIP-HOP
+setzen (LINK leuchtet grün) oder Rechtsklick › *Connect to…*.
+
+- **TRACK:** DRUMS (Raster, 8 Stimmen), BASS, MEL, PADS (Piano-Roll), CHOP (Raster, 16 Pads mit Akkord).
+- **VIEW:** BAR (erster sichtbarer Takt), ZOOM (1/2/4 Takte), PITCH (Tonbereich der Piano-Roll, pro Spur gemerkt),
+  AUTO (Ansicht läuft mit). Oben rechts: **ALL / SCALE / USED** (welche Tonzeilen) und **ONE / GHOST / ALL 5**
+  (eine Spur; die anderen Tonspuren blass dahinter; alle fünf als Streifen, Klick wählt, Doppelklick öffnet).
+- **NOTES:** VEL, LEN, CHANCE für neue Noten. **SNAP** schaltet AUS / SCALE / CHORD (mit Shift: die ganze Spur
+  einrasten). **FOLLOW:** bearbeitete Bass-, Melodie- und Pad-Noten wandern mit neuen Akkorden mit.
+- **EDIT:** UNDO, REDO (64 Schritte), COPY / PASTE BAR (erster sichtbarer Takt), CLEAR TRACK, GEN TRACK (Spur wieder
+  generativ), **REC** (Noten vom MIDI-Eingang an der Abspielposition; Rechtsklick › MIDI input).
+- **Raster (Drums, Chop):** Klick setzt / löscht, Ziehen malt / radiert, Mausrad = Velocity. Klick auf den Zeilennamen
+  wählt die Stimme für die VEL/CHANCE-Spur.
+- **Piano-Roll:** Klick setzt eine Note (Ziehen nach rechts = Länge), Note ziehen = verschieben, rechter Rand =
+  Länge, Doppelklick löscht. Tonleitertöne heller, Akkordtöne grünlich, die Akkorde stehen darüber.
+- **Rechtsklick auf Noten:** Roll 2–4× (Drums, Chop), Akzent, Slide, Pitch und Reverse (Chop), Velocity, Chance,
+  „nur jeden 2. Durchlauf“, Löschen; **Track tools** (rotieren, umkehren, doppelt / halb so schnell, transponieren,
+  Velocity zufällig / gleich).
+- **Tasten (Maus über dem Raster):** Shift + Ziehen = Rahmen, Strg + Klick = an-/abwählen, Strg+A / C / V / D,
+  Entf, Pfeile (Shift: Oktave / Takt), Alt + ←/→ = Nudge 1/24 Schritt, Strg+Z / Strg+Y.
+- **Eigene Länge und eigener Swing:** gelbe Endmarke ziehen (pro Drum-Stimme bzw. pro Spur, Doppelklick = wieder der
+  Loop); rechts die Swing-Felder hoch/runter ziehen (Doppelklick = wieder global).
+- **Bearbeitet:** Die erste Änderung an einer Spur macht aus dem, was DENS gerade zeigt, feste Noten. DENS wirkt
+  dann nicht mehr auf diese Spur, NEW ALL lässt sie stehen; GEN TRACK macht sie wieder generativ.
+- **MIDI (Rechtsklick):** Export (alle Spuren oder nur die gewählte, ohne Dateifenster), Import einer MIDI-Datei
+  (Spuren nach Name oder Kanal: 10 Drums, 1 Bass, 2 Melodie, 3 Pads, 4 Chop).
+
 ## Noch nicht drin (Merkliste)
 
 - **Wellenform-Display:** Schnitte verschieben (Einrasten am Nulldurchgang), setzen (Doppelklick), entfernen
@@ -88,6 +117,8 @@ ohne Dateifenster in den MIDI-Ordner aller GENRA-Module), MIDI-Eingang, Clock-Au
   Basis), `src/hh/Styles.cpp`: die 29 Stile, `src/hh/Chop.*`: WAV lesen/schreiben, Schnitt (Spectral Flux),
   12-Ton-Fingerabdruck pro Chop, Akkorde (Vorlagen-Vergleich), Tonart (Krumhansl-Profile). Ohne Rack testbar:
   `test/hh_test.cpp` (läuft im Build mit).
-- `src/HipHop.cpp`: Modul und Panel-Teile, `src/Export.*`: MIDI-Datei und Ordner.
+- `src/HipHopModule.hpp`: das Modul (mit der Austausch-Schnittstelle fürs Grid), `src/HipHop.cpp`: sein Panel,
+  `src/HipHopUI.hpp`: gemeinsamer Look, `src/GridHH.cpp`: der Grid-Editor, `src/Export.*`: MIDI-Datei und Ordner.
+- `tools/grid_panel.py` schreibt `res/GridHH.svg` und `src/GridHHLayout.hpp`.
 - `tools/hiphop_panel.py` schreibt `res/HipHop.svg`, die Knöpfe und `src/HipHopLayout.hpp`; prüft, dass sich keine
   Schrift überlappt. Vorschau: `python3 tools/hiphop_panel.py --preview docs/hiphop.png`.

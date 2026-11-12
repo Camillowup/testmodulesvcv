@@ -100,6 +100,8 @@ struct Hit {
 	float prio = 0.f;  // DENS shows it when prio <= DENS
 	float off = 0.f;   // timing, in steps (-0.45 .. 0.45)
 	uint8_t ratchet = 1; // hits in the step (trap rolls)
+	float chance = 1.f;  // 0..1: how likely it plays (GRID HH)
+	uint8_t cond = 0;    // 1: only every 2nd time round
 };
 struct Note {
 	int8_t pitch = -1; // MIDI note, -1: none
@@ -108,11 +110,15 @@ struct Note {
 	float prio = 0.f;
 	float off = 0.f;
 	bool acc = false, slide = false;
+	float chance = 1.f;
+	uint8_t cond = 0;
 };
 struct PadEv {
 	int8_t pitch[PAD_VOICES] = {-1, -1, -1, -1};
 	float len = 4.f, vel = 0.7f, prio = 0.f, off = 0.f;
 	float mod = 0.f;
+	float chance = 1.f;
+	uint8_t cond = 0;
 };
 struct ChopEv {
 	int8_t pad = -1;   // -1: none
@@ -123,6 +129,8 @@ struct ChopEv {
 	bool rev = false;
 	uint8_t ratchet = 1;
 	float prio = 0.f;
+	float chance = 1.f;
+	uint8_t cond = 0;
 };
 struct Pattern {
 	Hit drum[DRUMS][LEN];
@@ -131,6 +139,13 @@ struct Pattern {
 	PadEv pad[LEN];
 	ChopEv chop[LEN];
 	Chord bar[BARS]; // the chords per bar
+	// from GENRA GRID HH
+	uint8_t lenTrack[NUM_TRACKS] = {0, 0, 0, 0, 0}; // own length in steps (0: the loop, 64)
+	uint8_t lenDrum[DRUMS] = {0, 0, 0, 0, 0, 0, 0, 0};
+	float swTrack[NUM_TRACKS] = {0, 0, 0, 0, 0};    // own swing 0.5..0.75 (0: the module's SWING)
+	float swDrum[DRUMS] = {0, 0, 0, 0, 0, 0, 0, 0};
+	bool edited[NUM_TRACKS] = {false, false, false, false, false}; // fixed notes: DENS leaves them, NEW ALL keeps them
+	bool chordFollow = true; // edited bass / melody / pads move with new chords
 	void clear();
 };
 
@@ -172,6 +187,13 @@ extern const char* const DRUM_MODES[3];
 
 /** The chord a pad stands for (the hand-set one, else the detected one; Q_NONE if neither). */
 Chord padChord(const SampleInfo& si, const PadSet* ps, int pad);
+
+/** The scale the style plays in the key (a major key with a minor style plays major and the other way round). */
+int scaleOf(const Settings& set);
+bool inScale(int note, int scale, int keyRoot);
+int snapToScale(int note, int scale, int keyRoot);
+/** Chord tones as pitch classes (up to 5); returns the count. */
+int tonesOf(const Chord& c, int* out);
 
 /** NEW: roll the base of one track (or all: track -1). `lockChords`: keep the bars' chords. */
 void generate(Pattern& p, int track, const Settings& set, const SampleInfo& si, const PadSet* pads, uint32_t seed,

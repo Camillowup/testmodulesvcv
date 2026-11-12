@@ -1,7 +1,7 @@
 {
   "slug": "GenraHipHop",
   "name": "GENRA HipHop",
-  "version": "2.0.2",
+  "version": "2.1.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -23,6 +23,15 @@
         "Drum",
         "Random",
         "Polyphonic"
+      ]
+    },
+    {
+      "slug": "GenraGridHH",
+      "name": "GENRA GRID HH",
+      "description": "The grid editor for GENRA HIP-HOP: drum and chop raster, piano roll for bass, melody and pads, velocity and chance, own length and swing per track, track tools, REC MIDI, MIDI export and import",
+      "tags": [
+        "Sequencer",
+        "Utility"
       ]
     }
   ]
