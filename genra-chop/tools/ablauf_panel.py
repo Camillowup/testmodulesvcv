@@ -104,10 +104,10 @@ for r in range(4):
     for c in range(4):
         comp(f"PAD{r * 4 + c}", PX0 + 2.3 + c * (PAD_SIZE + PAD_GAP), 23.0 + r * (PAD_SIZE + PAD_GAP), PAD_SIZE, PAD_SIZE)
 comp("PADINFO", PX0 + 2.3, 81.2, 4 * PAD_SIZE + 3 * PAD_GAP, 3.4)
-text(PX0 + 3, 86.6, "VARIATION RENEWS", 1.3, CREAM, 700, "start", 0.3)
-RW = (4 * PAD_SIZE + 3 * PAD_GAP - 4 * 0.8) / 5
-for i in range(5):
-    comp(f"RENEW{i}", PX0 + 2.3 + i * (RW + 0.8), 88.0, RW, 5.8)
+# CLEAR (then a pad: that pad empty) | CLEAR ALL (twice: all 64 pads empty); VARIATION RENEWS is gone
+CW2 = (4 * PAD_SIZE + 3 * PAD_GAP - 0.8) / 2
+comp("CLEAR", PX0 + 2.3, 86.4, CW2, 6.6)
+comp("CLEARALL", PX0 + 2.3 + CW2 + 0.8, 86.4, CW2, 6.6)
 
 # ---------------------------------------------------------------- the song
 SX = 69.0

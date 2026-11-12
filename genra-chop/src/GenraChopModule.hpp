@@ -35,11 +35,11 @@ struct Loader {
 	~Loader() { delete done.exchange(nullptr); }
 };
 
-inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, bool keepPattern) {
+inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, bool keepPattern, int count = DEFAULT_CHOPS) {
 	L->busy = true;
 	L->keepPattern = keepPattern;
 	L->say("loading " + path, false);
-	std::thread([L, path, mode]() {
+	std::thread([L, path, mode, count]() {
 		ChopSet* cs = new ChopSet();
 		std::string err;
 		bool ok = false;
@@ -50,7 +50,7 @@ inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, boo
 			if (ok) {
 				cs->data.path = path;
 				cs->data.name = system::getStem(path);
-				analyse(*cs, mode);
+				analyse(*cs, mode, count);
 				L->say(string::f("analysed: %d chops, %.1f s", cs->info.count, cs->data.frames() / cs->data.sampleRate), false);
 				if (cs->info.count <= 0) {
 					ok = false;
@@ -80,17 +80,17 @@ inline void startLoad(std::shared_ptr<Loader> L, std::string path, int mode, boo
 	}).detach();
 }
 
-/** Re-cut a loaded sample in another mode (a copy of its audio). */
-inline void startRecut(std::shared_ptr<Loader> L, const ChopSet* from, int mode) {
+/** Re-cut a loaded sample in another mode / into another number of chops (a copy of its audio). */
+inline void startRecut(std::shared_ptr<Loader> L, const ChopSet* from, int mode, int count) {
 	if (!from)
 		return;
 	L->busy = true;
 	L->keepPattern = false;
 	SampleData data = from->data;
-	std::thread([L, data, mode]() {
+	std::thread([L, data, mode, count]() {
 		ChopSet* cs = new ChopSet();
 		cs->data = data;
-		analyse(*cs, mode);
+		analyse(*cs, mode, count);
 		delete L->done.exchange(cs);
 		L->busy = false;
 	}).detach();
@@ -343,7 +343,7 @@ struct GenraChop : Module {
 		BRK_PARAM,
 		MUTATE_PARAM,
 		PITCH_PARAM,
-		DUST_PARAM,
+		CHOPS_PARAM, // how many chops (4..64); was DUST
 		ENUMS(DENS_PARAM, 4),
 		ENUMS(TK2_PARAM, 4), // CHOP (drums, melody, pads), OCT (bass)
 		MOVE_PARAM,          // the start of the chop last played by hand (ms)
@@ -419,12 +419,14 @@ struct GenraChop : Module {
 	int cvNext = 0;
 	SVoice bv[4];
 	int bvNext = 0;
-	float lpL = 0.f, lpR = 0.f;
 	float rootPhase = 0.f;
 	std::atomic<bool> rootHeld{false};
 	// CLEAR: pressed alone = the whole chop pattern, held + a pad = only that pad's hits
 	std::atomic<bool> clearHeld{false}, clearUsed{false};
-	std::atomic<int> reqClear{0}; // bit per pad, bit 16: all
+	std::atomic<uint64_t> reqClearPads{0}; // bit per pad
+	std::atomic<bool> reqClearAll{false};
+	std::atomic<int> bank{0}; // the pads on the panel: bank A-D (16 each)
+	int cutCount = DEFAULT_CHOPS; // UI thread: the CHOPS the sample was last cut into
 	// MOVE: per pad, how far its start is moved (ms); the cut as analysed is kept to move from
 	float moveMs[PADS] = {};
 	size_t baseStart[PADS] = {}, baseEnd[PADS] = {};
@@ -468,7 +470,8 @@ struct GenraChop : Module {
 		configParam(BRK_PARAM, 0.f, 1.f, 0.8f, "Break level", "%", 0.f, 100.f);
 		configParam(MUTATE_PARAM, 0.f, 1.f, 0.f, "Mutate (chops changed every 4 bars)", "%", 0.f, 100.f);
 		configParam(PITCH_PARAM, -12.f, 12.f, 0.f, "Pitch of all chops", " semitones")->snapEnabled = true;
-		configParam(DUST_PARAM, 0.f, 1.f, 0.f, "Dust (vinyl, 12 bit, dark)", "%", 0.f, 100.f);
+		configParam(CHOPS_PARAM, (float) MIN_CHOPS, (float) PADS, (float) DEFAULT_CHOPS, "Chops (how many the sample is cut into)")
+		    ->snapEnabled = true;
 		configParam(MOVE_PARAM, -250.f, 250.f, 0.f, "Move the start of the chop last played (hit a pad first)", " ms");
 		const char* TN[4] = {"Drums", "Bass", "Melody", "Pads"};
 		for (int t = 0; t < 4; t++) {
@@ -808,12 +811,13 @@ struct GenraChop : Module {
 		}
 		if (reqRender.exchange(false))
 			dirty = true;
-		int rc = reqClear.exchange(0);
-		if (rc) {
+		uint64_t rc = reqClearPads.exchange(0);
+		bool rcAll = reqClearAll.exchange(false);
+		if (rc || rcAll) {
 			pushUndo();
 			for (int s = 0; s < LEN; s++) {
 				int pd = pat.chop[s].pad;
-				if (pd >= 0 && ((rc & (1 << 16)) || (rc & (1 << pd))))
+				if (pd >= 0 && (rcAll || (rc & ((uint64_t) 1 << pd))))
 					pat.chop[s] = ChopEv();
 			}
 			dirty = true;
@@ -995,7 +999,7 @@ struct GenraChop : Module {
 		outputs[PAD_OUTPUT + 2].setVoltage(padVel);
 		padMod = std::min(10.f, padMod + padModInc);
 		outputs[PAD_OUTPUT + 3].setVoltage(padMod);
-		// ---- the chops, through the dust
+		// ---- the chops (the vinyl and the dust: GENRA CHOP FX)
 		float L = 0.f, R = 0.f;
 		for (SVoice& v : cv)
 			v.next(sr, L, R);
@@ -1005,21 +1009,6 @@ struct GenraChop : Module {
 			rootPhase -= std::floor(rootPhase);
 			float y = 0.25f * std::sin(2.f * (float) M_PI * rootPhase);
 			L += y, R += y;
-		}
-		float dust = params[DUST_PARAM].getValue();
-		if (dust > 0.f) {
-			float fc = 18000.f * std::pow(3000.f / 18000.f, dust);
-			float a = 1.f - std::exp(-2.f * (float) M_PI * fc / sr);
-			lpL += (L - lpL) * a, lpR += (R - lpR) * a;
-			L = lpL, R = lpR;
-			float q = std::pow(2.f, 15.f - 7.f * dust);
-			L = std::round(L * q) / q, R = std::round(R * q) / q;
-			if (random::uniform() < dust * 0.0004f) {
-				float c = (random::uniform() - 0.5f) * 0.25f * dust;
-				L += c, R += c;
-			}
-			float hiss = (random::uniform() - 0.5f) * 0.004f * dust;
-			L += hiss, R += hiss;
 		}
 		float vol = 5.f * params[VOL_PARAM].getValue();
 		outputs[CHOP_L_OUTPUT].setVoltage(clamp(L * vol, -12.f, 12.f));
@@ -1114,7 +1103,7 @@ struct GenraChop : Module {
 			return;
 		if (clearHeld) {
 			// CLEAR held: this pad's hits leave the pattern
-			reqClear.fetch_or(1 << pad);
+			reqClearPads.fetch_or((uint64_t) 1 << pad);
 			clearUsed = true;
 			return;
 		}
@@ -1178,6 +1167,7 @@ struct GenraChop : Module {
 		json_object_set_new(r, "padMode", json_integer(set.padMode));
 		json_object_set_new(r, "drumMode", json_integer(set.drumMode));
 		json_object_set_new(r, "chopMode", json_integer(chopMode));
+		json_object_set_new(r, "bank", json_integer(bank.load()));
 		json_object_set_new(r, "lockChords", json_boolean(lockChords));
 		json_object_set_new(r, "clockDiv", json_integer(clockDiv));
 		json_object_set_new(r, "bakeChops", json_boolean(bakeChops));
@@ -1219,6 +1209,9 @@ struct GenraChop : Module {
 		set.padMode = clamp(geti(r, "padMode", 0), 0, 2);
 		set.drumMode = clamp(geti(r, "drumMode", 0), 0, 2);
 		chopMode = clamp(geti(r, "chopMode", 0), 0, NUM_CHOP_MODES - 1);
+		bank = clamp(geti(r, "bank", 0), 0, PADS / 16 - 1);
+		if (!json_object_get(r, "bank"))
+			params[CHOPS_PARAM].setValue((float) DEFAULT_CHOPS); // a patch from before CHOPS: this knob was DUST
 		lockChords = getb(r, "lockChords", false);
 		clockDiv = geti(r, "clockDiv", 1);
 		if (clockDiv != 1 && clockDiv != 6 && clockDiv != 12)
@@ -1246,8 +1239,10 @@ struct GenraChop : Module {
 		dirty = true;
 		json_t* js = json_object_get(r, "sample");
 		samplePath = js ? json_string_value(js) : "";
-		if (!samplePath.empty() && system::isFile(samplePath))
-			startLoad(loader, samplePath, chopMode, true);
+		if (!samplePath.empty() && system::isFile(samplePath)) {
+			cutCount = chopsWanted();
+			startLoad(loader, samplePath, chopMode, true, cutCount);
+		}
 		json_t* jb = json_object_get(r, "break");
 		breakPath = jb ? json_string_value(jb) : "";
 		if (!breakPath.empty() && system::isFile(breakPath))
@@ -1277,7 +1272,8 @@ struct GenraChop : Module {
 			return;
 		samplePath = p;
 		std::free(p);
-		startLoad(loader, samplePath, chopMode, false);
+		cutCount = chopsWanted();
+		startLoad(loader, samplePath, chopMode, false, cutCount);
 	}
 	void loadBreak() {
 		std::string dir = breakPath.empty() ? (samplePath.empty() ? hhx::sampleFolder() : system::getDirectory(samplePath))
@@ -1300,14 +1296,25 @@ struct GenraChop : Module {
 			return;
 		}
 		samplePath = p;
-		startLoad(loader, samplePath, chopMode, false);
+		cutCount = chopsWanted();
+		startLoad(loader, samplePath, chopMode, false, cutCount);
 	}
+	int chopsWanted() { return clamp((int) std::round(params[CHOPS_PARAM].getValue()), MIN_CHOPS, PADS); }
 	void setChopMode(int m) {
 		if (m == chopMode)
 			return;
 		chopMode = m;
+		cutCount = chopsWanted();
 		if (const ChopSet* c = uiChops.load())
-			startRecut(loader, c, m);
+			startRecut(loader, c, m, cutCount);
+	}
+	/** UI thread: CHOPS turned (and resting): cut the sample anew into that many. */
+	void setChopCount(int n) {
+		if (n == cutCount || loader->busy)
+			return;
+		cutCount = n;
+		if (const ChopSet* c = uiChops.load())
+			startRecut(loader, c, chopMode, n);
 	}
 	std::string saveChops() {
 		const ChopSet* c = uiChops.load();

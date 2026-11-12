@@ -5,6 +5,7 @@ RACK_DIR ?= ../..
 
 SOURCES += $(wildcard src/*.cpp)
 SOURCES += $(wildcard src/hh/*.cpp)
+SOURCES += $(wildcard src/fx/*.cpp)
 
 DISTRIBUTABLES += res
 DISTRIBUTABLES += $(wildcard LICENSE*)

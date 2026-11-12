@@ -42,13 +42,14 @@ struct HHButton : widget::OpaqueWidget {
 	NVGcolor col = C_GRAPH, textCol = C_CREAM;
 	std::function<void()> act, release;
 	std::function<bool()> lit, learning;
+	std::function<NVGcolor()> colOf, textColOf; // colours that change (else col / textCol)
 	std::function<void(ui::Menu*)> rightMenu;
 	float fontSize = 9.5f;
 	int symbol = 0; // 1 play triangle, 2 stop square (before the text)
 	bool down = false;
 	void draw(const DrawArgs& args) override {
 		bool on = lit && lit();
-		NVGcolor c = col;
+		NVGcolor c = colOf ? colOf() : col;
 		if (down)
 			c = nvgLerpRGBA(c, nvgRGB(0, 0, 0), 0.25f);
 		nvgBeginPath(args.vg);
@@ -63,9 +64,21 @@ struct HHButton : widget::OpaqueWidget {
 			nvgStroke(args.vg);
 		}
 		float tx = box.size.x / 2;
+		// the label always fits: smaller when it would reach past the button (with a little edge)
+		float fs = fontSize;
+		std::shared_ptr<window::Font> font = uiBold();
+		if (font && !text.empty()) {
+			nvgFontFaceId(args.vg, font->handle);
+			nvgFontSize(args.vg, fs);
+			nvgTextLetterSpacing(args.vg, 0.4f);
+			float tw = nvgTextBounds(args.vg, 0, 0, text.c_str(), NULL, NULL);
+			float avail = box.size.x - 8.f - (symbol ? 9.f : 0.f);
+			if (tw > avail && avail > 4.f)
+				fs = std::max(5.f, fs * avail / tw);
+		}
 		if (symbol) {
 			nvgFontFaceId(args.vg, uiBold()->handle);
-			nvgFontSize(args.vg, 9.5f);
+			nvgFontSize(args.vg, fs);
 			nvgTextLetterSpacing(args.vg, 0.4f);
 			float tw = nvgTextBounds(args.vg, 0, 0, text.c_str(), NULL, NULL);
 			float x0 = (box.size.x - tw - 9.f) / 2, y = box.size.y / 2;
@@ -82,7 +95,7 @@ struct HHButton : widget::OpaqueWidget {
 			nvgFill(args.vg);
 			tx = x0 + 9.f + tw / 2;
 		}
-		label(args.vg, uiBold(), tx, box.size.y / 2 + 0.5f, text, fontSize, textCol);
+		label(args.vg, uiBold(), tx, box.size.y / 2 + 0.5f, text, fs, textColOf ? textColOf() : textCol);
 		if (learning && learning())
 			learnRing(args.vg, box.size.x, box.size.y);
 	}

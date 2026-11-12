@@ -8,7 +8,7 @@
 
 namespace hh {
 
-const char* const CHOP_MODES[NUM_CHOP_MODES] = {"Transient", "Equal 16", "Equal 8"};
+const char* const CHOP_MODES[NUM_CHOP_MODES] = {"Transient", "Equal"};
 
 // ---------------------------------------------------------------- WAV
 static uint32_t rd32(const uint8_t* p) { return p[0] | (p[1] << 8) | (p[2] << 16) | ((uint32_t) p[3] << 24); }
@@ -232,8 +232,12 @@ static std::vector<std::pair<size_t, float>> onsets(const std::vector<float>& m,
 static void cut(ChopSet& cs, const std::vector<float>& m) {
 	size_t total = cs.data.frames();
 	std::vector<size_t> st;
-	if (cs.mode == CM_EQUAL16 || cs.mode == CM_EQUAL8) {
-		int n = cs.mode == CM_EQUAL16 ? 16 : 8;
+	int want = std::max(MIN_CHOPS, std::min(PADS, cs.want));
+	if (cs.mode == CM_EQUAL) {
+		int n = want;
+		// never shorter than 20 ms
+		while (n > 1 && total / (size_t) n < (size_t) (0.02f * cs.data.sampleRate))
+			n--;
 		for (int i = 0; i < n; i++)
 			st.push_back(total * i / n);
 	}
@@ -242,7 +246,7 @@ static void cut(ChopSet& cs, const std::vector<float>& m) {
 		std::vector<std::pair<size_t, float>> on = onsets(m, cs.data.sampleRate);
 		size_t minLen = (size_t) (0.06f * cs.data.sampleRate);
 		for (auto& o : on) {
-			if ((int) st.size() >= PADS)
+			if ((int) st.size() >= want)
 				break;
 			bool close = false;
 			for (size_t s : st)
@@ -252,15 +256,15 @@ static void cut(ChopSet& cs, const std::vector<float>& m) {
 				st.push_back(o.first);
 		}
 		std::sort(st.begin(), st.end());
-		// fewer than 16: split the longest in half (while they are long enough)
-		while ((int) st.size() < PADS) {
+		// fewer than asked: split the longest in half (while they are long enough)
+		while ((int) st.size() < want) {
 			size_t best = 0, bestLen = 0;
 			for (size_t i = 0; i < st.size(); i++) {
 				size_t e = i + 1 < st.size() ? st[i + 1] : total;
 				if (e - st[i] > bestLen)
 					bestLen = e - st[i], best = i;
 			}
-			if (bestLen < (size_t) (0.3f * cs.data.sampleRate))
+			if (bestLen < (size_t) ((want > 16 ? 0.12f : 0.3f) * cs.data.sampleRate))
 				break;
 			st.insert(st.begin() + best + 1, st[best] + bestLen / 2);
 		}
@@ -357,8 +361,9 @@ void findHarmony(ChopSet& cs) {
 	cs.info.keyConf = std::max(0.f, std::min(1.f, (best - second) * 5.f + best * 0.5f));
 }
 
-void analyse(ChopSet& cs, int mode) {
+void analyse(ChopSet& cs, int mode, int count) {
 	cs.mode = mode;
+	cs.want = count;
 	std::vector<float> m = monoOf(cs.data);
 	float sr = cs.data.sampleRate;
 	cut(cs, m);

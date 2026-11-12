@@ -8,4 +8,5 @@ void init(Plugin* p) {
 	p->addModel(modelGenraChop);
 	p->addModel(modelChopGrid);
 	p->addModel(modelChopAblauf);
+	p->addModel(modelChopFx);
 }

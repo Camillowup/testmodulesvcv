@@ -90,8 +90,9 @@ rect(bx, 3.3, 1.3, 7.2, RED, 0.2)
 text(bx + 2.8, 6.0, "CHOP", 1.9, INK_DIM, 700, "start", 0.35)
 text(bx + 2.8, 9.6, "PRODUCTION CENTER", 1.9, INK_DIM, 700, "start", 0.35)
 # PLAY and the four header knobs
-comp("STOP", 103.6, 3.3, 11.6, 6.6)
-comp("PLAY", 116.2, 3.3, 11.6, 6.6)
+# STOP and PLAY bigger (14.6 x 8.4 mm), easier to find and to hit
+comp("STOP", 101.4, 2.4, 14.6, 8.4)
+comp("PLAY", 117.0, 2.4, 14.6, 8.4)
 for name, x, label in (("BPM", 141.5, "BPM"), ("SWING", 155.0, "SWING"), ("VOL", 168.5, "CHOP"), ("BRK", 182.0, "BREAK")):
     comp(name, x, 6.0)
     text(x, 12.6, label, 1.45, INK, 700)
@@ -104,18 +105,24 @@ for name, x0, x1 in (("ERA", 4, 25), ("STYLE", 27, 73), ("KEY", 75, 96)):
     comp(name, x0, 33.2, x1 - x0, 6.2)
 
 rect(3, 41.2, 51.5, 50.6, SECTION, 1.2, EDGE)
-PAD_SIZE, PAD_GAP = 11.5, 1.0
+PAD_SIZE, PAD_GAP = 10.6, 0.8
+PADS_W = 4 * PAD_SIZE + 3 * PAD_GAP
+PX0 = 3 + (51.5 - PADS_W) / 2
 for r in range(4):
     for c in range(4):
-        x = 4.0 + c * (PAD_SIZE + PAD_GAP)
-        y = 42.2 + r * (PAD_SIZE + PAD_GAP)
+        x = PX0 + c * (PAD_SIZE + PAD_GAP)
+        y = 42.0 + r * (PAD_SIZE + PAD_GAP)
         comp(f"PAD{r * 4 + c}", x, y, PAD_SIZE, PAD_SIZE)
+# the pad banks A-D (64 chops) under the pads
+BKW = (PADS_W - 3 * PAD_GAP) / 4
+for i in range(4):
+    comp(f"BANK{i}", PX0 + i * (BKW + PAD_GAP), 87.2, BKW, 4.0)
 
 rect(55.5, 41.2, 41.5, 50.6, SECTION, 1.2, EDGE)
 text(57.0, 46.6, "CHOP", 2.0, INK, 900, "start", 0.3)
 rect(67, 42.4, 29, 6.2, GRAPH, 0.8)
 comp("MODE", 67, 42.4, 29, 6.2)
-for name, x, label in (("MUTATE", 61.4, "MUTATE"), ("PITCH", 71.3, "PITCH"), ("DUST", 81.2, "DUST"), ("MOVE", 91.1, "MOVE")):
+for name, x, label in (("MUTATE", 61.4, "MUTATE"), ("PITCH", 71.3, "PITCH"), ("CHOPS", 81.2, "CHOPS"), ("MOVE", 91.1, "MOVE")):
     comp(name, x, 56.4)
     text(x, 64.1, label, 1.45, INK, 700)
 BW, BG = 9.4, 0.8
@@ -261,7 +268,7 @@ if "--preview" in sys.argv:
     CHORDS = ["F#m7", "Bm9", "Dmaj", "C#7", "F#m", "Am7", "E", "Bm"]
     for k, v in comps.items():
         if len(v) == 2:
-            big = k in ("MUTATE", "PITCH", "DUST", "MOVE") or k.startswith(("DENS", "TK2_"))
+            big = k in ("MUTATE", "PITCH", "CHOPS", "MOVE") or k.startswith(("DENS", "TK2_"))
             hdr = k in ("BPM", "SWING", "VOL", "BRK")
             if big or hdr:
                 r = 4.2 if big else 3.3
@@ -277,6 +284,10 @@ if "--preview" in sys.argv:
                 text(x + w / 2, y + 3.0, str(i + 1), 1.5, INK_DIM, 700, check=False)
                 if i < 8:
                     text(x + w / 2, y + h / 2 + 1.6, CHORDS[i], 2.1, INK, 700, check=False)
+            elif k.startswith("BANK"):
+                i = int(k[4:])
+                e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.6" fill="{RED if i == 0 else GRAPH}"/>')
+                text(x + w / 2, y + h / 2 + 0.55, "ABCD"[i], 1.5, CREAM, 700, check=False)
             elif k in LABELS:
                 col = RED if k in ("REC", "NEWALL", "PLAY") else (YELLOW if k == "LOAD" else GRAPH)
                 e(f'<rect x="{x}" y="{y}" width="{w}" height="{h}" rx="0.8" fill="{col}"/>')

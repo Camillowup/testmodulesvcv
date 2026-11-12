@@ -25,12 +25,15 @@ bool readWav(const std::vector<uint8_t>& buf, SampleData& out, std::string& err,
 /** A stereo 24-bit WAV of the frames [a, b), reversed and/or pitched (resampled, plain linear) if asked. */
 std::vector<uint8_t> writeWav(const SampleData& s, size_t a, size_t b, bool reverse, int semitones);
 
-enum ChopMode { CM_TRANSIENT, CM_EQUAL16, CM_EQUAL8, NUM_CHOP_MODES };
+// Transient: the strongest attacks; Equal: parts of the same length. How many: CHOPS (4..64).
+enum ChopMode { CM_TRANSIENT, CM_EQUAL, NUM_CHOP_MODES };
+static const int MIN_CHOPS = 4, DEFAULT_CHOPS = 16;
 extern const char* const CHOP_MODES[NUM_CHOP_MODES];
 
 struct ChopSet {
 	SampleData data;
 	int mode = CM_TRANSIENT;
+	int want = DEFAULT_CHOPS; // how many chops were asked for (info.count: how many there are)
 	size_t start[PADS] = {}, end[PADS] = {};
 	SampleInfo info;
 	float chroma[PADS][12] = {};
@@ -39,8 +42,8 @@ struct ChopSet {
 	int voicePad[DRUMS] = {-1, -1, -1, -1, -1, -1, -1, -1};
 };
 
-/** Cut and analyse. */
-void analyse(ChopSet& cs, int mode);
+/** Cut (into `count` chops, 4..64) and analyse. */
+void analyse(ChopSet& cs, int mode, int count = DEFAULT_CHOPS);
 /** The chords and the key again (after the cut is the same but e.g. nothing else changed): part of analyse(). */
 void findHarmony(ChopSet& cs);
 

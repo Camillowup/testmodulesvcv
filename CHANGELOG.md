@@ -2,6 +2,19 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### GENRA CHOP 2.3.0 (eigenes Plugin in `genra-chop/`)
+- **GENRA CHOP FX** (neu, 22 HP): zwei Effekt-Busse zum Live-Spielen nach Vorbild SP-404, 37 Effekte in sechs Gruppen
+  (TEXTURE, FILTER, DRIVE, SPACE, MOD, PERFORM), CTRL 1–3 pro Bus, FX ON (antippen = an/aus, halten = solange
+  gehalten), sechs frei belegbare Schnelltasten, 20 Presets, ROUTE 1>2 / 2>1 / parallel, Tempo von einer 16tel-Clock,
+  CV, MIDI learn. Kabelloses Verbinden ist vorbereitet (noch nicht drin). Engine-Test `test/fx_test.cpp` im Build.
+- **GENRA CHOP:** DUST ist weg, an seiner Stelle **CHOPS** (4 bis 64 Chops, ruht der Regler, wird neu geschnitten);
+  Pads in **Banks A–D** (64 Chops, MIDI C1 = Pad 1 bis Pad 64); MODE nur noch Transient / Equal; **STOP und PLAY
+  grösser** (14,6 × 8,4 mm). Alte 2.2.0-Patches laden (CHOPS startet dann bei 16).
+- **Taster-Schrift** passt sich in allen drei bisherigen Modulen automatisch an (LOAD SAMPLE ragte hinaus).
+- **GENRA CHOP ABLAUF:** VARIATION RENEWS weg (jeder Druck auf einen Teil = neues Pattern; Bass, Melodie, Pads neu,
+  Drums und Chop vom Original); darunter **CLEAR** (dann ein Pad) und **CLEAR ALL** (zweimal), UNDO holt zurück.
+- **GENRA CHOP GRID:** schwarze Tasten links schwarz; das Chop-Raster hat so viele Zeilen wie Chops (mind. 16).
+
 ### GENRA CHOP 2.2.0 (eigenes Plugin in `genra-chop/`)
 - **Umbenannt:** GENRA HipHop heisst **GENRA CHOP** (Slug `GenraChop`, Ordner `genra-chop/`), der Grid-Editor
   **GENRA CHOP GRID**. Alte Test-Patches laden nicht mehr.

@@ -10,10 +10,12 @@
 
 struct HHPad : widget::OpaqueWidget {
 	GenraChop* module = nullptr;
+	int slot = 0; // 0..15 on the panel; the chop: bank * 16 + slot
 	int idx = 0;
 	float flash = 0.f;
 	uint32_t seenTick = 0;
 	void step() override {
+		idx = (module ? module->bank.load() * 16 : 0) + slot;
 		if (module && module->lastPad.load() == idx && module->lastPadTick.load() != seenTick) {
 			seenTick = module->lastPadTick.load();
 			flash = 1.f;
@@ -236,6 +238,8 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 	float takenCheck = 0.f;
 	ml::Learner* learner() override { return &learn; }
 	float lastStop = -10.f;
+	int chopsSeen = -1;
+	float chopsRest = 0.f;
 	std::string note; // last export message
 	float noteTime = 0.f;
 
@@ -389,14 +393,31 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		};
 		learnField(key, "key", "KEY");
 		// the pads
-		for (int i = 0; i < PADS; i++) {
+		for (int i = 0; i < 16; i++) {
 			const float* r = i == 0 ? hhl::PAD0 : i == 1 ? hhl::PAD1 : i == 2 ? hhl::PAD2 : i == 3 ? hhl::PAD3 : i == 4 ? hhl::PAD4
 			                 : i == 5 ? hhl::PAD5 : i == 6 ? hhl::PAD6 : i == 7 ? hhl::PAD7 : i == 8 ? hhl::PAD8 : i == 9 ? hhl::PAD9
 			                 : i == 10 ? hhl::PAD10 : i == 11 ? hhl::PAD11 : i == 12 ? hhl::PAD12 : i == 13 ? hhl::PAD13
 			                 : i == 14 ? hhl::PAD14 : hhl::PAD15;
 			HHPad* p = at<HHPad>(r);
 			p->module = m;
+			p->slot = i;
 			p->idx = i;
+		}
+		// the pad banks A-D: 64 chops at most
+		const float* BK[4] = {hhl::BANK0, hhl::BANK1, hhl::BANK2, hhl::BANK3};
+		for (int i = 0; i < 4; i++) {
+			HHButton* b = button(BK[i], i == 0 ? "A" : i == 1 ? "B" : i == 2 ? "C" : "D", C_GRAPH, [=]() {
+				if (m)
+					m->bank = i;
+			});
+			b->fontSize = 8.f;
+			b->colOf = [=]() { return m && m->bank.load() == i ? C_RED : C_GRAPH; };
+			// a bank without chops (the sample has fewer) stays dim
+			b->textColOf = [=]() {
+				const ChopSet* c = m ? m->uiChops.load() : nullptr;
+				return (c && c->info.count <= i * 16) ? nvgRGB(0x77, 0x73, 0x6a) : C_CREAM;
+			};
+			learnButton(b, string::f("bank%d", i), string::f("PAD BANK %c", 'A' + i));
 		}
 		// CHOP
 		HHField* mode = at<HHField>(hhl::MODE);
@@ -411,7 +432,7 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		learnField(mode, "chopmode", "CHOP mode");
 		knob<HHKnob>(hhl::MUTATE, m, M::MUTATE_PARAM, "MUTATE");
 		knob<HHKnob>(hhl::PITCH, m, M::PITCH_PARAM, "PITCH");
-		knob<HHKnob>(hhl::DUST, m, M::DUST_PARAM, "DUST");
+		knob<HHKnob>(hhl::CHOPS, m, M::CHOPS_PARAM, "CHOPS");
 		knob<HHKnob>(hhl::MOVE, m, M::MOVE_PARAM, "MOVE", 0.25f);
 		// LOAD SAMPLE: big and yellow, right under the waveform (used often)
 		HHButton* load = button(hhl::LOAD, "LOAD SAMPLE", C_YELLOW, [=]() {
@@ -461,7 +482,7 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 				return;
 			m->clearHeld = false;
 			if (!m->clearUsed)
-				m->reqClear.fetch_or(1 << 16);
+				m->reqClearAll = true;
 		};
 		clr->lit = [=]() { return m && m->clearHeld; };
 		learnButton(clr, "clear", "CLEAR");
@@ -561,6 +582,19 @@ struct GenraChopWidget : ModuleWidget, ml::LearnHost {
 		if (GenraChop* m = dynamic_cast<GenraChop*>(module)) {
 			m->collectTrash();
 			learn.step();
+			// CHOPS: when it rests a moment on a new number, the sample is cut anew
+			int want = m->chopsWanted();
+			if (want != chopsSeen) {
+				chopsSeen = want;
+				chopsRest = 0.35f;
+			}
+			if (chopsRest > 0.f) {
+				chopsRest -= APP->window->getLastFrameDuration();
+				if (chopsRest <= 0.f && want != m->cutCount && m->loader->busy)
+					chopsRest = 0.1f; // still cutting: try again a little later
+				else if (chopsRest <= 0.f)
+					m->setChopCount(want);
+			}
 			// notes learned as controls: the pad input leaves them
 			takenCheck -= APP->window->getLastFrameDuration();
 			if (takenCheck <= 0.f) {

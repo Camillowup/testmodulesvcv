@@ -3,7 +3,9 @@
 //
 // PATTERNS: 64 places (banks A-D, 4 x 4 pads). An empty pad stores what GENRA CHOP plays ("GENRA 1", a new family);
 // a part button (INTRO, VERSE, HOOK, BRIDGE, BREAK, OUTRO) makes a variation of the family's original on the next free
-// pad ("HOOK 1", "HOOK 2" …) and plays it; VARIATION RENEWS picks the tracks that get new notes (chords stay).
+// pad ("HOOK 1", "HOOK 2" …) and plays it; every press makes a new one (as in GENRA's ABLAUF): bass, melody and pads
+// get new notes, drums and the chop track stay the original's (shaped by the part), the chords stay.
+// CLEAR, then a pad: that pad is empty. CLEAR ALL twice: all 64 pads are empty (the song list stays). UNDO brings them back.
 // SONG: a list of rows (pattern, bars, fill). MAKE SONG builds a song in the FORM (AUTO: the style's form) from the
 // selected pad's family, using variations that are there and making the missing ones. PATT | SONG: the mode. PLAY in
 // SONG starts at the selected row, in PATT the selected pad. One sample per song: the pads keep patterns, not samples.
@@ -25,7 +27,8 @@ static const NVGcolor FAMILY_COL[8] = {nvgRGB(0xc8, 0x31, 0x2b), nvgRGB(0x6f, 0x
 static const NVGcolor PART_COL[NUM_PARTS] = {nvgRGB(0xa9, 0xb9, 0x8c), nvgRGB(0x8f, 0x8a, 0x7c), nvgRGB(0xd6, 0xa6, 0x40),
                                              nvgRGB(0x9a, 0x6f, 0xa8), nvgRGB(0x6f, 0x8f, 0xa8), nvgRGB(0xc8, 0x7a, 0x4a)};
 static const int PART_BARS[NUM_PARTS] = {4, 16, 8, 8, 4, 4};
-static const char* const RENEW_NAMES[NUM_TRACKS] = {"DRUM", "BASS", "MEL", "PADS", "CHOP"};
+// what a part button rolls anew (fixed): bass, melody, pads
+static const int RENEW = (1 << T_BASS) | (1 << T_MEL) | (1 << T_PAD);
 
 struct Slot {
 	bool used = false;
@@ -55,7 +58,9 @@ struct ChopAblauf : Module {
 	std::atomic<int> selSlot{-1}, selRow{0};
 	std::atomic<bool> songMode{false};
 	int form = -1; // -1 AUTO
-	int renew = (1 << T_BASS) | (1 << T_MEL);
+	// CLEAR (UI thread): armed until a pad is tapped; CLEAR ALL: armed for a moment, the second press clears
+	bool clearArmed = false;
+	float clearAllArmed = 0.f;
 	bool loop = false;
 	int64_t linkedId = -1;
 	struct Snap {
@@ -540,7 +545,7 @@ struct ChopAblauf : Module {
 			return "All 64 pads are full";
 		const ChopSet* cs = c->uiChops.load();
 		Pattern out;
-		makePart(out, slots[orig].pat, part, renew, c->set, cs ? cs->info : SampleInfo(), c->pads, random::u32(), c->bpmNow());
+		makePart(out, slots[orig].pat, part, RENEW, c->set, cs ? cs->info : SampleInfo(), c->pads, random::u32(), c->bpmNow());
 		snapshot();
 		{
 			std::lock_guard<std::mutex> lk(dataM);
@@ -608,7 +613,7 @@ struct ChopAblauf : Module {
 				else {
 					const ChopSet* cs = c->uiChops.load();
 					Pattern out;
-					makePart(out, slots[orig].pat, part, renew, c->set, cs ? cs->info : SampleInfo(), c->pads, random::u32(),
+					makePart(out, slots[orig].pat, part, RENEW, c->set, cs ? cs->info : SampleInfo(), c->pads, random::u32(),
 					         c->bpmNow());
 					std::lock_guard<std::mutex> lk(dataM);
 					Slot& s = slots[dst];
@@ -667,6 +672,15 @@ struct ChopAblauf : Module {
 		for (Row& r : rows)
 			if (r.slot == i)
 				r.slot = -1;
+	}
+	/** CLEAR ALL: every pad empty; the song list stays as it is (its rows play nothing until their pads are filled). */
+	void clearAll() {
+		snapshot();
+		std::lock_guard<std::mutex> lk(dataM);
+		for (Slot& s : slots)
+			s = Slot();
+		families = 0;
+		selSlot = -1;
 	}
 
 	// ---------------------------------------------------------------- MIDI export (no dialog)
@@ -757,7 +771,6 @@ struct ChopAblauf : Module {
 		json_object_set_new(r, "selRow", json_integer(selRow));
 		json_object_set_new(r, "songMode", json_boolean(songMode));
 		json_object_set_new(r, "form", json_integer(form));
-		json_object_set_new(r, "renew", json_integer(renew));
 		json_object_set_new(r, "loop", json_boolean(loop));
 		json_object_set_new(r, "linkedId", json_integer(linkedId));
 		json_object_set_new(r, "families", json_integer(families));
@@ -791,7 +804,6 @@ struct ChopAblauf : Module {
 		selRow = std::max(0, gi("selRow", 0));
 		songMode = jbool(r, "songMode", false);
 		form = clamp(gi("form", -1), -1, NUM_FORMS - 1);
-		renew = gi("renew", renew) & 31;
 		loop = jbool(r, "loop", false);
 		linkedId = gi("linkedId", -1);
 		families = std::max(0, gi("families", 0));
@@ -1003,6 +1015,16 @@ void APad::onButton(const ButtonEvent& e) {
 	if (!m || e.action != GLFW_PRESS)
 		return;
 	int s = slot();
+	if (e.button == GLFW_MOUSE_BUTTON_LEFT && m->clearArmed) {
+		// CLEAR was pressed: this pad is emptied
+		m->clearArmed = false;
+		if (m->slots[s].used) {
+			m->clearSlot(s);
+			w->say(string::f("Pad %c%d cleared (UNDO brings it back)", 'A' + s / 16, s % 16 + 1));
+		}
+		e.consume(this);
+		return;
+	}
 	if (e.button == GLFW_MOUSE_BUTTON_LEFT) {
 		if (!m->slots[s].used)
 			w->say(m->storeHost(s));
@@ -1263,16 +1285,35 @@ struct ChopAblaufWidget : AblaufWidgetBase {
 		info->m = m;
 		info->msg = &msg;
 		info->msgTime = &msgTime;
-		const float* RN[5] = {cal::RENEW0, cal::RENEW1, cal::RENEW2, cal::RENEW3, cal::RENEW4};
-		for (int t = 0; t < NUM_TRACKS; t++) {
-			HHButton* b = button(RN[t], RENEW_NAMES[t], nvgRGB(0x55, 0x53, 0x4f), [=]() {
-				if (m)
-					m->renew ^= 1 << t;
-			}, string::f("renew%d", t));
-			b->fontSize = 7.5f;
-			b->lit = [=]() { return false; };
-			renewBtn[t] = b;
-		}
+		// CLEAR | CLEAR ALL under the pads
+		HHButton* clr = button(cal::CLEAR, "CLEAR", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+			if (!m)
+				return;
+			m->clearArmed = !m->clearArmed;
+			m->clearAllArmed = 0.f;
+			if (m->clearArmed)
+				say("CLEAR: tap the pad to empty");
+		}, "clear");
+		clr->colOf = [=]() { return m && m->clearArmed ? C_RED : nvgRGB(0x55, 0x53, 0x4f); };
+		HHButton* clrAll = button(cal::CLEARALL, "CLEAR ALL", nvgRGB(0x55, 0x53, 0x4f), [=]() {
+			if (!m)
+				return;
+			m->clearArmed = false;
+			if (m->clearAllArmed > 0.f) {
+				m->clearAllArmed = 0.f;
+				m->clearAll();
+				say("All 64 pads cleared (UNDO brings them back)");
+			}
+			else {
+				m->clearAllArmed = 2.5f;
+				say("CLEAR ALL: press again to empty all 64 pads");
+			}
+		}, "clearall");
+		clrAll->colOf = [=]() {
+			if (!m || m->clearAllArmed <= 0.f)
+				return nvgRGB(0x55, 0x53, 0x4f);
+			return (std::fmod(system::getTime(), 0.4) < 0.2) ? C_RED : nvgRGB(0x55, 0x53, 0x4f); // blinks: press again
+		};
 		// song
 		AMode* mode = at<AMode>(cal::MODE);
 		mode->m = m;
@@ -1341,7 +1382,6 @@ struct ChopAblaufWidget : AblaufWidgetBase {
 		addOutput(createOutputCentered<PJ301MPort>(Vec(cal::BAR_OUT[0], cal::BAR_OUT[1]), m, M::BAR_OUTPUT));
 		addOutput(createOutputCentered<PJ301MPort>(Vec(cal::ROW_OUT[0], cal::ROW_OUT[1]), m, M::ROW_OUTPUT));
 	}
-	HHButton* renewBtn[NUM_TRACKS] = {};
 
 	void learnField(HHField* f, const std::string& id, const std::string& lab) {
 		ml::Target t;
@@ -1397,9 +1437,8 @@ struct ChopAblaufWidget : AblaufWidgetBase {
 		if (m) {
 			findHost(m);
 			learn.step();
-			for (int t = 0; t < NUM_TRACKS; t++)
-				if (renewBtn[t])
-					renewBtn[t]->col = (m->renew & (1 << t)) ? C_RED : nvgRGB(0x55, 0x53, 0x4f);
+			if (m->clearAllArmed > 0.f)
+				m->clearAllArmed = std::max(0.f, m->clearAllArmed - (float) APP->window->getLastFrameDuration());
 		}
 		if (msgTime > 0.f)
 			msgTime -= APP->window->getLastFrameDuration();

@@ -23,7 +23,6 @@ static const char* const DRUM_NAME[DRUMS] = {"KICK", "SNARE", "CLAP", "RIM", "C.
 static const int GM_DRUM[DRUMS] = {36, 38, 39, 37, 42, 46, 45, 56};
 
 static bool isPiano(int t) { return t == T_BASS || t == T_MEL || t == T_PAD; }
-static int rowsOfRaster(int t) { return t == T_DRUMS ? DRUMS : PADS; }
 
 // ================================================================ the items of a track (one model for every track)
 struct Ref {
@@ -589,6 +588,13 @@ struct GridView : widget::OpaqueWidget {
 			rows.push_back(n);
 		return rows;
 	}
+	/** Rows of a raster: the drum voices, or the chops (as many as the sample has, at least 16). */
+	int rowsOfRaster(int t) const {
+		if (t == T_DRUMS)
+			return DRUMS;
+		const ChopSet* c = hh ? hh->uiChops.load() : nullptr;
+		return clamp(c ? c->info.count : 16, 16, PADS);
+	}
 	int rowCount(int t) const { return isPiano(t) ? (int) pianoRows(t).size() : rowsOfRaster(t); }
 	float rowH(int t) const { return rh() / std::max(1, rowCount(t)); }
 	/** Row index (top 0) of a row value (pitch / voice / pad), -1 if not visible. */
@@ -930,10 +936,16 @@ struct GridView : widget::OpaqueWidget {
 					lb = string::f("%s%d", NOTE_NAMES[((n % 12) + 12) % 12], n / 12 - 1);
 				}
 				bool hl = (t == T_DRUMS || t == T_CHOP) && m && m->laneVoice == i;
-				rectFill(vg, 0, y + 0.4f, KEYS, rhh - 0.8f, hl ? C_RED : C_CREAM, 1.5f);
+				// piano: the black keys black (light text)
+				bool blackKey = false;
+				if (isPiano(t)) {
+					int pc = ((pr[i] % 12) + 12) % 12;
+					blackKey = pc == 1 || pc == 3 || pc == 6 || pc == 8 || pc == 10;
+				}
+				rectFill(vg, 0, y + 0.4f, KEYS, rhh - 0.8f, hl ? C_RED : (blackKey ? nvgRGB(0x1e, 0x1d, 0x1c) : C_CREAM), 1.5f);
 				if (rhh >= 6.f)
-					label(vg, uiBold(), KEYS - 3.f, y + rhh / 2 + 0.5f, lb, std::min(7.5f, rhh - 1.f), hl ? C_CREAM : C_INK,
-					      NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
+					label(vg, uiBold(), KEYS - 3.f, y + rhh / 2 + 0.5f, lb, std::min(7.5f, rhh - 1.f),
+					      (hl || blackKey) ? C_CREAM : C_INK, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE);
 			}
 		}
 		// beat lines

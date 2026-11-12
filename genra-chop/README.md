@@ -2,8 +2,9 @@
 
 Ein Hip-Hop-Beat-Generator im Look einer alten Production Center (beiges Gehäuse, graue Pads, Akai-Rot, grünes LCD).
 Eigenes Plugin (**GENRA CHOP**, Slug `GenraChop`; bis 2.1.0 hiess es GENRA HipHop) unter der Marke **Genra**, liegt
-im Repo von GENRA Test im Unterordner `genra-chop/`. Drei Module in einer Datei: **GENRA CHOP** (38 HP),
-**GENRA CHOP GRID** (der Grid-Editor, 44 HP) und ab 2.2.0 **GENRA CHOP ABLAUF** (der Song-Arranger, 26 HP).
+im Repo von GENRA Test im Unterordner `genra-chop/`. Vier Module in einer Datei: **GENRA CHOP** (38 HP),
+**GENRA CHOP GRID** (der Grid-Editor, 44 HP), ab 2.2.0 **GENRA CHOP ABLAUF** (der Song-Arranger, 26 HP) und ab 2.3.0
+**GENRA CHOP FX** (zwei Effekt-Busse zum Live-Spielen nach Vorbild SP-404, 22 HP).
 Patches mit dem alten GENRA HipHop laden nicht mehr (neuer Slug).
 
 ![Panel](docs/genra_chop.png)
@@ -16,7 +17,7 @@ Rack-Benutzerordner legen (Rack › Help › Open user folder) und Rack neu star
 
 ## Bedienung
 
-**Kopf:** STOP hält an und springt auf Takt 1 (zweimal STOP schneidet auch Chops und Break ab), PLAY startet bei
+**Kopf:** STOP und PLAY (ab 2.3.0 grösser): STOP hält an und springt auf Takt 1 (zweimal STOP schneidet auch Chops und Break ab), PLAY startet bei
 Takt 1 (ohne Kabel im RUN-Eingang). **BPM**, **SWING** (50 % gerade bis 75 %), **CHOP**
 (Lautstärke der Chops) und **BREAK** (Lautstärke des Breaks).
 
@@ -33,15 +34,21 @@ Takt 1 (ohne Kabel im RUN-Eingang). **BPM**, **SWING** (50 % gerade bis 75 %), *
 Ein neuer Stil setzt BPM und Swing auf seine Werte und würfelt alles neu (mit UNDO zurück). **KEY Auto** nimmt die
 Tonart aus dem Sample; eine Tonart von Hand würfelt Akkorde, Bass, Melodie und Pads neu.
 
-**Pads (1–16):** jedes Pad ist ein Chop des Samples, mit dem erkannten Akkord (rot = von Hand gesetzt, HIT = ohne
+**Pads (1–64):** 16 Pads auf dem Panel, darunter die **Banks A–D** (Klick wählt; eine Bank ohne Chops ist
+blass). Jedes Pad ist ein Chop des Samples, mit dem erkannten Akkord (rot = von Hand gesetzt, HIT = ohne
 Tonhöhe). **Klick** spielt das Pad. **Rechtsklick:** Lock (bleibt bei NEW und MUTATE stehen), Reverse, Pitch
 (−12 bis +12) und Akkord (wie erkannt, keiner, oder von Hand). Unten auf dem Pad: L = Lock, R = Reverse, Pitch.
-Über MIDI spielbar (Rechtsklick › MIDI input; C1 = Pad 1, mit Anschlagstärke).
+Über MIDI spielbar (Rechtsklick › MIDI input; C1 = Pad 1 bis Pad 64, mit Anschlagstärke; die Banks wechseln am
+Controller nichts).
 
 **CHOP:**
-- **MODE:** Transient (an den Anschlägen geschnitten), Equal 16, Equal 8. Ein Wechsel schneidet neu.
+- **MODE:** Transient (an den stärksten Anschlägen geschnitten) oder Equal (gleich lange Teile). Ein Wechsel
+  schneidet neu.
+- **CHOPS** (ab 2.3.0, statt DUST): wie viele Chops, 4 bis 64 (Standard 16). Bleibt der Regler kurz stehen, wird das
+  Sample neu geschnitten (wie ein neuer MODE: das Chop-Pattern wird neu gewürfelt). Findet Transient weniger
+  Anschläge, werden die längsten Teile halbiert; was dann noch fehlt, bleibt leer (das Display zeigt die Anzahl).
 - **MUTATE:** wie viel der Chop-Spur sich alle vier Takte verändert (0 = steht).
-- **PITCH:** alle Chops zusammen in Halbtönen. **DUST:** Vinyl, 12 Bit, dunkler.
+- **PITCH:** alle Chops zusammen in Halbtönen. (DUST ist weg: Vinyl, Bits und Staub gibt es in GENRA CHOP FX.)
 - **MOVE:** verschiebt den Anfang des Chops, den du zuletzt angetippt hast (Maus oder MIDI), ±250 ms, rastet auf
   den nächsten Nulldurchgang ein. Der Chop davor endet dort, wo der verschobene beginnt. Im Wellenform-Fenster hat der
   Chop einen gelben Rahmen; der Regler zeigt immer den Wert des angetippten Pads. UNDO nimmt eine Drehung zurück.
@@ -103,7 +110,8 @@ steuern (z. B. Akai MPD218: Pads, Endlos-Regler).
 Bearbeitet das Pattern von GENRA CHOP Note für Note. **Verbindung:** direkt links oder rechts neben GENRA CHOP
 setzen (LINK leuchtet grün) oder Rechtsklick › *Connect to…*.
 
-- **TRACK:** DRUMS (Raster, 8 Stimmen), BASS, MEL, PADS (Piano-Roll), CHOP (Raster, 16 Pads mit Akkord).
+- **TRACK:** DRUMS (Raster, 8 Stimmen), BASS, MEL, PADS (Piano-Roll), CHOP (Raster, so viele Zeilen wie das Sample
+  Chops hat, mindestens 16, mit Akkord). Links in der Piano-Roll sind die schwarzen Tasten schwarz.
 - **VIEW:** BAR (erster sichtbarer Takt), ZOOM (1/2/4 Takte), PITCH (Tonbereich der Piano-Roll, pro Spur gemerkt),
   AUTO (Ansicht läuft mit). Oben rechts: **ALL / SCALE / USED** (welche Tonzeilen) und **ONE / GHOST / ALL 5**
   (eine Spur; die anderen Tonspuren blass dahinter; alle fünf als Streifen, Klick wählt, Doppelklick öffnet).
@@ -140,8 +148,9 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   GENRA CHOP*, als MIDI exportieren, löschen. Die Zeile unter den Pads zeigt das gewählte Pad und Meldungen.
 - **VARIATION** (INTRO, VERSE, HOOK, BRIDGE, BREAK, OUTRO): macht aus dem Original der Familie (vom gewählten Pad;
   ist das laufende Pattern noch nicht gespeichert, wird es zuerst gespeichert) eine Variante auf dem nächsten freien
-  Pad (**HOOK 1**, **HOOK 2** …) und spielt sie an. **VARIATION RENEWS** (DRUM, BASS, MEL, PADS, CHOP; rot = an):
-  diese Spuren bekommen neue Noten, die anderen bleiben exakt; die Akkorde bleiben immer.
+  Pad (**HOOK 1**, **HOOK 2** …) und spielt sie an. Wie beim alten GENRA-ABLAUF: **jeder Druck macht ein neues
+  Pattern** auf dem nächsten freien Pad. Bass, Melodie und Pads bekommen neue Noten; Drums und Chop-Spur bleiben die
+  des Originals (nur vom Teil geformt), die Akkorde bleiben immer. (Die Taster VARIATION RENEWS sind ab 2.3.0 weg.)
   - **INTRO:** dünnere Drums (keine Toms/Percussion, Hats auf Achteln, Kick auf 1 und 3), Pads vorne, Melodie dünn;
     über die Song-Zeile: erste Hälfte ohne Bass, Melodie und Snare, im ersten Viertel auch ohne Kick.
   - **VERSE:** Platz für die Stimme: Chops leiser und etwas weniger, Melodie lässt Lücken (DENS wirkt weiter).
@@ -152,6 +161,10 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   - **BREAK:** Drums raus bis auf leise Hats (die in der ersten Hälfte der Zeile auch fehlen), das Sample trägt;
     der Bass wechselt bei jedem Druck: lange Grundtöne, ausgedünnt oder raus; Snare-Auftakt am Ende der Zeile.
   - **OUTRO:** dünnt über die Zeile aus (Melodie, dann Hats, dann Bass und Snare), im letzten Takt nur Kick, Chop, Pads.
+- **CLEAR | CLEAR ALL** (unter den Pads, ab 2.3.0): **CLEAR**, dann ein Pad antippen = dieses Pad leer (CLEAR
+  leuchtet rot, bis ein Pad kommt; nochmal CLEAR bricht ab). **CLEAR ALL** zweimal drücken (blinkt nach dem ersten
+  Druck 2,5 s) = alle 64 Pads leer; die Song-Liste bleibt stehen (ihre Zeilen spielen nichts, bis die Pads wieder
+  belegt sind). **UNDO** holt beides zurück. Beide per MIDI learn steuerbar.
 - **SONG:** die Song-Liste (Zeile: Pattern, Takte, F = Übergang am Ende). Klick wählt, Mausrad blättert, Rechtsklick:
   Takte, Übergang an/aus, Pattern = gewähltes Pad, hoch/runter, duplizieren, löschen. Unten: Takte und Spieldauer.
   **INS** fügt das gewählte Pad nach der gewählten Zeile ein, **DEL** löscht die Zeile, **UNDO** nimmt Schritte
@@ -185,6 +198,87 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   Audio-Thread, was der nächste Takt ist, und gibt GENRA CHOP dessen Pattern; eine neue Zeile startet GENRA CHOPs
   Loop wieder bei Schritt 1. Ein hängendes Dateifenster lässt also keine Zeile zu spät kommen.
 
+## GENRA CHOP FX: zwei Effekt-Busse zum Live-Spielen (22 HP, ab 2.3.0)
+
+Nach Vorbild des SP-404: Stereo rein (IN L, IN R; nur IN L = mono auf beide), zwei Busse mit je einem Effekt,
+Stereo raus. Alles im Retro-Look von GENRA CHOP. Verbunden wird vorerst nur mit Kabeln (z. B. CHOP L/R von GENRA
+CHOP, und GENRA CHOPs CLK-Ausgang an CLK).
+
+![Panel](docs/genra_chop_fx.png)
+
+- **Kopf:** **IN** und **OUT** (Pegel, bis +6 dB). Über etwa 8 V rundet der Ausgang weich ab statt hart zu clippen.
+- **Display:** Zeile 1 und 2 = Bus 1 und 2 (Effekt, **ON** oder `--`, `CV` wenn der FX-Eingang steckt; `>` zeigt den
+  gewählten Bus); Zeile 3 = was CTRL 1–3 beim gewählten Bus gerade tun, mit ihren Werten (z. B. `NOISE 35% WOW 20%
+  AGE 60%`, `TIME 1/8D`). Ein Bus wird gewählt durch Klick auf seinen Titel (rote Linie), sein Effektfeld, seinen
+  FX-ON-Taster oder einen seiner Regler.
+- **PRESET:** ganze Setups (beide Effekte, alle Regler, ROUTE); die Busse bleiben aus, bis du sie spielst.
+  Dusty Basement, Lo-Fi Tape, Boom Bap Crunch, Telephone Hook, Dilla Wobble, Underwater, Spaced Out, Stutter Break,
+  Chopped & Screwed, Trap Gate, Robot Talk, Tape Death, Phase Dreams, Bitcrushed, Scatterbrain, Sub Bump, Backspin
+  Drop, Resonant Keys, Two Worlds (und Init).
+- **ROUTE:** 1 > 2 (Bus 1 zuerst), 2 > 1, 1 + 2 (beide nebeneinander am selben Eingang).
+- **BUS 1 / BUS 2:** das **Effektfeld** (Klick = Liste in sechs Gruppen, Mausrad = blättern; ein neuer Effekt setzt
+  CTRL 1–3 auf seine Grundwerte), **CTRL 1–3** (Tooltip und Display sagen, was sie tun) und **FX ON**:
+  **antippen** = an / aus, **gedrückt halten** = nur solange du hältst. Rot = der Bus spielt.
+- **Schnelltasten (6):** legen ihren Effekt auf den gewählten Bus und schalten ihn ein (antippen = bleibt an, halten
+  = nur solange gehalten; nochmal antippen = aus). Rot = dieser Effekt spielt gerade. **Rechtsklick:** welcher Effekt
+  (alle 37), zurück auf die Werksbelegung. Ab Werk: FILTER, RESO, DELAY, ISOLATOR, LOOPER, STOPPER.
+- **Buchsen:** IN L/R, **CLK** (16tel, z. B. GENRA CHOPs CLK-Ausgang: Delays, Gater, Stopper, Looper, Scatter laufen
+  im Tempo; ohne Clock im Tempo aus dem Menü, Standard 90 BPM), **RST** (der Takt beginnt). Pro Bus: **CV 1–3**
+  (±5 V = ±halber Regelweg), **ON** (Gate, zusätzlich zum Taster), **FX** (0–10 V über die 37 Effekte). OUT L/R.
+- **MIDI learn:** wie bei GENRA CHOP (Rechtsklick auf Regler, Taster, Felder; Controller im Modul-Menü).
+
+**Die Effekte** (CTRL 1 · CTRL 2 · CTRL 3):
+
+| Gruppe | Effekt | CTRL 1 · 2 · 3 |
+|---|---|---|
+| TEXTURE | VINYL SIM | NOISE (Knistern, Rauschen) · WOW · AGE (dünner, dumpfer) |
+| | CASSETTE SIM | SAT · WOBBLE (Wow und Flutter) · TONE (dumpfer, Rauschen) |
+| | LO-FI | BITS (16 bis 3) · RATE (Samplerate bis 1/40) · TONE |
+| | WOW & FLUTTER | DEPTH · RATE · MIX |
+| | RADIO | BAND (300–3000 Hz) · WIDTH · DIRT (Verzerrung, Rauschen) |
+| | DUST | CRACKLE · HISS · POPS (kommt zum Signal dazu) |
+| | WARP | DEPTH · SPEED · MIX (verbogene Platte: ein Durchhänger pro Umdrehung) |
+| FILTER | FILTER+DRIVE | CUTOFF · RESO · DRIVE (Tiefpass) |
+| | SUPER FILTER | CUTOFF · RESO · SWEEP (über einen Takt im Tempo) |
+| | ISOLATOR | LOW · MID · HIGH (ganz links = weg, Mitte = 0 dB, rechts bis +6 dB) |
+| | RESONATOR | TUNE (C2–C4, Grundton, Quinte, Oktave) · RING · MIX |
+| | TALK FILTER | VOWEL (A–E–I–O–U) · RESO · MIX |
+| | AUTO WAH | SENS · RANGE · RESO |
+| DRIVE | SATURATOR | DRIVE · TONE · MIX |
+| | FUZZ | FUZZ · TONE · LEVEL |
+| | WAVEFOLDER | FOLD · BIAS · MIX |
+| | COMPRESSOR | AMOUNT (Schwelle, Ratio) · SPEED (rechts = pumpt) · MIX (parallel) |
+| | GATER | RATE (1/4–1/32) · DEPTH · SMOOTH |
+| SPACE | DELAY · TAPE ECHO · PING PONG · REVERSE DELAY | TIME (1/32 bis 1 Takt, auch triolisch / punktiert) · FEEDBACK · MIX |
+| | REVERB | SIZE · TONE · MIX |
+| MOD | CHORUS | RATE · DEPTH · MIX |
+| | FLANGER · PHASER | RATE · DEPTH · FEEDBACK |
+| | RING MOD | FREQ (20–2000 Hz) · WOBBLE · MIX |
+| | TREMOLO / PAN | RATE · DEPTH · PAN (0 = Tremolo, rechts = Auto-Pan) |
+| | VIBRATO | RATE · DEPTH · MIX |
+| PERFORM | LOOPER | LENGTH (1/32 bis 1 Takt, ganz rechts FREEZE) · SPEED (×0,5 bis ×2) · MIX |
+| | SCATTER | AMOUNT · SLICE (1/16, 1/8, 1/4) · MIX: Stücke des letzten Takts durcheinander, manche rückwärts |
+| | STOPPER | PATTERN (8 Rhythmen) · DEPTH · SMOOTH: rhythmische Stopps |
+| | TAPE STOP | TIME · CURVE · MIX: bremst bis zum Stillstand |
+| | BACKSPIN | TIME · SPEED · MIX: Platte rückwärts gedreht |
+| | TAPE START | TIME · CURVE · MIX: läuft aus dem Stand an, dann wieder live |
+| | DOWNER | TIME · DEPTH (bis −24 Halbtöne) · MIX: zieht langsam runter |
+| | SUB OCTAVER | SUB · TONE · OCT (−1 oder −2 Oktaven) |
+
+- **LOOPER** wie beim SP-404: ab FX ON läuft ein Durchgang live mit und wird dabei aufgenommen, dann wiederholt er;
+  **FREEZE** hält eine Viertelsekunde weich (zwei überblendete Köpfe). Die Stopps und Spins starten bei jedem FX ON
+  neu (auch über eine Schnelltaste).
+- **Echos und Hall klingen nach FX OFF aus**, die anderen Effekte blenden in 8 ms weich ein und aus; ein
+  Effektwechsel blendet in 5 ms über.
+- **CPU:** Ein Bus, der aus und still ist, schläft (gerechnet wird dann nur das Mitschreiben der letzten Sekunden für
+  Looper und Spins). Gerechnet wird nur der gewählte Effekt; Filterwerte nur, wenn sich ein Regler bewegt (alle 16
+  Samples geprüft). Die Verzerrer nutzen statt Oversampling eine günstigere Glättung (Antiderivative Anti-Aliasing).
+  Im Test (48 kHz) kostet ein laufender Effekt unter 0,2 % eines Prozessorkerns (Vinyl, Hall und Saturator am
+  meisten).
+- **Vorbereitet, noch nicht drin:** kabellos verbinden (Sound und Clock von GENRA CHOP ohne Kabel). Im Code ist die
+  Quelle schon eine eigene Wahl (heute nur „Kabel“, im Patch gespeichert), über IN L/R und CLK ist Platz für die
+  Leuchtsegmente.
+
 ## Noch nicht drin (Merkliste)
 
 - **Wellenform-Display:** Schnitte verschieben (Einrasten am Nulldurchgang), setzen (Doppelklick), entfernen
@@ -193,7 +287,6 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
 - **Follow GENRA** für FUNKE, GRUND, SCHMELZ, DRUM-X, SCHLAG ohne Kabel: die Instrumente kennen als Quelle bisher
   nur GENRA und GENRA BOX (Slug-Prüfung in `Follow.cpp` im GENRA-Repo); GENRA CHOP müsste sich dort über den Link-Hub
   anmelden. Bis dahin per Kabel.
-- **GENRA CHOP GRID:** die schwarzen Tasten links in der Piano-Roll schwarz.
 - Der PITCH-Regler verschiebt die Chops, aber noch nicht die erkannten Akkorde für Bass und Pads.
 
 ## Technik
@@ -208,5 +301,9 @@ Ein Sample pro Song: die Pads speichern Patterns, keine Samples.
   Song-Arranger, `src/MidiLearn.hpp`: MIDI learn, `src/Export.*`: MIDI-Datei (auch ganze Songs) und Ordner.
 - `tools/grid_panel.py` schreibt `res/ChopGrid.svg` und `src/ChopGridLayout.hpp`; `tools/ablauf_panel.py` schreibt
   `res/ChopAblauf.svg` und `src/ChopAblaufLayout.hpp`.
+- `src/fx/FxEngine.*`: die 37 Effekte und die Presets von GENRA CHOP FX (ohne Rack testbar: `test/fx_test.cpp`, läuft
+  im Build mit: jeder Effekt an, aus, ausklingen, schlafen, endlich und im Pegel, Effektwechsel im Lauf, was er kostet);
+  `src/ChopFx.cpp`: Modul und Panel; `tools/fx_panel.py` schreibt `res/ChopFx.svg` und `src/ChopFxLayout.hpp`
+  (Vorschau: `--preview docs/genra_chop_fx.png`).
 - `tools/chop_panel.py` schreibt `res/GenraChop.svg`, die Knöpfe und `src/GenraChopLayout.hpp`; prüft, dass sich
   keine Schrift überlappt. Vorschau: `python3 tools/chop_panel.py --preview docs/genra_chop.png`.

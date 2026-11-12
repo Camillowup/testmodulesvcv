@@ -32,8 +32,12 @@ Gebaut und in Rack zu testen. Schon im neuen Look. Offen, falls gewünscht:
 ## GENRA CHOP (eigenes Plugin in `genra-chop/`, bis 2.1.0 GENRA HipHop)
 
 2.2.0 (12.11.2026): Umbenennung, MOVE, CLEAR, LOAD SAMPLE, MIDI learn, GENRA CHOP ABLAUF – in Rack testen.
+2.3.0 (12.11.2026): GENRA CHOP FX (neu), CHOPS statt DUST, Pad-Banks A–D, STOP/PLAY grösser, Taster-Schrift passt
+sich an, ABLAUF ohne RENEWS mit CLEAR / CLEAR ALL, GRID schwarze Tasten – in Rack testen.
 Offen (Details in `genra-chop/README.md`):
 - Wellenform-Fenster: Klick lädt ein Sample, sonst Chops mit der Maus verschieben (erst nach dem Test von GENRA CHOP).
 - Follow GENRA für die GENRA-Instrumente (DRUM-X, SCHLAG, FUNKE …): GENRA CHOP ist dort noch keine Quelle
   (`Follow.cpp` im GENRA-Repo kennt nur GENRA und GENRA BOX).
-- GENRA CHOP GRID: schwarze Tasten links in der Piano-Roll schwarz.
+- GENRA CHOP FX: kabellos verbinden (Sound und Clock von GENRA CHOP ohne Kabel) – im Code vorbereitet (Quelle als
+  eigene Wahl im Patch, Platz für die Leuchtsegmente über IN L/R und CLK), noch nicht gewünscht.
+- GENRA CHOP FX: Effekte und Presets beim Anhören nachstimmen.

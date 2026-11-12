@@ -175,6 +175,20 @@ int main() {
 		CHECK(bass == 0, "intro bar 1 of 8 has bass (style %d)", st);
 	}
 
+	// ---- CHOPS: how many the sample is cut into (4..64), both modes
+	{
+		ChopSet c2;
+		c2.data = cs.data;
+		analyse(c2, CM_EQUAL, 40);
+		CHECK(c2.info.count == 40, "equal 40: got %d chops", c2.info.count);
+		analyse(c2, CM_TRANSIENT, 64);
+		CHECK(c2.info.count >= 16 && c2.info.count <= 64, "transient 64: got %d chops", c2.info.count);
+		analyse(c2, CM_TRANSIENT, 4);
+		CHECK(c2.info.count == 4, "transient 4: got %d chops", c2.info.count);
+		for (int i = 0; i + 1 < c2.info.count; i++)
+			CHECK(c2.end[i] <= c2.start[i + 1] && c2.start[i] < c2.end[i], "chop %d out of order", i);
+		printf("CHOPS: equal 40, transient 64 -> %d, transient 4\n", c2.info.count);
+	}
 	// ---- WAV out and back in
 	std::vector<uint8_t> w = writeWav(cs.data, cs.start[0], cs.end[0], true, 3);
 	SampleData back;

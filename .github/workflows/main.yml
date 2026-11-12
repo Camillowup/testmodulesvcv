@@ -116,6 +116,8 @@ jobs:
           cd genra-chop
           g++ -std=c++11 -O2 -D_USE_MATH_DEFINES -Isrc test/hh_test.cpp src/hh/Core.cpp src/hh/Styles.cpp src/hh/Chop.cpp src/hh/Song.cpp -o hht.exe
           ./hht.exe
+          g++ -std=c++11 -O2 -D_USE_MATH_DEFINES -Isrc test/fx_test.cpp src/fx/FxEngine.cpp -o fxt.exe
+          ./fxt.exe
 
       - name: Check GENRA CHOP's package
         run: |
@@ -123,6 +125,7 @@ jobs:
           ls -la $D $D/res
           test -f $D/plugin.dll
           test -f $D/res/GenraChop.svg
+          test -f $D/res/ChopFx.svg
           test -f $D/res/HHKnob.svg
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
 

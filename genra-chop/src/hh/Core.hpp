@@ -12,7 +12,7 @@
 
 namespace hh {
 
-static const int STEPS = 16, BARS = 4, LEN = STEPS * BARS, DRUMS = 8, PAD_VOICES = 4, PADS = 16;
+static const int STEPS = 16, BARS = 4, LEN = STEPS * BARS, DRUMS = 8, PAD_VOICES = 4, PADS = 64; // PADS: chops at most (4 banks of 16)
 enum DrumVoice { KICK, SNARE, CLAP, RIM, CH, OH, TOM, PERC };
 enum Track { T_DRUMS, T_BASS, T_MEL, T_PAD, T_CHOP, NUM_TRACKS, T_HARMONY = 10 };
 
