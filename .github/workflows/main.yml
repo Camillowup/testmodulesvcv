@@ -114,7 +114,7 @@ jobs:
       - name: Test GENRA HipHop's engine (without Rack)
         run: |
           cd genra-hiphop
-          g++ -std=c++11 -O2 -Isrc test/hh_test.cpp src/hh/Core.cpp src/hh/Styles.cpp src/hh/Chop.cpp -o hht.exe
+          g++ -std=c++11 -O2 -D_USE_MATH_DEFINES -Isrc test/hh_test.cpp src/hh/Core.cpp src/hh/Styles.cpp src/hh/Chop.cpp -o hht.exe
           ./hht.exe
 
       - name: Check GENRA HipHop's package
