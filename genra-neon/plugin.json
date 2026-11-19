@@ -1,0 +1,29 @@
+{
+  "slug": "GenraNeon",
+  "name": "GENRA Neon",
+  "version": "2.0.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv/tree/main/genra-neon",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-neon/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-neon/CHANGELOG.md",
+  "modules": [
+    {
+      "slug": "Welle",
+      "name": "WELLE",
+      "description": "Wavetable synth in the neon look: two oscillators with 32 built-in tables in folders and your own WAV wavetables, TABLE and POSITION, six warps, unison, GENRA's filters, MOTION in time, MUTATE, FREEZE. Follows GENRA and GENRA TECHNO.",
+      "tags": ["Synth Voice", "Oscillator", "Polyphonic", "Filter"]
+    },
+    {
+      "slug": "Nebel",
+      "name": "NEBEL",
+      "description": "Cluster universe: every note becomes a cloud of up to 8 voices (chords, spread, detune, chaos, drift, strum) from five generators, five textures and three huge reverbs; ORBIT turns it in time. Takes GENRA's chords.",
+      "tags": ["Synth Voice", "Polyphonic", "Reverb", "Random"]
+    }
+  ]
+}

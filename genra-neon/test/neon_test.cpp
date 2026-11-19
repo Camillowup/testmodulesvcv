@@ -1,0 +1,179 @@
+// SPDX-License-Identifier: GPL-3.0-only
+// GENRA NEON – the engine test (no Rack): every factory preset of WELLE and NEBEL plays a short phrase; the test checks
+// for silence, NaN and clipping and prints the gain that brings each preset to the same loudness (RMS), so the
+// presets are even: not too hot, not too quiet.
+//   g++ -O2 -std=c++11 -I.. test/neon_test.cpp -o neon_test && ./neon_test        (from genra-neon/)
+//   ./neon_test gains   prints only "module index gain" lines (tools/set_gains.py writes them into the presets)
+#include "../src/welle/WellePresets.hpp"
+#include "../src/nebel/NebelPresets.hpp"
+#include <chrono>
+#include <cstdio>
+#include <cstring>
+#include <algorithm>
+#include <vector>
+
+static const float FS = 48000.f;
+static const float TARGET_RMS = 1.9f;  // volts: loud and even (peaks stay under the limiter's knee of 6 V)
+static const float MAX_PEAK = 7.0f;  // short transients may touch the soft limiter (knee 6 V, ceiling 8 V)
+
+/** Loudness: RMS of 50 ms blocks, the 80th percentile of the blocks that are not silent. */
+struct Meter {
+	std::vector<float> blocks;
+	double ss = 0.0;
+	int n = 0;
+	void add(float L, float R) {
+		ss += 0.5 * ((double) L * L + (double) R * R);
+		if (++n >= (int) (0.05f * FS)) {
+			blocks.push_back((float) std::sqrt(ss / n));
+			ss = 0.0, n = 0;
+		}
+	}
+	float value() {
+		std::vector<float> b;
+		for (float x : blocks)
+			if (x > 0.01f)
+				b.push_back(x);
+		if (b.empty())
+			return 0.f;
+		std::sort(b.begin(), b.end());
+		return b[(size_t) (0.8f * (b.size() - 1))];
+	}
+};
+
+struct Result {
+	float rms = 0.f, peak = 0.f;
+	bool nan = false;
+	double cpu = 0.0;  // µs per sample
+};
+
+static Result playWelle(int pi, float gain) {
+	using namespace welle;
+	const Preset& pr = PRESETS[pi];
+	static std::shared_ptr<neon::Table> cache[neon::NUM_BUILTINS];
+	if (!cache[pr.tA])
+		cache[pr.tA] = neon::makeBuiltin(pr.tA);
+	if (!cache[pr.tB])
+		cache[pr.tB] = neon::makeBuiltin(pr.tB);
+	std::unique_ptr<Engine> e(new Engine);
+	e->setSampleRate(FS);
+	e->tab[0] = cache[pr.tA].get();
+	e->tab[1] = cache[pr.tB].get();
+	Params p = pr.params();
+	if (gain >= 0.f)
+		p.outGain = gain;  // < 0: the preset's own gain
+	Channel ch[3];
+	bool poly = p.mode == MODE_POLY;
+	const float chord[3] = {0.f, 3.f / 12.f, 7.f / 12.f};      // C4 minor
+	const float line[4] = {-1.f, -1.f + 3.f / 12.f, -1.f + 7.f / 12.f, -1.f + 10.f / 12.f};
+	int N = (int) (2.4f * FS);
+	Result r;
+	Meter m;
+	auto t0 = std::chrono::steady_clock::now();
+	for (int i = 0; i < N; i++) {
+		float t = i / FS;
+		int n;
+		if (poly) {
+			n = 3;
+			for (int c = 0; c < 3; c++) {
+				ch[c].voct = chord[c] + (pr.octA < 0.f || p.sub > 0.3f ? -1.f : 0.f);
+				ch[c].gate = std::fmod(t, 0.6f) < 0.45f && t < 1.8f;
+				ch[c].vel = 0.8f;
+				ch[c].acc = std::fmod(t, 1.2f) < 0.6f;
+			}
+		} else {
+			n = 1;
+			int k = (int) (t / 0.3f) % 4;
+			ch[0].voct = line[k];
+			ch[0].gate = std::fmod(t, 0.3f) < 0.22f && t < 1.8f;
+			ch[0].vel = 0.8f;
+			ch[0].acc = k == 2;
+			ch[0].slide = k == 1;
+		}
+		float L, R, env, mot;
+		e->process(p, ch, n, !poly, 125.f, 0.f, L, R, env, mot);
+		if (!std::isfinite(L) || !std::isfinite(R))
+			r.nan = true;
+		r.peak = std::max(r.peak, std::max(std::fabs(L), std::fabs(R)));
+		m.add(L, R);
+	}
+	r.cpu = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / N;
+	r.rms = m.value();
+	return r;
+}
+
+static Result playNebel(int pi, float gain) {
+	using namespace nebel;
+	const Preset& pr = PRESETS[pi];
+	std::unique_ptr<Engine> e(new Engine);
+	e->setSampleRate(FS);
+	Params p = pr.params();
+	if (gain >= 0.f)
+		p.outGain = gain;
+	Channel ch[4];
+	const float chord[4] = {-1.f, -1.f + 3.f / 12.f, -1.f + 7.f / 12.f, -1.f + 10.f / 12.f};
+	int N = (int) (4.f * FS);
+	Result r;
+	Meter m;
+	auto t0 = std::chrono::steady_clock::now();
+	for (int i = 0; i < N; i++) {
+		float t = i / FS;
+		int n = p.chordSrc == SRC_GENRA ? 4 : 1;
+		for (int c = 0; c < n; c++) {
+			ch[c].voct = p.chordSrc == SRC_GENRA ? chord[c] : -1.f;
+			ch[c].gate = t < 2.6f;
+			ch[c].vel = 0.8f;
+			ch[c].acc = false;
+		}
+		float L, R, env, orb;
+		e->process(p, ch, n, 125.f, 0.f, 0.f, L, R, env, orb);
+		if (!std::isfinite(L) || !std::isfinite(R))
+			r.nan = true;
+		r.peak = std::max(r.peak, std::max(std::fabs(L), std::fabs(R)));
+		m.add(L, R);
+	}
+	r.cpu = std::chrono::duration<double, std::micro>(std::chrono::steady_clock::now() - t0).count() / N;
+	r.rms = m.value();
+	return r;
+}
+
+template <typename F>
+static int run(const char* mod, int count, F play, bool gainsOnly, float& worstCpu, bool check = false) {
+	int bad = 0;
+	for (int i = 0; i < count; i++) {
+		if (check) {  // as the module plays it (with the preset's gain)
+			Result c = play(i, -1.f);
+			bool off = c.rms < 0.75f * TARGET_RMS || c.rms > 1.3f * TARGET_RMS || c.peak > 8.01f;
+			std::printf("%-6s %2d  %.2f V rms  peak %.2f V%s%s\n", mod, i, c.rms, c.peak, off ? "  UNEVEN" : "", c.nan ? "  NaN" : "");
+			bad += c.nan || c.rms < 1e-3f;
+			continue;
+		}
+		Result a = play(i, 1.f);
+		float g = a.rms > 1e-4f ? TARGET_RMS / a.rms : 1.f;
+		// the peak scales with the gain (before the limiter): keep it under MAX_PEAK
+		if (a.peak * g > MAX_PEAK)
+			g = MAX_PEAK / a.peak * 0.98f + (g - MAX_PEAK / a.peak * 0.98f) * 0.35f;
+		g = std::min(std::max(g, 0.05f), 20.f);
+		Result b = play(i, g);
+		worstCpu = std::max(worstCpu, (float) b.cpu);
+		bool silent = a.rms < 1e-4f;
+		if (silent || a.nan || b.nan)
+			bad++;
+		if (gainsOnly)
+			std::printf("%s %d %.3f\n", mod, i, g);
+		else
+			std::printf("%-6s %2d  rms %.3f -> %.2f V  peak %.2f V  gain %.3f  cpu %.2f us%s%s\n", mod, i, a.rms, b.rms,
+			            b.peak, g, b.cpu, silent ? "  SILENT" : "", (a.nan || b.nan) ? "  NaN" : "");
+	}
+	return bad;
+}
+
+int main(int argc, char** argv) {
+	bool gainsOnly = argc > 1 && !std::strcmp(argv[1], "gains");
+	bool check = argc > 1 && !std::strcmp(argv[1], "check");
+	float cpu = 0.f;
+	int bad = run("WELLE", welle::NUM_PRESETS, playWelle, gainsOnly, cpu, check);
+	bad += run("NEBEL", nebel::NUM_PRESETS, playNebel, gainsOnly, cpu, check);
+	if (!gainsOnly)
+		std::printf("worst cpu %.2f us/sample, %d bad\n", cpu, bad);
+	return bad ? 1 : 0;
+}
