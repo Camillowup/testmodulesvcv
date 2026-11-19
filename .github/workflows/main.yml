@@ -2,6 +2,9 @@ name: Build GENRA Test
 
 on:
   push:
+    paths-ignore:
+      - "genra-glanz/**"
+      - ".github/workflows/glanz.yml"
   workflow_dispatch:
 
 permissions:

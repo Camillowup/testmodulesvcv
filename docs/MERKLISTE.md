@@ -21,3 +21,7 @@ Verbeugung am Ende; KESSEL: MIDI-Eingang im Modul) stehen jetzt in der Merkliste
 ## GENRA CHOP
 
 Im eigenen Repo `Camillowup/Genra-Chop` (Merkliste dort in `docs/MERKLISTE.md`).
+
+## GENRA GLANZ (eigenes Plugin in `genra-glanz/`, seit 19. Nov. 2026)
+- 2.0.0 gebaut (Test): in Rack prüfen, ob jede Szene flüssig läuft und mit GENRA in den Spurfarben reagiert.
+- Später: weitere Szenen (immer hinten anhängen), z. B. KALEIDOSKOP, Wellen-Landschaft, Akkordkreis.
