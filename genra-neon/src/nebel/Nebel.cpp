@@ -32,6 +32,7 @@ struct Nebel : Module, follow::Host {
 		NUM_PARAMS,
 		PRESETSEL_PARAM = NUM_PARAMS,
 		BANG_PARAM, FREEZE_PARAM, UNDO_PARAM, INIT_PARAM,
+		LEVEL_PARAM,  // the output level (not in a preset)
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -69,6 +70,11 @@ struct Nebel : Module, follow::Host {
 	std::atomic<uint32_t> bangReq{0}, undoReq{0}, initReq{0};
 	uint32_t doneB = 0, doneU = 0, doneI = 0;
 	float flash = 0.f;
+	// jumps (a preset, generator, texture, space) happen while the output is muted for a moment (no clicks)
+	neon::SwitchFade sfade;
+	float appliedGain = -1.f, lastBankGain = -1.f;
+	int lastPreset = -2, lastGen = -1, lastText = -1, lastSpace = -1;
+	bool restrikeDue = false;
 
 	genra_presets::Bank bank;
 	void initPresets() {
@@ -148,6 +154,8 @@ struct Nebel : Module, follow::Host {
 		configButton(INIT_PARAM, "Init: back to a plain cluster");
 		for (int id : {BANG_PARAM, UNDO_PARAM, INIT_PARAM, FREEZE_PARAM})
 			paramQuantities[id]->randomizeEnabled = false;
+		configParam(LEVEL_PARAM, 0.f, 1.4125f, 1.f, "Level", " dB", -10.f, 20.f);
+		paramQuantities[LEVEL_PARAM]->randomizeEnabled = false;
 		const char* inNames[INPUTS_LEN] = {
 			"V/Oct (polyphonic)", "Gate (polyphonic)", "Velocity (0–10 V)", "Accent (gate)", "Slide (glide only on a slide)",
 			"Clock (ORBIT in time; GENRA: 16ths)", "Reset (ORBIT from the start)", "Big bang trigger", "Freeze trigger (toggles)",
@@ -207,6 +215,21 @@ struct Nebel : Module, follow::Host {
 
 		if (--ctl <= 0) {
 			ctl = 16;
+			// a jump (preset, generator, texture, space): mute first; the old sound keeps its knobs until it is silent
+			int ng = ki(GEN_PARAM, GEN_INPUT, NUM_GENS), nt = ki(TEXT_PARAM, TEXT_INPUT, NUM_TEXTURES);
+			int nsp = clamp((int) std::round(params[SPACE_PARAM].getValue()), 0, neon::NUM_VERBS - 1);
+			if (bank.preset != lastPreset || bank.gain != lastBankGain ||
+			    (lastGen >= 0 && (ng != lastGen || nt != lastText || nsp != lastSpace))) {
+				if (appliedGain < 0.f)
+					appliedGain = bank.gain;
+				else
+					sfade.trigger(true);
+				lastPreset = bank.preset;
+				lastBankGain = bank.gain;
+			}
+			lastGen = ng, lastText = nt, lastSpace = nsp;
+		}
+		if (ctl == 16 && sfade.state != 1) {
 			p.gen = ki(GEN_PARAM, GEN_INPUT, NUM_GENS);
 			p.timbre = kv(TIMBRE_PARAM, TIMBRE_INPUT);
 			p.morph = kv(MORPH_PARAM, MORPH_INPUT);
@@ -241,9 +264,13 @@ struct Nebel : Module, follow::Host {
 			if (inputs[SLIDE_INPUT].isConnected() && inputs[SLIDE_INPUT].getVoltage() < 1.f)
 				p.glide = 0.f;  // with SLIDE patched: glide only on a slide
 			p.chordSrc = clamp((int) std::round(params[CSRC_PARAM].getValue()), 0, NUM_SRCS - 1);
-			p.outGain = bank.gain;
+			p.outGain = appliedGain < 0.f ? bank.gain : appliedGain;
 			p.freeze = params[FREEZE_PARAM].getValue() > 0.5f;
 			p.seed = seed;
+			if (restrikeDue) {
+				restrikeDue = false;
+				engine->restrike(p);
+			}
 		}
 		int n = std::min(std::max(inputs[VOCT_INPUT].getChannels(), inputs[GATE_INPUT].getChannels()), 8);
 		bool vel = inputs[VEL_INPUT].isConnected();
@@ -255,10 +282,23 @@ struct Nebel : Module, follow::Host {
 			x.vel = vel ? clamp(inputs[VEL_INPUT].getPolyVoltage(c) * 0.1f, 0.f, 1.f) : 0.8f;
 			x.acc = inputs[ACC_INPUT].getPolyVoltage(c) >= 1.f;
 		}
+		bool bottom;
+		float fg = sfade.step(args.sampleRate, bottom);
+		if (bottom) {
+			if (sfade.wantReset) {
+				engine->softReset();
+				restrikeDue = true;
+			}
+			sfade.wantReset = false;
+			appliedGain = p.outGain = bank.gain;
+			ctl = 1;  // the new knobs at once
+		}
 		float l, r, env, orb;
 		engine->process(p, ch, n, bpm, inputs[INL_INPUT].getVoltage() * 0.2f,
 		                inputs[INR_INPUT].isConnected() ? inputs[INR_INPUT].getVoltage() * 0.2f : inputs[INL_INPUT].getVoltage() * 0.2f,
 		                l, r, env, orb);
+		float lvl = fg * params[LEVEL_PARAM].getValue();
+		l *= lvl, r *= lvl;
 		outputs[L_OUTPUT].setVoltage(outputs[R_OUTPUT].isConnected() || pulled(args.frame) ? l : 0.5f * (l + r));
 		outputs[R_OUTPUT].setVoltage(r);
 		outputs[ENV_OUTPUT].setVoltage(10.f * env);
@@ -546,7 +586,7 @@ struct NebelWidget : ModuleWidget {
 			{L::DENSITY, M::DENSITY_PARAM}, {L::WIDTH, M::WIDTH_PARAM}, {L::SIZE, M::SIZE_PARAM},     {L::DECAY, M::DECAY_PARAM},
 			{L::SMIX, M::SMIX_PARAM},     {L::TONE, M::TONE_PARAM},     {L::ATK, M::ATK_PARAM},       {L::DEC, M::DEC_PARAM},
 			{L::SUS, M::SUS_PARAM},       {L::REL, M::REL_PARAM},       {L::ORATE, M::ORATE_PARAM},   {L::ODEPTH, M::ODEPTH_PARAM},
-			{L::MACRO, M::MACRO_PARAM},   {L::GLIDE, M::GLIDE_PARAM}};
+			{L::MACRO, M::MACRO_PARAM},   {L::GLIDE, M::GLIDE_PARAM},   {L::LEVEL, M::LEVEL_PARAM}};
 		for (auto& k : knobs)
 			knob(k.first, k.second);
 		NLamps* lr = createParam<NLamps>(Vec(0, 0), module, M::CSRC_PARAM);

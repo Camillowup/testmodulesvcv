@@ -176,6 +176,31 @@ struct Engine {
 		verb.clear();
 	}
 	void resetOrbit() { orbitPh = 0.f; }
+	/** While the output is muted for a preset change: generators, textures and the space start clean (notes go on). */
+	void softReset() {
+		for (auto& x : v) {
+			x.line.clear();
+			x.sLp = x.lp = 0.f;
+			for (int i = 0; i < 6; i++)
+				x.ry1[i] = x.ry2[i] = 0.f;
+			// silent until restrike() plays the held notes again with the new sound
+			x.env.v = 0.f;
+			x.env.stage = 0;
+			x.env.gate = false;
+			x.burst = 0;
+		}
+		for (auto& gn : grains)
+			gn.on = false;
+		for (int c = 0; c < 2; c++) {
+			grainBuf[c].clear();
+			shift[c].buf.clear();
+			shift5[c].buf.clear();
+			for (int i = 0; i < 6; i++)
+				smear[i][c].clear();
+			texLp[c] = smearFb[c] = dustLp[c] = 0.f;
+		}
+		verb.clear();
+	}
 
 	/** The octave a voice of a cluster moves to with SPREAD (a fixed pattern, widening). */
 	static float spreadOct(int k, float spread) {
@@ -300,7 +325,7 @@ struct Engine {
 					x.ry2[i] = x.ry1[i], x.ry1[i] = o;
 					y += o / (1.f + 0.6f * i);
 				}
-				return y * 9.f;
+				return y * 22.f;
 			}
 			case G_STRING: {
 				float len = clampf(fs / std::max(freq, 20.f), 2.f, (float) x.line.mask - 4.f);
@@ -308,11 +333,11 @@ struct Engine {
 				float bright = 0.15f + 0.8f * timbre;
 				x.sLp += (y - x.sLp) * bright;
 				float noise = rng.bi();
-				float ex = (x.burst > 0 ? noise : 0.f) + noise * 0.03f * morph;
+				float ex = (x.burst > 0 ? noise * 0.45f : 0.f) + noise * 0.03f * morph;
 				if (x.burst > 0)
 					x.burst--;
 				x.line.push(x.sLp * 0.9985f + ex);
-				return y * 4.f;
+				return y * 8.f;
 			}
 		}
 	}
@@ -394,15 +419,17 @@ struct Engine {
 			if (!x.on)
 				continue;
 			Group& gr = g[x.group];
+			bool waiting = false;  // STRUM: this voice joins later
 			if (x.k >= perGroup) {
 				x.gate = false;
 			} else if (x.delay > 0.f) {
 				x.delay -= dt;
 				x.gate = false;
+				waiting = gr.gate;
 			} else
 				x.gate = gr.gate;
 			float e = x.env.process(x.gate, aT, dT, p.sus, rT, dt);
-			if (!x.gate && x.env.stage == 0 && x.delay <= 0.f) {
+			if (!x.gate && !waiting && x.env.stage == 0) {
 				x.on = false;
 				showOn[i] = false;
 				continue;
@@ -462,7 +489,19 @@ struct Engine {
 		R = genra_out::limit(r * 5.f * p.outGain);
 	}
 
-	void startGroup(const Params& p, int gi, float chaos, float spread) {
+	/** After softReset(), with the new knobs: the held notes start again (attack, strum, spread of the new sound). */
+	void restrike(const Params& p) {
+		float mac = clampf(p.macro, 0.f, 1.f);
+		float spread = clampf(p.spread + 0.5f * mac, 0.f, 1.f), chaos = clampf(p.chaos + 0.2f * mac, 0.f, 1.f);
+		for (auto& x : v)
+			if (!g[x.group].gate)
+				x.on = false;
+		for (int gi = 0; gi < MAXG; gi++)
+			if (g[gi].gate)
+				startGroup(p, gi, chaos, spread, true);
+	}
+
+	void startGroup(const Params& p, int gi, float chaos, float spread, bool snap = false) {
 		Group& gr = g[gi];
 		gr.active = true;
 		int nv = clamp(p.voices, 1, MAXVG);
@@ -491,8 +530,8 @@ struct Engine {
 			x.on = true;
 			x.group = gi, x.k = k;
 			x.target = voicePitch(p, gr, k, chaos, spread);
-			if (fresh || p.glide < 0.02f)
-				x.pitch = x.target;
+			if (fresh || snap || p.glide < 0.02f)
+				x.pitch = x.target;  // (a restrike after a preset change: no glide from the old sound)
 			x.delay = p.strum * 0.12f * k;
 			x.env.gate = false;
 			x.detCents = r.bi() * 25.f;

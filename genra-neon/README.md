@@ -6,8 +6,8 @@ menus are in English; the module names stay German.
 
 | Module | What it is |
 | --- | --- |
-| **WELLE** (44 HP) | Wavetable synth. The table is a neon mountain range on the display; the frame that plays is its glowing ridge. |
-| **NEBEL** (44 HP) | Cluster universe. Every note becomes a cloud of up to 8 voices; the display is a galaxy, the voices its stars. |
+| **WELLE** (34 HP) | Wavetable synth. The table is a neon mountain range on the display; the frame that plays is its glowing ridge. |
+| **NEBEL** (35 HP) | Cluster universe. Every note becomes a cloud of up to 8 voices; the display is a galaxy, the voices its stars. |
 | **WOGE** (44 HP) | Scanned synthesis. A string of masses moves slowly; a scan head reads its shape as the wave. |
 | **PULS** (44 HP) | Pulsar synthesis. A train of pulses with two formants: a rhythm when slow, a tone when fast. |
 | **GLAS** (44 HP) | ANS synthesizer. Paint on the glass with the mouse; a head plays the picture in time. |
@@ -32,7 +32,7 @@ take MIDI-MAP on every knob, button, field and the preset field, and have many C
 - **MIX:** A / B, SUB, UNISON (1–7), SPREAD. **VOICE:** POLY / MONO / LEGATO, GLIDE (on GENRA's SLIDE), ACCENT.
 - **MUTATE** makes new tables for A and B from the building blocks, **FREEZE** holds the frame, **UNDO** takes back the
   last MUTATE / INIT, **INIT** goes back to a plain sound. MUTATE and FREEZE have trigger inputs.
-- Outputs: ENV, MOTION (±5 V), L, R.
+- **LEVEL** sets the output (not part of the presets). Outputs: ENV, MOTION (±5 V), L, R.
 
 ## NEBEL
 
@@ -44,7 +44,7 @@ take MIDI-MAP on every knob, button, field and the preset field, and have many C
 - **SPACE:** three reverbs, NEBULA (shimmer cloud), HALL, VOID (endless dark) – SIZE, DECAY, MIX, TONE.
 - **ORBIT:** RATE and DEPTH turn the voices in the stereo field in time; MACRO gives more of everything; GLIDE.
 - **BIG BANG** throws a new cluster, **FREEZE** holds it, UNDO, INIT. IN L/R send other sounds through texture and space.
-- Outputs: ENV, ORBIT (±5 V), L, R.
+- **LEVEL** sets the output (not part of the presets). Outputs: ENV, ORBIT (±5 V), L, R.
 
 ## WOGE
 
@@ -92,7 +92,8 @@ take MIDI-MAP on every knob, button, field and the preset field, and have many C
 
 WELLE has 32 factory presets, NEBEL 24, WOGE 18, PULS 16, GLAS 12, FLUT 14, sorted by style (the styles match GENRA's genres). Every preset is levelled by
 the engine test (`test/neon_test.cpp`): it plays each one and sets its gain, so they are even – not too hot, not too
-quiet. Own presets: right-click › Save preset as …
+quiet: no preset reaches the output limiter in normal playing. A preset change mutes for a few milliseconds, so it
+does not click. Own presets: right-click › Save preset as …
 
 ## Build
 

@@ -1,5 +1,19 @@
 # GENRA NEON – Versionsgeschichte
 
+### 2.1.1 (20. Nov. 2026, Test-Build, kein Release)
+WELLE und NEBEL:
+- Kein Knacken mehr beim Preset-Wechsel (auch per Mausrad): kurz stumm (4 ms), Filter und Effekt-Fahnen starten sauber,
+  gehaltene Noten werden mit dem neuen Klang neu angeschlagen, dann Einblenden (30 ms). Gleiches beim Wechsel von
+  Filtertyp, Tabelle (WELLE) und Generator, Textur, Raum (NEBEL).
+- Presets neu ausgesteuert: kein Preset erreicht im normalen Spiel den Begrenzer (Spitzen unter 5 V statt bis 8 V).
+- LEVEL-Regler (Ausgangspegel) in der PLAY-Sektion beider Module; nicht Teil der Presets.
+- Schmalere Panels: CV-Buchsen direkt unter ihren Reglern, Auswahlfelder neben den Sektionstiteln.
+  WELLE 34 HP (vorher 44), NEBEL 35 HP (vorher 44); unten nur noch GENRA-Leiste, CLOCK/RESET, Audio, Ausgänge.
+- NEBEL: STRUM liess Stimmen verstummen (behoben); MODAL und STRING lauter, damit die Presets weniger Verstärkung brauchen.
+
+WOGE, PULS, GLAS, FLUT:
+- Presets neu ausgesteuert: Spitzen unter 5 V statt bis 8 V (einige rhythmische PULS-Presets dadurch leiser).
+
 ### 2.1.0 (20. Nov. 2026, Test-Build, kein Release)
 - Vier neue eigene Module im NEON-TERRAIN-Look (Entwürfe vom 19. Nov. 2026):
   - **WOGE**: Scanned Synthesis – Saite aus 24 Massen (MASS, TENSION, DAMP, CENTER), Anregung HAMMER/PLUCK/NOISE/BOW/

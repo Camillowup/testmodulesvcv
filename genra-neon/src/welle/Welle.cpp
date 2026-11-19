@@ -34,6 +34,7 @@ struct Welle : Module, follow::Host {
 		NUM_PARAMS,
 		PRESETSEL_PARAM = NUM_PARAMS,  // after the knobs: not in a preset
 		MUTATE_PARAM, FREEZE_PARAM, UNDO_PARAM, INIT_PARAM,
+		LEVEL_PARAM,  // the output level (not in a preset)
 		PARAMS_LEN
 	};
 	// in the order of the panel (WelleLayout.hpp JACK_IN)
@@ -103,6 +104,12 @@ struct Welle : Module, follow::Host {
 	float flash = 0.f;
 	// a folder / table to restore by name after the folders are known (patch from another computer)
 	std::string wantFolderName[2], wantTableName[2];
+	// jumps (a preset, the filter type, a table) happen while the output is muted for a moment (no clicks)
+	neon::SwitchFade sfade;
+	float appliedGain = -1.f;
+	int lastPreset = -2, lastFtype = -1;
+	float lastBankGain = -1.f;
+	neon::Table* pendingTab[2] = {nullptr, nullptr};
 
 	genra_presets::Bank bank;
 	void initPresets() {
@@ -188,6 +195,8 @@ struct Welle : Module, follow::Host {
 		configButton(INIT_PARAM, "Init: back to a plain sound (BASIC tables, no mutant)");
 		for (int id : {MUTATE_PARAM, UNDO_PARAM, INIT_PARAM, FREEZE_PARAM})
 			paramQuantities[id]->randomizeEnabled = false;
+		configParam(LEVEL_PARAM, 0.f, 1.4125f, 1.f, "Level", " dB", -10.f, 20.f);
+		paramQuantities[LEVEL_PARAM]->randomizeEnabled = false;
 
 		const char* inNames[INPUTS_LEN] = {
 			"V/Oct (polyphonic)", "Gate (polyphonic)", "Velocity (0–10 V)", "Accent (gate, from GENRA's ACC)",
@@ -276,8 +285,29 @@ struct Welle : Module, follow::Host {
 				if (mutantOn[o].load() && (idx != mutantIdx[o] || f != mutantFold[o]))
 					mutantOn[o].store(false);  // the table was turned: the mutant goes
 				idxNow[o] = idx;
-				engine->tab[o] = tables->pick(o, idx, mutantOn[o].load());
+				neon::Table* t = tables->pick(o, idx, mutantOn[o].load());
+				if (!engine->tab[o])
+					engine->tab[o] = t;
+				else if (t == engine->tab[o])
+					pendingTab[o] = nullptr;  // turned back before the dip
+				else if (t != engine->tab[o] && t != pendingTab[o]) {
+					pendingTab[o] = t;  // the new table comes in the silence of a short dip
+					sfade.trigger(false);
+				}
 			}
+			// a new preset (or its level) or another filter type: mute, start clean, then the new sound
+			int ft = (int) std::round(params[FTYPE_PARAM].getValue());
+			if (bank.preset != lastPreset || bank.gain != lastBankGain || (lastFtype >= 0 && ft != lastFtype)) {
+				if (appliedGain < 0.f)
+					appliedGain = bank.gain;  // the first time: no fade
+				else
+					sfade.trigger(true);
+				lastPreset = bank.preset;
+				lastBankGain = bank.gain;
+			}
+			lastFtype = ft;
+		}
+		if (ctl == 16 && sfade.state != 1) {  // while muting for a jump the old sound keeps its knobs
 			p.posA = kv(POSA_PARAM, POSA_INPUT);
 			p.posB = kv(POSB_PARAM, POSB_INPUT);
 			p.warpModeA = (int) std::round(params[WARPMA_PARAM].getValue());
@@ -313,7 +343,7 @@ struct Welle : Module, follow::Host {
 			p.mode = clamp((int) std::round(params[VMODE_PARAM].getValue()), 0, NUM_MODES - 1);
 			p.glide = kv(GLIDE_PARAM, GLIDE_INPUT);
 			p.accent = params[ACCENT_PARAM].getValue();
-			p.outGain = bank.gain;
+			p.outGain = appliedGain < 0.f ? bank.gain : appliedGain;
 			p.freeze = params[FREEZE_PARAM].getValue() > 0.5f;
 		}
 
@@ -328,8 +358,24 @@ struct Welle : Module, follow::Host {
 			x.acc = inputs[ACC_INPUT].getPolyVoltage(c) >= 1.f;
 			x.slide = inputs[SLIDE_INPUT].getPolyVoltage(c) >= 1.f;
 		}
+		bool bottom;
+		float fg = sfade.step(args.sampleRate, bottom);
+		if (bottom) {
+			if (sfade.wantReset)
+				engine->softReset();
+			sfade.wantReset = false;
+			appliedGain = p.outGain = bank.gain;
+			ctl = 1;  // the new knobs at once
+			for (int o = 0; o < 2; o++)
+				if (pendingTab[o]) {
+					engine->tab[o] = pendingTab[o];
+					pendingTab[o] = nullptr;
+				}
+		}
 		float l, r, env, mot;
 		engine->process(p, ch, n, inputs[SLIDE_INPUT].isConnected(), bpm, inputs[FM_INPUT].getVoltage(), l, r, env, mot);
+		float lvl = fg * params[LEVEL_PARAM].getValue();
+		l *= lvl, r *= lvl;
 		outputs[L_OUTPUT].setVoltage(outputs[R_OUTPUT].isConnected() || pulled(args.frame) ? l : 0.5f * (l + r));
 		outputs[R_OUTPUT].setVoltage(r);
 		outputs[ENV_OUTPUT].setVoltage(10.f * env);
@@ -824,6 +870,7 @@ struct WelleWidget : ModuleWidget {
 		knob(L::SPREAD, M::SPREAD_PARAM);
 		knob(L::GLIDE, M::GLIDE_PARAM);
 		knob(L::ACCENT, M::ACCENT_PARAM);
+		knob(L::LEVEL, M::LEVEL_PARAM);
 		NLamps* lr = createParam<NLamps>(Vec(0, 0), module, M::VMODE_PARAM);
 		lr->place(L::VMODE, NUM_MODES);
 		lr->accent = CYAN;

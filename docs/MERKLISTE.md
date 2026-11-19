@@ -36,5 +36,10 @@ Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyber
 - 2.1.0 gebaut (Test): WOGE, PULS, GLAS, FLUT in Rack prüfen – Klang und Lautstärke der Presets (die rhythmischen
   PULS-Presets sind von Natur aus etwas leiser), Malen in GLAS (Werkzeuge, rechte Maustaste, SNAP, LINE), GLAS REC mit
   einem Eingang, FLUT-Gezeit (SYNC/FREE, TIME), PULS-Modi CLOCK/FREE/NOTE und die Masken-Schritte, CPU.
+- 2.1.1 gebaut (Test): WELLE/NEBEL – Preset-Wechsel ohne Knacken (auch Mausrad), Spitzen unter 5 V, LEVEL-Regler,
+  schmale Panels (WELLE 34 HP, NEBEL 35 HP, CV-Buchsen unter den Reglern; alte Patches laden, Buchsen sitzen neu).
+  WOGE/PULS/GLAS/FLUT: Presets neu ausgesteuert (Spitzen unter 5 V statt bis 8 V; einige PULS-Presets leiser).
+- Offen für WOGE, PULS, GLAS, FLUT: Schutz gegen Knacken beim Preset-Wechsel wie in WELLE/NEBEL, LEVEL-Regler
+  (fehlt bei WOGE, PULS, GLAS), schmale Panels mit CV-Buchsen unter den Reglern (Panel-Entwurf zuerst zeigen).
 - Warteliste PULS: Clock-Multiplikator (×2 … ×64 bis in den Ton, taktfest).
 - Offen: NEBEL nach dem Laniakea Pro gebaut – Bastian prüft, wie nah es dran ist (eigene Module gehören hierher).

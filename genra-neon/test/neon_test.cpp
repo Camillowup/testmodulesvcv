@@ -18,10 +18,10 @@
 #include <vector>
 
 static const float FS = 48000.f;
-static const float TARGET_RMS = 1.9f;  // volts: loud and even (peaks stay under the limiter's knee of 6 V)
-static const float MAX_PEAK = 7.0f;  // short transients may touch the soft limiter (knee 6 V, ceiling 8 V)
+static const float TARGET_RMS = 2.0f;  // volts: loud and even (peaks stay under the limiter's knee of 6 V)
+static const float MAX_PEAK = 5.0f;  // under the soft limiter (knee 6 V, ceiling 8 V), with room for accents
 
-/** Loudness: RMS of 50 ms blocks, the 80th percentile of the blocks that are not silent. */
+/** Loudness: RMS of 50 ms blocks, the 95th percentile (how loud it hits; plucks are short) of the blocks that are not silent. */
 struct Meter {
 	std::vector<float> blocks;
 	double ss = 0.0;
@@ -36,12 +36,12 @@ struct Meter {
 	float value() {
 		std::vector<float> b;
 		for (float x : blocks)
-			if (x > 0.01f)
+			if (x > 0.0005f)
 				b.push_back(x);
 		if (b.empty())
 			return 0.f;
 		std::sort(b.begin(), b.end());
-		return b[(size_t) (0.8f * (b.size() - 1))];
+		return b[(size_t) (0.95f * (b.size() - 1))];
 	}
 };
 
@@ -115,17 +115,21 @@ static Result playNebel(int pi, float gain) {
 	if (gain >= 0.f)
 		p.outGain = gain;
 	nebel::Channel ch[4];
-	const float chord[4] = {-1.f, -1.f + 3.f / 12.f, -1.f + 7.f / 12.f, -1.f + 10.f / 12.f};
-	int N = (int) (4.f * FS);
+	const float chordA[4] = {-1.f, -1.f + 3.f / 12.f, -1.f + 7.f / 12.f, -1.f + 10.f / 12.f};
+	const float chordB[4] = {-1.f, -0.75f, -0.5f, -0.25f};  // a second voicing: peaks differ with the notes
+	int N = (int) (8.f * FS);
 	Result r;
 	Meter m;
 	auto t0 = std::chrono::steady_clock::now();
 	for (int i = 0; i < N; i++) {
 		float t = i / FS;
 		int n = p.chordSrc == SRC_GENRA ? 4 : 1;
+		bool second = t >= 4.f;
+		const float* chord = second ? chordB : chordA;
+		float tt = second ? t - 4.f : t;
 		for (int c = 0; c < n; c++) {
-			ch[c].voct = p.chordSrc == SRC_GENRA ? chord[c] : -1.f;
-			ch[c].gate = t < 2.6f;
+			ch[c].voct = p.chordSrc == SRC_GENRA ? chord[c] : (second ? -0.5f : -1.f);
+			ch[c].gate = tt < 2.6f;
 			ch[c].vel = 0.8f;
 			ch[c].acc = false;
 		}
@@ -297,27 +301,29 @@ static int run(const char* mod, int count, F play, bool gainsOnly, float& worstC
 	for (int i = 0; i < count; i++) {
 		if (check) {  // as the module plays it (with the preset's gain)
 			Result c = play(i, -1.f);
-			bool off = c.rms < 0.75f * TARGET_RMS || c.rms > 1.3f * TARGET_RMS || c.peak > 8.01f;
+			bool off = c.rms < 0.6f * TARGET_RMS || c.rms > 1.3f * TARGET_RMS || c.peak > 6.0f;
 			std::printf("%-6s %2d  %.2f V rms  peak %.2f V%s%s\n", mod, i, c.rms, c.peak, off ? "  UNEVEN" : "", c.nan ? "  NaN" : "");
 			bad += c.nan || c.rms < 1e-3f;
 			continue;
 		}
-		Result a = play(i, 1.f);
+		// measured quietly (0.1: the limiter does not touch it), so level and peak scale exactly with the gain
+		Result a = play(i, 0.1f);
+		a.rms *= 10.f, a.peak *= 10.f;
 		float g = a.rms > 1e-4f ? TARGET_RMS / a.rms : 1.f;
 		// the peak scales with the gain (before the limiter): keep it under MAX_PEAK
 		if (a.peak * g > MAX_PEAK)
-			g = MAX_PEAK / a.peak * 0.98f + (g - MAX_PEAK / a.peak * 0.98f) * 0.35f;
+			g = MAX_PEAK / a.peak;  // strictly: no preset reaches the limiter in normal playing
 		g = std::min(std::max(g, 0.05f), 20.f);
 		Result b = play(i, g);
 		worstCpu = std::max(worstCpu, (float) b.cpu);
-		bool silent = a.rms < 1e-4f;
+		bool silent = a.rms < 1e-3f;
 		if (silent || a.nan || b.nan)
 			bad++;
 		if (gainsOnly)
 			std::printf("%s %d %.3f\n", mod, i, g);
 		else
-			std::printf("%-6s %2d  rms %.3f -> %.2f V  peak %.2f V  gain %.3f  cpu %.2f us%s%s\n", mod, i, a.rms, b.rms,
-			            b.peak, g, b.cpu, silent ? "  SILENT" : "", (a.nan || b.nan) ? "  NaN" : "");
+			std::printf("%-6s %2d  rms %.3f -> %.2f V  peak %.2f V  crest %.1f  gain %.3f  cpu %.2f us%s%s\n", mod, i, a.rms, b.rms,
+			            b.peak, a.peak / std::max(a.rms, 1e-4f), g, b.cpu, silent ? "  SILENT" : "", (a.nan || b.nan) ? "  NaN" : "");
 	}
 	return bad;
 }

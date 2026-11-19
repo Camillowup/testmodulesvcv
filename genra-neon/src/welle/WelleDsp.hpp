@@ -124,6 +124,19 @@ struct Engine {
 		verb.clear();
 	}
 	void resetMotion() { motionPh = 0.f; }
+	/** While the output is muted for a preset change: filters and effect tails start clean (the notes go on). */
+	void softReset() {
+		for (auto& x : v) {
+			x.flt[0].reset(), x.flt[1].reset();
+			// held notes start again with the new sound (its attack, its level), as if struck anew
+			x.amp.v = x.fe.v = 0.f;
+			x.amp.stage = x.fe.stage = x.gate ? 1 : 0;
+			if (!x.gate)
+				x.active = false;
+		}
+		delay.clear();
+		verb.clear();
+	}
 
 	/** The oscillator: one sample of table t at frame f, phase p, increment inc, warp mode/amount. */
 	static float osc(const Table* t, float f, float p, float inc, int mode, float w) {

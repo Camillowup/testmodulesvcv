@@ -68,6 +68,41 @@ static const char* const RATE_NAMES[NUM_RATES] = {"8 BARS", "4 BARS", "2 BARS", 
                                                    "1/8 DOT", "1/8", "1/8 TRIP", "1/16", "1/32"};
 inline int rateIndex(float k) { return clampf(std::round(clampf(k, 0.f, 1.f) * (NUM_RATES - 1)), 0, NUM_RATES - 1); }
 
+/** A quick mute around a jump (a preset, a filter type, a table): down in 4 ms, the change happens in silence, back up
+ * in 30 ms. trigger(true): the change needs a clean start (filters, tails) – step() says when to do it. */
+struct SwitchFade {
+	float g = 1.f;
+	int state = 0;  // 0 open / opening, 1 closing, 2 closed (hold)
+	int hold = 0;
+	bool wantReset = false;
+	void trigger(bool reset) {
+		if (state == 0)
+			state = 1;
+		wantReset = wantReset || reset;
+		if (state == 2)
+			hold = std::max(hold, 64);
+	}
+	bool busy() const { return state != 0; }
+	/** One sample: the gain; `atBottom` true once, when the output is silent (do the reset and take the new level). */
+	float step(float fs, bool& atBottom) {
+		atBottom = false;
+		if (state == 1) {
+			g -= 1.f / (0.004f * fs);
+			if (g <= 0.f) {
+				g = 0.f;
+				state = 2;
+				hold = (int) (0.025f * fs);
+				atBottom = true;
+			}
+		} else if (state == 2) {
+			if (--hold <= 0)
+				state = 0;
+		} else if (g < 1.f)
+			g = std::min(1.f, g + 1.f / (0.03f * fs));
+		return g * g;
+	}
+};
+
 // ---------------------------------------------------------------- delay line
 struct Ring {
 	std::vector<float> b;
