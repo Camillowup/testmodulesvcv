@@ -33,3 +33,8 @@ Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyber
   leiser), Follow mit GENRA und GENRA TECHNO, MIDI-MAP (auch Preset-Feld), eigene WAV-Wavetables (SET ROOT FOLDER,
   Unterordner, TABLE bleibt am Ordnerende), MUTATE/UNDO/INIT, FREEZE, CPU bei vielen Stimmen (NEBEL ADDITIVE).
 - Merkliste: Idee BIEST-Look (Maul-Display, Augen-Regler) behalten.
+- 2.1.0 gebaut (Test): WOGE, PULS, GLAS, FLUT in Rack prüfen – Klang und Lautstärke der Presets (die rhythmischen
+  PULS-Presets sind von Natur aus etwas leiser), Malen in GLAS (Werkzeuge, rechte Maustaste, SNAP, LINE), GLAS REC mit
+  einem Eingang, FLUT-Gezeit (SYNC/FREE, TIME), PULS-Modi CLOCK/FREE/NOTE und die Masken-Schritte, CPU.
+- Warteliste PULS: Clock-Multiplikator (×2 … ×64 bis in den Ton, taktfest).
+- Offen: NEBEL nach dem Laniakea Pro gebaut – Bastian prüft, wie nah es dran ist (eigene Module gehören hierher).

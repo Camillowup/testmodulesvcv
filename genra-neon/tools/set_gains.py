@@ -9,12 +9,14 @@ import sys
 
 exe = sys.argv[1] if len(sys.argv) > 1 else "build/neon_test"
 out = subprocess.run([exe, "gains"], capture_output=True, text=True).stdout.split("\n")
-gains = {"WELLE": {}, "NEBEL": {}}
+MODS = (("WELLE", "src/welle/WellePresets.hpp"), ("NEBEL", "src/nebel/NebelPresets.hpp"), ("WOGE", "src/woge/WogePresets.hpp"),
+        ("PULS", "src/puls/PulsPresets.hpp"), ("GLAS", "src/glas/GlasPresets.hpp"), ("FLUT", "src/flut/FlutPresets.hpp"))
+gains = {m: {} for m, _ in MODS}
 for line in out:
     p = line.split()
     if len(p) == 3:
         gains[p[0]][int(p[1])] = float(p[2])
-for mod, path in (("WELLE", "src/welle/WellePresets.hpp"), ("NEBEL", "src/nebel/NebelPresets.hpp")):
+for mod, path in MODS:
     s = open(path).read()
     i = [0]
 

@@ -1,7 +1,7 @@
 {
   "slug": "GenraNeon",
   "name": "GENRA Neon",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -17,13 +17,65 @@
       "slug": "Welle",
       "name": "WELLE",
       "description": "Wavetable synth in the neon look: two oscillators with 32 built-in tables in folders and your own WAV wavetables, TABLE and POSITION, six warps, unison, GENRA's filters, MOTION in time, MUTATE, FREEZE. Follows GENRA and GENRA TECHNO.",
-      "tags": ["Synth Voice", "Oscillator", "Polyphonic", "Filter"]
+      "tags": [
+        "Synth Voice",
+        "Oscillator",
+        "Polyphonic",
+        "Filter"
+      ]
     },
     {
       "slug": "Nebel",
       "name": "NEBEL",
       "description": "Cluster universe: every note becomes a cloud of up to 8 voices (chords, spread, detune, chaos, drift, strum) from five generators, five textures and three huge reverbs; ORBIT turns it in time. Takes GENRA's chords.",
-      "tags": ["Synth Voice", "Polyphonic", "Reverb", "Random"]
+      "tags": [
+        "Synth Voice",
+        "Polyphonic",
+        "Reverb",
+        "Random"
+      ]
+    },
+    {
+      "slug": "Woge",
+      "name": "WOGE",
+      "description": "Scanned synthesis in the neon look: a string of masses on springs moves slowly, a scan head reads its shape at the pitch of the note. MASS, TENSION, DAMP, CENTER; HAMMER, PLUCK, NOISE, BOW or AUDIO excite it; PATH, WIDTH, DRIFT; filter, poly 4. Follows GENRA.",
+      "tags": [
+        "Synth Voice",
+        "Physical Modeling",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "Puls",
+      "name": "PULS",
+      "description": "Pulsar synthesis in the neon look: a train of pulses with two formants. CLOCK (note values), FREE (0.25 Hz to 2 kHz: rhythm turns into tone) or NOTE (an instrument); a 16-step mask, DUTY, SKEW, JITTER, TAIL, a PULSE output. Follows GENRA.",
+      "tags": [
+        "Synth Voice",
+        "Oscillator",
+        "Clock Modulator",
+        "Polyphonic"
+      ]
+    },
+    {
+      "slug": "Glas",
+      "name": "GLAS",
+      "description": "An ANS synthesizer in the neon look: paint on the glass with the mouse (pitch up, time across), a head plays it in time. PEN, SPRAY, LINE, ERASE, SNAP to the scale (also GENRA's key and chord), REC paints the spectrum of an input. Follows GENRA.",
+      "tags": [
+        "Synth Voice",
+        "Oscillator",
+        "Visual"
+      ]
+    },
+    {
+      "slug": "Flut",
+      "name": "FLUT",
+      "description": "A tidal drone in the neon look: up to six voices on GENRA's chord drift and glide; a slow tide (1 to 128 bars or up to 10 minutes) makes it louder, brighter and denser. Textures, sub, bloom, haze, TIDE and POLY outputs. Follows GENRA.",
+      "tags": [
+        "Synth Voice",
+        "Drone",
+        "Polyphonic",
+        "Reverb"
+      ]
     }
   ]
 }

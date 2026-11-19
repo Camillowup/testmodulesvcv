@@ -12,4 +12,8 @@ void init(Plugin* p) {
 	pluginInstance = p;
 	p->addModel(modelWelle);
 	p->addModel(modelNebel);
+	p->addModel(modelWoge);
+	p->addModel(modelPuls);
+	p->addModel(modelGlas);
+	p->addModel(modelFlut);
 }

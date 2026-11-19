@@ -8,8 +8,12 @@ menus are in English; the module names stay German.
 | --- | --- |
 | **WELLE** (44 HP) | Wavetable synth. The table is a neon mountain range on the display; the frame that plays is its glowing ridge. |
 | **NEBEL** (44 HP) | Cluster universe. Every note becomes a cloud of up to 8 voices; the display is a galaxy, the voices its stars. |
+| **WOGE** (44 HP) | Scanned synthesis. A string of masses moves slowly; a scan head reads its shape as the wave. |
+| **PULS** (44 HP) | Pulsar synthesis. A train of pulses with two formants: a rhythm when slow, a tone when fast. |
+| **GLAS** (44 HP) | ANS synthesizer. Paint on the glass with the mouse; a head plays the picture in time. |
+| **FLUT** (44 HP) | Tidal drone. Up to six voices on GENRA's chord, breathing with a slow tide. |
 
-Both follow **GENRA** and **GENRA TECHNO** without cables (right-click › Follow GENRA; presets change with the genre),
+All follow **GENRA** and **GENRA TECHNO** without cables (right-click › Follow GENRA; presets change with the genre),
 take MIDI-MAP on every knob, button, field and the preset field, and have many CV inputs (no built-in LFO: patch one).
 
 ## WELLE
@@ -42,9 +46,51 @@ take MIDI-MAP on every knob, button, field and the preset field, and have many C
 - **BIG BANG** throws a new cluster, **FREEZE** holds it, UNDO, INIT. IN L/R send other sounds through texture and space.
 - Outputs: ENV, ORBIT (±5 V), L, R.
 
+## WOGE
+
+- **STRING:** MASS, TENSION, DAMP, CENTER – 24 masses on springs, moving about 1500 times a second; every voice has
+  its own string.
+- **EXCITE:** HAMMER, PLUCK, NOISE, BOW (as long as the gate is held) or AUDIO (EXC IN pushes the string); POSITION and
+  FORCE. **STRIKE** hits every sounding string.
+- **SCAN:** PATH (LINEAR, LOOP, BOUNCE, SPIRAL), WIDTH (how much of the string is read), DRIFT (that part wanders, in time).
+- **FILTER** (ladder, CUTOFF, RES, DRIVE), envelope, POLY 4 / MONO / LEGATO, GLIDE, ACCENT. **FREEZE** holds the strings.
+- Outputs: ENV, SHAPE (the middle of the string, ±5 V), L, R.
+
+## PULS
+
+- **PULSE:** CLOCK (note values 1/1 … 1/64, in time), FREE (0.25 Hz … 2 kHz: a rhythm turns into a tone) or NOTE (the
+  pulse rate follows V/OCT: an instrument; the mask then cuts the tone in 16ths). F1 and F2: the two formants (in
+  CLOCK / FREE V/OCT moves them).
+- **PULSARET:** the wave (SINE … NOISE), the window (GAUSS, EXPO, REV EXPO, HANN, RECT), DUTY, SKEW.
+- **MASK:** 16 steps; EUCLID, RANDOM, BURST, ALL or EDIT (click the steps), DENS, ROT, PROB, **NEW**.
+- **SPACE:** SPREAD (pulses left and right), JITTER (time and formant), TAIL. Filter, envelope, voice mode.
+- Outputs: ENV, PULSE (a trigger for every pulse that plays), L, R.
+
+## GLAS
+
+- **The glass:** paint with the mouse – pitch goes up, time across. Left button: the tool (PEN, SPRAY, LINE, ERASE),
+  right button: erase. SIZE, **SNAP** (strokes land on the notes of SCALE). The picture is saved with the patch.
+- **BANK:** pictures to start from (CHOIR, DRONE, BELLS, NOISE, GLISS, PULSE, AURORA); **NEW** paints a new one,
+  **CLEAR** wipes the glass, **REC** paints the spectrum of IN at the head.
+- **PLAY:** 1 … 32 bars in time, FORWARD / BACKWARD / PING-PONG, SPEED, POS (with POS CV patched the CV moves the head).
+- **TONE:** SCALE (FREE, CHROMATIC, MAJOR, MINOR, DORIAN, PENTATONIC, **GENRA KEY**: the key of the notes GENRA plays,
+  **GENRA CHORD**: the notes held now), LOW, RANGE, TILT. SCALE works when the picture plays, SNAP when you paint.
+- **SPACE:** SPREAD, BLUR, SHIMMER. DRONE (plays all the time) or GATE (while a note is held; V/OCT transposes).
+- Outputs: ENV, BRIGHT (how much the head plays, 0–10 V), L, R.
+
+## FLUT
+
+- **VOICES:** 1–6 voices (the clouds) on the chord that comes in (one note makes its own chord), OCT, SPREAD over the
+  octaves (NEW: a new voicing), DRIFT, MORPH (glide into the next chord), SUB one or two octaves below.
+- **TIDE:** SYNC (1 … 128 bars) or FREE (2 s … 10 min) with TIME; DEPTH (how much the tide changes loudness, brightness
+  and density), PHASE, SKEW.
+- **TEXTURE:** GLASS, REED, CHOIR, BOWED, DUST; BRIGHT, GRIT, BREATH. **SPACE:** BLOOM, WIDTH, HAZE (IN L/R go in too).
+- SWELL, FADE, LEVEL; DRONE or GATE; **FREEZE** holds tide, drift and chord.
+- Outputs: TIDE (0–10 V), SUB, POLY (the voices), L, R.
+
 ## Presets
 
-WELLE has 32 factory presets, NEBEL 24, sorted by style (the styles match GENRA's genres). Every preset is levelled by
+WELLE has 32 factory presets, NEBEL 24, WOGE 18, PULS 16, GLAS 12, FLUT 14, sorted by style (the styles match GENRA's genres). Every preset is levelled by
 the engine test (`test/neon_test.cpp`): it plays each one and sets its gain, so they are even – not too hot, not too
 quiet. Own presets: right-click › Save preset as …
 
