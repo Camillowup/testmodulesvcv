@@ -25,3 +25,11 @@ Im eigenen Repo `Camillowup/Genra-Chop` (Merkliste dort in `docs/MERKLISTE.md`).
 ## GENRA GLANZ (eigenes Plugin in `genra-glanz/`, seit 19. Nov. 2026)
 - 2.0.0 gebaut (Test): in Rack prüfen, ob jede Szene flüssig läuft und mit GENRA in den Spurfarben reagiert.
 - Später: weitere Szenen (immer hinten anhängen), z. B. KALEIDOSKOP, Wellen-Landschaft, Akkordkreis.
+
+## GENRA NEON (eigenes Plugin in `genra-neon/`, seit 19. Nov. 2026)
+Neon als Überbegriff: neue Module im NEON-TERRAIN-Look kommen hierher (Name deutsch, alles andere Englisch).
+Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyberdeck und Atom-Terminal).
+- 2.0.0 gebaut (Test): WELLE und NEBEL in Rack prüfen – Klang der Presets (gleich laut? die perkussiven sind etwas
+  leiser), Follow mit GENRA und GENRA TECHNO, MIDI-MAP (auch Preset-Feld), eigene WAV-Wavetables (SET ROOT FOLDER,
+  Unterordner, TABLE bleibt am Ordnerende), MUTATE/UNDO/INIT, FREEZE, CPU bei vielen Stimmen (NEBEL ADDITIVE).
+- Merkliste: Idee BIEST-Look (Maul-Display, Augen-Regler) behalten.

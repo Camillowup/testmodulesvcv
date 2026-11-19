@@ -12,6 +12,9 @@ Rack-Plugin-Ordner gelöscht werden, sonst stehen die Module doppelt im Browser.
 
 Offenes und Geplantes: `docs/MERKLISTE.md`.
 
+**GENRA NEON** (eigenes Plugin im Ordner `genra-neon/`, seit 19. Nov. 2026): die Neon-Module im NEON-TERRAIN-Look,
+zuerst **WELLE** (Wavetable-Synth) und **NEBEL** (Cluster-Universum). Beschreibung: `genra-neon/README.md`.
+
 **GENRA CHOP** (Hip-Hop-Beat-Generator mit Sample-Chopping) ist ein eigenes Plugin im eigenen Repo:
 https://github.com/Camillowup/Genra-Chop
 

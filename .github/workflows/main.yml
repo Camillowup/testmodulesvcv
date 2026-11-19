@@ -5,6 +5,8 @@ on:
     paths-ignore:
       - "genra-glanz/**"
       - ".github/workflows/glanz.yml"
+      - "genra-neon/**"
+      - ".github/workflows/neon.yml"
   workflow_dispatch:
 
 permissions:
