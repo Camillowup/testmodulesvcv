@@ -1,0 +1,28 @@
+{
+  "slug": "GenraKehle",
+  "name": "GENRA Kehle",
+  "version": "2.0.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv/tree/main/genra-kehle",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-kehle/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-kehle/CHANGELOG.md",
+  "modules": [
+    {
+      "slug": "Kehle",
+      "name": "KEHLE",
+      "description": "Neon vocoder: your voice into MOD, a synth into CAR (or the built-in carrier on V/OCT + GATE, chords from GENRA). 8 to 32 bands, eight characters (CLASSIC, WHISPER, CHOIR, METAL, GLASS, SHIFT, CRUSH, TALKBOX), FORMANT, SIBIL, FREEZE, HOLD. A little figure sings along.",
+      "tags": [
+        "Vocoder",
+        "Effect",
+        "Polyphonic",
+        "Visual"
+      ]
+    }
+  ]
+}
