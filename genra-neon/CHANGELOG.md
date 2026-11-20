@@ -1,5 +1,21 @@
 # GENRA NEON – Versionsgeschichte
 
+### 2.1.2 (20. Nov. 2026, Test-Build, kein Release)
+Reparaturen:
+- Hall NEBULA (Shimmer) schaukelte sich bei langer Hallzeit auf: nach 20–30 s hing der Ausgang an 8 V (FLUT, NEBEL).
+  Shimmer-Rückführung begrenzt, Hall-Tank gesättigt, DC-Filter im Hall.
+- FLUT: GRIT-Knistern ohne Schlagseite, DC-Filter an L, R und SUB; Presets neu ausgesteuert.
+- NEBEL: Textur FOLD erzeugte Gleichspannung (bis 0,9 V, auch in der Stille) – DC-Filter an den Ausgängen.
+- PULS: im Modus FREE konnte Gleichspannung entstehen – DC-Filter an den Ausgängen.
+- Hall: beim Preset-Wechsel werden jetzt auch Shimmer-Puffer und DC-Filter geleert (kein Nachklang des alten Sounds).
+- WELLE LOAD WAV: WAV-Dateien mit zu grosser Framegrösse im Header lasen über das Dateiende (Absturzgefahr);
+  kaputte Werte in Float-WAVs werden abgefangen.
+- PULS: mit CV an DENS/ROT wurden beim Laden eines Patches die gespeicherten Schritte überschrieben.
+
+Panels WELLE und NEBEL:
+- Grössere Schrift wie bei FUNKE/SCHMELZ: Beschriftungen 1,4–1,65 mm (vorher 1,05–1,3 mm), Sektionsnamen 1,7 mm;
+  Sektionsreiter passen sich der Textlänge an. (Entwürfe WOGE/PULS/GLAS/FLUT in docs/panels/ ebenso.)
+
 ### 2.1.1 (20. Nov. 2026, Test-Build, kein Release)
 WELLE und NEBEL:
 - Kein Knacken mehr beim Preset-Wechsel (auch per Mausrad): kurz stumm (4 ms), Filter und Effekt-Fahnen starten sauber,

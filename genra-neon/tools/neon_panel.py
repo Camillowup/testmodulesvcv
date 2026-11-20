@@ -154,12 +154,12 @@ def build(S):
         o.e(f'<rect x="{gx}" y="{gy}" width="{gw}" height="0.55" fill="#05020c"/>')
         o.e(f'<rect x="{gx + 2}" y="{gy + 0.55}" width="{gw * 0.6:.1f}" height="0.3" fill="{C2}" fill-opacity="0.8"/>')
     px = W - 58.0
-    o.text(53, 6.0, S["sub"], 1.55, C2, 700, "start", 0.5)
-    o.text(53, 8.9, "GENRA // NEON", 1.3, "#7d6aa8", 600, "start", 0.45)
+    o.text(53, 6.0, S["sub"], 1.75, C2, 700, "start", 0.5)
+    o.text(53, 8.9, "GENRA // NEON", 1.5, "#7d6aa8", 600, "start", 0.45)
     for i, nm in enumerate(("UNDO", "INIT")):
         bx = px - 22.0 + i * 10.6
         o.e(f'<path d="M{bx:.2f} 3.6 h7.8 l1.4 1.4 v4.2 h-9.2 z" fill="#1a0a2e" stroke="{C3}" stroke-width="0.3"/>')
-        o.text(bx + 4.6, 7.8, nm, 1.3, "#ffffff", 800, "middle", 0.3)
+        o.text(bx + 4.6, 7.8, nm, 1.45, "#ffffff", 800, "middle", 0.3)
         lay.append((nm, [bx, 3.6, 9.2, 5.6]))
     o.e(f'<path d="M{px:.2f} 3.0 h47 l3 3 v4.4 h-47 l-3 -3 z" fill="#0a0518" stroke="{C1}" stroke-width="0.3"/>')
     o.e(f'<polyline points="{px + 45:.2f},5.6 {px + 46.4:.2f},7 {px + 47.8:.2f},5.6" fill="none" stroke="{C2}" stroke-width="0.4"/>')
@@ -179,9 +179,9 @@ def build(S):
             o.e(f'<path d="{cut(x0, y0, x1, y1)}" fill="#0a0618" fill-opacity="0.8"/>')
             o.e(f'<path d="{cut(x0, y0, x1, y1)}" fill="none" stroke="#3a2b66" stroke-width="0.3"/>')
             corners(o, x0, y0, x1, y1, C2, 2.2, 0.35)
-            tw = len(sec["title"]) * 1.15 + 4
+            tw = twidth(sec["title"], 1.7, 800, 0.5) + 2.6
             o.e(f'<path d="M{x0:.2f} {y0:.2f} V{y0 - hb:.2f} H{x0 + tw:.2f} L{x0 + tw + 2.4:.2f} {y0:.2f} Z" fill="#2a0f3f" stroke="{C1}" stroke-width="0.3"/>')
-            o.text(x0 + 1.6, y0 - hb / 2 + 0.65, sec["title"], 1.45, "#ffffff", 800, "start", 0.5)
+            o.text(x0 + 1.6, y0 - hb / 2 + 0.65, sec["title"], 1.7, "#ffffff", 800, "start", 0.5)
             fy = y0 - hb + 0.2
             if sec.get("fields"):  # beside the title, in the band
                 fx = x0 + tw + 3.6
@@ -204,15 +204,15 @@ def build(S):
                 kind = c[0]
                 if kind == "knob":
                     _, name, label, big, cv = c
-                    o.text(mx, ky + KR + 2.9, label, 1.3, LBL if big else LBL2, 700, "middle", 0.3)
+                    o.text(mx, ky + KR + 2.9, label, 1.65, LBL if big else LBL2, 700, "middle", 0.3)
                     lay.append((name, [mx, ky, KR, float(big)]))
                     if cv:
                         o.e(f'<polygon points="{hexagon(mx, jy, 2.9)}" fill="#141024" stroke="{CV}" stroke-width="0.3"/>')
                         pos[cv] = (mx, jy, CV)
                 elif kind == "jack":  # a CV for the field above (generator, chord, texture)
                     _, cv, label = c
-                    o.text(mx, ky - 0.4, label, 1.3, LBL2, 700, "middle", 0.3)
-                    o.text(mx, ky + 2.6, "CV", 1.1, "#6d5c99", 700, "middle", 0.3)
+                    o.text(mx, ky - 0.4, label, 1.6, LBL2, 700, "middle", 0.3)
+                    o.text(mx, ky + 2.6, "CV", 1.4, "#6d5c99", 700, "middle", 0.3)
                     o.e(f'<line x1="{mx:.2f}" y1="{ky + 3.6:.2f}" x2="{mx:.2f}" y2="{jy - 3.4:.2f}" stroke="{CV}" stroke-width="0.25" stroke-opacity="0.6"/>')
                     o.e(f'<polygon points="{hexagon(mx, jy, 2.9)}" fill="#141024" stroke="{CV}" stroke-width="0.3"/>')
                     pos[cv] = (mx, jy, CV)
@@ -221,7 +221,7 @@ def build(S):
                     dx = (cw - 1.0) / len(names)
                     lx0 = cx + 0.5 + dx / 2
                     for i, nm in enumerate(names):
-                        o.text(lx0 + i * dx, ky + 4.2, nm, 1.15, LBL2, 700, "middle", 0.15)
+                        o.text(lx0 + i * dx, ky + 4.2, nm, 1.45, LBL2, 700, "middle", 0.15)
                     lay.append((name, [lx0, ky, dx, float(len(names))]))
                 elif kind == "steps":  # PULS: the mask steps, frames the module lights (layout: x, y, pitch, h, n)
                     _, name, n = c
@@ -230,16 +230,16 @@ def build(S):
                     for i in range(n):
                         sx = sx0 + i * pitch
                         o.e(f'<path d="M{sx + 0.3:.2f} {sy0:.2f} h{pitch - 1.6:.2f} l1.0 1.0 v{sh - 1.0:.2f} h-{pitch - 0.6:.2f} z" fill="#120a28" stroke="{C1 if i % 4 == 0 else "#5b3a7a"}" stroke-width="0.25"/>')
-                        o.text(sx + pitch / 2, sy0 + sh + 1.9, str(i + 1), 1.05, LBL2, 700, "middle", 0.1)
+                        o.text(sx + pitch / 2, sy0 + sh + 1.9, str(i + 1), 1.35, LBL2, 700, "middle", 0.1)
                     lay.append((name, [sx0, sy0, pitch, sh, float(n)]))
                 elif kind == "btn":
                     _, name, label, trig = c
                     bw = min(cw - 1.2, 11.0)
                     o.e(f'<path d="M{mx - bw / 2:.2f} {ky - 3:.2f} h{bw - 2:.2f} l2 2 v4 h-{bw:.2f} z" fill="#1a0a2e" stroke="{C1}" stroke-width="0.35"/>')
-                    o.text(mx, ky + 0.6, label, 1.2, "#ffffff", 800, "middle", 0.2)
+                    o.text(mx, ky + 0.6, label, 1.5, "#ffffff", 800, "middle", 0.2)
                     lay.append((name, [mx - bw / 2, ky - 3, bw, 6.0]))
                     if trig:
-                        o.text(mx, ky + 6.0, "TRIG", 1.1, "#6d5c99", 700, "middle", 0.3)
+                        o.text(mx, ky + 6.0, "TRIG", 1.4, "#6d5c99", 700, "middle", 0.3)
                         o.e(f'<polygon points="{hexagon(mx, jy, 2.9)}" fill="#141024" stroke="{TR}" stroke-width="0.3"/>')
                         pos[trig] = (mx, jy, TR)
                 cx += cw
@@ -253,7 +253,7 @@ def build(S):
         o.e(f'<rect x="{x - 4.3:.2f}" y="{jy - 3.6:.2f}" width="{len(items) * JS:.2f}" height="9.4" rx="0.8" fill="none" stroke="{col}" stroke-width="0.25" stroke-opacity="0.75"/>')
         for name, lb in items:
             o.e(f'<polygon points="{hexagon(x, jy, 3.0)}" fill="#141024" stroke="{col}" stroke-width="0.3"/>')
-            o.text(x, jy + 4.6, lb, 1.1, LBL2, 700, "middle", 0.15)
+            o.text(x, jy + 4.6, lb, 1.45, LBL2, 700, "middle", 0.15)
             pos[name] = (x, jy, col)
             x += JS
         x += GAP
@@ -265,9 +265,9 @@ def build(S):
     for i, (name, lb) in enumerate(S["outs"]):
         x = ox + i * JS
         o.e(f'<polygon points="{hexagon(x, jy, 3.1)}" fill="#141024" stroke="{C1}" stroke-width="0.3"/>')
-        o.text(x, jy + 4.6, lb, 1.15, "#ffffff", 700, "middle", 0.2)
+        o.text(x, jy + 4.6, lb, 1.45, "#ffffff", 700, "middle", 0.2)
         outs.append((name, x, jy, C1))
-    o.text(ox - 6.2, jy + 0.5, "OUT", 1.2, C1, 800, "end", 0.4)
+    o.text(ox - 6.2, jy + 0.5, "OUT", 1.5, C1, 800, "end", 0.4)
     for sx in (7.62, W - 7.62):
         for sy in (2.54, H - 2.54):
             o.e(f'<circle cx="{sx:.2f}" cy="{sy:.2f}" r="1.5" fill="#0b0716" stroke="#5b4a8a" stroke-width="0.25"/>')

@@ -192,6 +192,18 @@ struct PingPong {
 };
 
 // ---------------------------------------------------------------- octave-up shifter (two crossfaded moving taps)
+/** DC blocker (about 5 Hz): takes a constant offset off an output (2.1.2). */
+struct DcBlock {
+	float x = 0.f, y = 0.f, k = 0.9993f;
+	void setSampleRate(float sr) { k = 1.f - 2.f * PI * 5.3f / sr; }
+	void reset() { x = y = 0.f; }
+	float process(float in) {
+		y = in - x + k * y;
+		x = in;
+		return y;
+	}
+};
+
 struct Shifter {
 	Ring buf;
 	float ph = 0.f, fs = 48000.f, win = 0.06f;
@@ -240,6 +252,9 @@ struct Verb {
 		for (int i = 0; i < 4; i++)
 			ap[i].clear();
 		shimFb[0] = shimFb[1] = 0.f;
+		// 2.1.2: the shimmer lines and the DC filters too (else the old sound comes back after a preset change)
+		for (int c = 0; c < 2; c++)
+			shimmer[c].buf.clear(), shimmer[c].ph = 0.f, dcx[c] = dcy[c] = 0.f;
 	}
 	float scale = 1.f, g[N] = {}, damp = 0.5f, shimK = 0.35f;
 	int type = V_HALL;

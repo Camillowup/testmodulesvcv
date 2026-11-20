@@ -72,6 +72,7 @@ struct Puls : Module, follow::Host {
 	uint32_t doneN = 0, doneU = 0, doneI = 0;
 	uint32_t seed = 1;
 	int genKey = -1;
+	bool keepSteps = false;  // 2.1.2: just loaded: the saved steps stay, whatever DENS/ROT CV say
 	float flash = 0.f;
 	Undo undo;
 
@@ -163,7 +164,7 @@ struct Puls : Module, follow::Host {
 		Module::onReset(e);
 		engine->allOff();
 		bank.reset();
-		genKey = -1;
+		genKey = -1, keepSteps = false;
 	}
 	void onRemove(const RemoveEvent& e) override { follow::gone(this); }
 	void onPortChange(const PortChangeEvent& e) override { fol.portChange(e); }
@@ -173,6 +174,11 @@ struct Puls : Module, follow::Host {
 		int pat = clamp((int) std::round(params[PATTERN_PARAM].getValue()), 0, NUM_PATTERNS - 1);
 		float dens = kv(this, DENS_PARAM, DENS_INPUT), rot = kv(this, ROT_PARAM, ROT_INPUT);
 		int key = pat * 100000 + (int) std::round(dens * 16.f) * 1000 + (int) std::round(rot * 15.f) * 50 + (int) (seed % 50u);
+		if (keepSteps) {
+			keepSteps = false;
+			genKey = pat == PT_EDIT ? -1 : key;
+			return;
+		}
 		if (key == genKey || pat == PT_EDIT) {
 			genKey = pat == PT_EDIT ? -1 : genKey;
 			return;
@@ -318,10 +324,8 @@ struct Puls : Module, follow::Host {
 		if (json_t* v = json_object_get(j, "seed"))
 			seed = (uint32_t) json_integer_value(v);
 		bank.fromJson(j);
-		// the steps come back as they were saved: do not let the pattern write over them
-		int pat = clamp((int) std::round(params[PATTERN_PARAM].getValue()), 0, NUM_PATTERNS - 1);
-		float dens = params[DENS_PARAM].getValue(), rot = params[ROT_PARAM].getValue();
-		genKey = pat * 100000 + (int) std::round(dens * 16.f) * 1000 + (int) std::round(rot * 15.f) * 50 + (int) (seed % 50u);
+		// the steps come back as they were saved: do not let the pattern write over them (also with CV at DENS/ROT)
+		keepSteps = true;
 	}
 };
 

@@ -623,7 +623,7 @@ inline std::shared_ptr<Table> loadWav(const std::string& path, std::string* err 
 			v = (int32_t) u32(o) / 2147483648.f;
 		else if (bits == 8)
 			v = (d[o] - 128) / 128.f;
-		x[i] = v;
+		x[i] = std::isfinite(v) ? clampf(v, -4.f, 4.f) : 0.f;  // 2.1.2: broken float WAVs
 	}
 	if (n < 16) {
 		if (err) *err = "too short";
@@ -631,6 +631,9 @@ inline std::shared_ptr<Table> loadWav(const std::string& path, std::string* err 
 	}
 	if (frameSize <= 0)
 		frameSize = n % 2048 == 0 ? 2048 : (n % 1024 == 0 && n >= 1024 ? (n >= 2048 * 2 ? 2048 : 1024) : (n <= 8192 ? (int) n : 2048));
+	// 2.1.2: a frame size from the file larger than the file itself read past its end
+	if (frameSize > (int) n)
+		frameSize = (int) n;
 	int total = std::max(1, (int) (n / frameSize));
 	int frames = std::min(total, MAXFRAMES);
 	std::vector<std::vector<float>> waves(frames, std::vector<float>(FRAME));

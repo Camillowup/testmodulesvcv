@@ -114,6 +114,7 @@ struct Engine {
 	gmono::Filter flt[2];
 	float g = 0.f;
 	Verb verb;
+	DcBlock dcb[2];  // 2.1.2
 	int ctl = 0, newest = 0;
 	// for the display / outputs
 	uint32_t pulseCount = 0;   // every pulse (played or masked)
@@ -130,6 +131,7 @@ struct Engine {
 	void setSampleRate(float sr) {
 		fs = sr, dt = 1.f / sr;
 		verb.setSampleRate(sr);
+		dcb[0].setSampleRate(sr), dcb[1].setSampleRate(sr);
 		verb.set(V_HALL, 0.35f, 0.3f, 0.6f);
 		flt[0].reset(), flt[1].reset();
 	}
@@ -343,6 +345,8 @@ struct Engine {
 		if (trig > 0.f)
 			trig -= dt;
 		pulseOut = trig > 0.f ? 10.f : 0.f;
+		// 2.1.2: short pulsarets can carry DC (FREE): off the outputs
+		l = dcb[0].process(l), r = dcb[1].process(r);
 		L = genra_out::limit(l * 3.f * p.outGain);
 		R = genra_out::limit(r * 3.f * p.outGain);
 	}

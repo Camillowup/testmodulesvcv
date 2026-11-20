@@ -136,6 +136,7 @@ struct Engine {
 	float texLp[2] = {};
 	float kShim = 0.1f, kDust = 0.1f, kSmear = 0.1f, kFold = 0.1f, dustQ = 4096.f;
 	Verb verb;
+	DcBlock dcb[2];  // 2.1.2
 	int ctl = 0;
 	// display
 	float showPitch[MAXVOICES] = {};
@@ -162,6 +163,7 @@ struct Engine {
 		for (auto& x : v)
 			x.line.resize((int) (sr / 18.f) + 8);
 		verb.setSampleRate(sr);
+		dcb[0].setSampleRate(sr), dcb[1].setSampleRate(sr);
 	}
 	void allOff() {
 		for (auto& x : v) {
@@ -485,6 +487,8 @@ struct Engine {
 		verb.process(l, r, wl, wr);
 		l = l * (1.f - 0.45f * smix) + wl * smix * 1.3f;
 		r = r * (1.f - 0.45f * smix) + wr * smix * 1.3f;
+		// 2.1.2: FOLD (and anything else) must not leave a DC offset on the outputs
+		l = dcb[0].process(l), r = dcb[1].process(r);
 		L = genra_out::limit(l * 5.f * p.outGain);
 		R = genra_out::limit(r * 5.f * p.outGain);
 	}
