@@ -12,18 +12,19 @@ of its own; once it works it moves into GENRA Neon Punk.
   C minor chord, so it speaks right away.
 
 ## Controls
-- **CHARACTER**: CLASSIC (robot), WHISPER (noise carrier, a ghost), CHOIR (detuned voices with vibrato and a wide
+- **CHARACTER** (seven): CLASSIC (robot), WHISPER (noise carrier, a ghost), CHOIR (detuned voices with vibrato and a wide
   chorus), METAL (ring-modulated bands, tin can), GLASS (very narrow singing bands, crystal), SHIFT (FORMANT over
-  ±2 octaves: monster to mouse), CRUSH (a speech chip: 45 frames per second, 8 kHz, 6 bits), TALKBOX (fewer, softer
+  ±2 octaves: monster to mouse), TALKBOX (fewer, softer
   bands, a driven carrier).
 - **BANDS** 8–32 · **FORMANT** moves the carrier's bands (±1 octave, SHIFT ±2) · **RESO** narrower bands ·
-  **SIBIL** the hiss of S, T, F comes through as noise · **OCT** and **ENSEMBLE** for the carrier.
+  **SIBIL** the hiss of S, T, F comes through as noise (only on real S sounds, not on sung vowels) · **OCT** and **ENSEMBLE** for the carrier.
 - **ATTACK / RELEASE** of the band envelopes · **DRY** the voice itself in the output · **LEVEL** (not in a preset).
 - **FREEZE** the bands stand still: the vowel you are singing stays · **HOLD** the built-in carrier keeps the last
   chord after the gates close · **UNDO / INIT**.
 - CV under the knobs: FORMANT, RESO, SIBIL, ENSEMBLE, RELEASE, DRY; a trigger input toggles FREEZE.
 - Outputs: **ENV** (how loud the voice is, 0–10 V), **L / R**.
 - The display: the bands as a neon landscape, and a figure for each character that sings along with your voice.
+- A soft gate on MOD and smoothed band envelopes keep it clean while you sing.
 - 16 factory presets (ROBOT, CHOIR, WHISPER, FX), your own presets, MIDI-MAP on every control.
 
 ## Build

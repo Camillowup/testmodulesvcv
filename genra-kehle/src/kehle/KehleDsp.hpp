@@ -2,9 +2,11 @@
 // KEHLE – the engine of the neon vocoder (plain C++ without Rack, so test/kehle_test.cpp can play it).
 // A classic channel vocoder: the modulator (MOD: a voice) is split into 8–32 bands, an envelope follower per band
 // measures how loud each band is, and the same bands of the carrier (CAR L/R: a synth, or the built-in carrier on
-// V/OCT + GATE) are opened by those envelopes. On top: eight CHARACTERs (CLASSIC, WHISPER, CHOIR, METAL, GLASS, SHIFT,
-// CRUSH, TALKBOX), FORMANT (moves the carrier's bands: monster .. mouse), RESO, SIBIL (the hiss of S, T, F comes
-// through as noise), ENSEMBLE, DRY, FREEZE (the envelopes stand still).
+// V/OCT + GATE) are opened by those envelopes. On top: seven CHARACTERs (CLASSIC, WHISPER, CHOIR, METAL, GLASS, SHIFT,
+// TALKBOX), FORMANT (moves the carrier's bands: monster .. mouse), RESO, SIBIL (the hiss of S, T, F comes
+// through as noise, only on real S sounds), ENSEMBLE, DRY, FREEZE (the envelopes stand still).
+// Against grit: the band envelopes are smoothed (two more poles, 30 Hz), so the voice's own vibration does not ring
+// on the carrier; a soft gate on MOD; a gentle low-pass at the output.
 #pragma once
 #include "../neon/NeonDsp.hpp"
 #include "../../genra/OutLimit.hpp"
@@ -14,10 +16,10 @@ namespace kehle {
 
 using neon::clampf;
 
-enum Character { CH_CLASSIC, CH_WHISPER, CH_CHOIR, CH_METAL, CH_GLASS, CH_SHIFT, CH_CRUSH, CH_TALKBOX, NUM_CHARS };
-static const char* const CHAR_NAMES[NUM_CHARS] = {"CLASSIC", "WHISPER", "CHOIR", "METAL", "GLASS", "SHIFT", "CRUSH", "TALKBOX"};
+enum Character { CH_CLASSIC, CH_WHISPER, CH_CHOIR, CH_METAL, CH_GLASS, CH_SHIFT, CH_TALKBOX, NUM_CHARS };
+static const char* const CHAR_NAMES[NUM_CHARS] = {"CLASSIC", "WHISPER", "CHOIR", "METAL", "GLASS", "SHIFT", "TALKBOX"};
 static const char* const CHAR_INFO[NUM_CHARS] = {"ROBOT", "GHOST", "CHOIR", "TIN CAN", "CRYSTAL", "MONSTER <> MOUSE",
-                                                 "SPEECH CHIP", "FUNK TUBE"};
+                                                 "FUNK TUBE"};
 enum Carrier { CAR_SAW, CAR_PULSE, CAR_STRINGS, CAR_NOISE, NUM_CARS };
 static const char* const CAR_NAMES[NUM_CARS] = {"SAW CHORD", "PULSE", "STRINGS", "NOISE"};
 static const char* const CAR_INFO[NUM_CARS] = {"BRIGHT", "HOLLOW", "DETUNED", "AIR"};
@@ -129,18 +131,17 @@ struct Voice {
 struct Engine {
 	float fs = 48000.f;
 	BP ana[MAXB][2], car[MAXB][2][2];  // the modulator's bands (two in a row: steeper) and the carrier's, per side
-	float env[MAXB] = {}, held[MAXB] = {}, smooth[MAXB] = {}, ring[MAXB] = {}, ringInc[MAXB] = {}, weight[MAXB] = {};
+	float env[MAXB] = {}, sm1[MAXB] = {}, sm2[MAXB] = {}, smooth[MAXB] = {}, ring[MAXB] = {}, ringInc[MAXB] = {}, weight[MAXB] = {};
 	int nb = 0, lastChar = -1;
 	float lastShift = -99.f, lastQ = -1.f, carQ = 4.f, makeup = 1.f;
 	HP1 sibHp[2], noiseHp;
-	float sibEnv = 0.f, sibHeld = 0.f, modEnv = 0.f;
+	float sibEnv = 0.f, voiceEnv = 0.f, sibOpen = 0.f, modEnv = 0.f, gateEnv = 0.f, gate = 0.f, voiceLp = 0.f;
+	float lp[2][2] = {};  // the output's gentle low-pass (two poles per side)
 	Voice voice[MAXV];
 	neon::Rng rng;
 	neon::Chorus chorus;
 	neon::DcBlock dc[2];
 	float vibPh = 0.f;
-	int frame = 0;  // CRUSH: the speech-chip frames
-	float crushHold[2] = {}, crushPh = 0.f;
 	// for the display (UI thread reads, no lock: only numbers)
 	float showBand[MAXB] = {};
 	int showN = 16;
@@ -174,7 +175,7 @@ struct Engine {
 			if (full) {
 				ana[i][0].set(f, qBase * 1.1f, fs);
 				ana[i][1].set(f, qBase * 1.1f, fs);
-				weight[i] = 1.f + 0.8f * i / (n - 1);  // a little more of the highs: clearer words
+				weight[i] = 1.f + 0.25f * i / (n - 1);  // a touch more of the highs: clearer words (not the breath)
 			}
 			float fc = f * std::pow(2.f, shiftOct);
 			for (int s = 0; s < 2; s++) {
@@ -185,7 +186,7 @@ struct Engine {
 		}
 		if (n != nb)
 			for (int i = n; i < MAXB; i++)
-				env[i] = held[i] = smooth[i] = 0.f;
+				env[i] = sm1[i] = sm2[i] = smooth[i] = 0.f;
 		nb = n;
 		lastChar = character;
 		lastShift = shiftOct;
@@ -247,29 +248,29 @@ struct Engine {
 
 		// the modulator: bands and their envelopes
 		float m = mod * 0.2f;
-		float ta = 0.0005f * std::pow(120.f, clampf(p.atk, 0.f, 1.f)), tr = 0.005f * std::pow(300.f, clampf(p.rel, 0.f, 1.f));
+		// a soft gate: below the noise of a quiet mic the bands stay shut
+		float am = std::fabs(m);
+		gateEnv += (am - gateEnv) * (am > gateEnv ? 0.01f : 0.0005f);
+		float gTarget = gateEnv > 0.004f ? 1.f : (gateEnv < 0.002f ? 0.f : (gateEnv - 0.002f) / 0.002f);
+		gate += (gTarget - gate) * (gTarget > gate ? 0.004f : 0.0003f);
+		m *= gate;
+		float ta = 0.002f * std::pow(30.f, clampf(p.atk, 0.f, 1.f)), tr = 0.005f * std::pow(300.f, clampf(p.rel, 0.f, 1.f));
 		float ka = 1.f - std::exp(-1.f / (ta * fs)), kr = 1.f - std::exp(-1.f / (tr * fs));
-		bool crush = p.character == CH_CRUSH, talk = p.character == CH_TALKBOX;
-		bool newFrame = false;
-		if (crush && ++frame >= (int) (fs / 45.f)) {
-			frame = 0;
-			newFrame = true;
-		}
+		float ks = 1.f - std::exp(-2.f * neon::PI * 30.f / fs);  // the smoothing after the follower (2 poles, 30 Hz)
+		bool talk = p.character == CH_TALKBOX;
 		float outL = 0.f, outR = 0.f, total = 0.f;
 		for (int i = 0; i < nb; i++) {
 			float a = ana[i][1].process(ana[i][0].process(m)) * weight[i];
 			float r = std::fabs(a);
-			if (!p.freeze)
+			if (!p.freeze) {
 				env[i] += (r - env[i]) * (r > env[i] ? ka : kr);
-			float e = env[i];
+				sm1[i] += (env[i] - sm1[i]) * ks;
+				sm2[i] += (sm1[i] - sm2[i]) * ks;
+			}
+			float e = sm2[i];
 			if (talk) {
 				smooth[i] += (e - smooth[i]) * 0.004f;
 				e = smooth[i];
-			}
-			if (crush) {
-				if (newFrame)
-					held[i] = std::pow(2.f, std::round(std::log2(e + 1e-5f) * 1.5f) / 1.5f);
-				e = held[i];
 			}
 			float bl = car[i][0][1].process(car[i][0][0].process(cl));
 			float br = car[i][1][1].process(car[i][1][0].process(cr));
@@ -291,24 +292,30 @@ struct Engine {
 		}
 		showN = nb;
 
-		// the hiss of S, T, F: the voice's highs open a noise
+		// the hiss of S, T, F: only when the voice's highs are louder than its body (a sung vowel is not)
 		float hs = sibHp[1].process(sibHp[0].process(m));
 		float hr = std::fabs(hs);
-		if (!p.freeze)
+		voiceLp += (m - voiceLp) * 0.25f;  // ~2.5 kHz
+		float vr = std::fabs(voiceLp);
+		if (!p.freeze) {
 			sibEnv += (hr - sibEnv) * (hr > sibEnv ? 0.02f : 0.0015f);
-		float noise = noiseHp.process(rng.bi()) * sibEnv * p.sibil * 6.f;
+			voiceEnv += (vr - voiceEnv) * (vr > voiceEnv ? 0.02f : 0.0015f);
+			float ratio = sibEnv / (voiceEnv + 1e-4f);
+			float want = clampf((ratio - 1.0f) * 2.f, 0.f, 1.f);
+			sibOpen += (want - sibOpen) * (want > sibOpen ? 0.01f : 0.002f);
+		}
+		float noise = noiseHp.process(rng.bi()) * sibEnv * sibOpen * p.sibil * 3.f;
 		float g = makeup * 1.2f;
 		L = outL * g + noise;
 		R = outR * g + noise;
-		if (crush) {  // a speech chip: 8 kHz, 6 bits
-			crushPh += 8000.f / fs;
-			if (crushPh >= 1.f) {
-				crushPh -= 1.f;
-				crushHold[0] = std::round(L * 32.f) / 32.f;
-				crushHold[1] = std::round(R * 32.f) / 32.f;
-			}
-			L = crushHold[0];
-			R = crushHold[1];
+		{  // a gentle low-pass (~11 kHz): no fizz on top
+			float kl = 1.f - std::exp(-2.f * neon::PI * std::min(11000.f, 0.4f * fs) / fs);
+			lp[0][0] += (L - lp[0][0]) * kl;
+			lp[0][1] += (lp[0][0] - lp[0][1]) * kl;
+			lp[1][0] += (R - lp[1][0]) * kl;
+			lp[1][1] += (lp[1][0] - lp[1][1]) * kl;
+			L = lp[0][1];
+			R = lp[1][1];
 		}
 		float ens = choir ? std::max(p.ens, 0.6f) : p.ens;
 		chorus.process(ens, L, R);

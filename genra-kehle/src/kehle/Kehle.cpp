@@ -442,25 +442,6 @@ static void drawFigure(Pen& P, int ch, float m, float t, float form, bool frozen
 			P.circle(134, 57, 1.5f + 2.5f * m * mu, d);
 			break;
 		}
-		case CH_CRUSH: {  // the pixel face flickers
-			float fl = frozen ? 1.f : (std::fmod(t * 13.7f, 1.f) < 0.08f ? 0.45f : 1.f);
-			NVGcolor c = alpha(CYAN, fl);
-			P.fillRect(64, 16, 48, 6, c);
-			P.fillRect(58, 22, 6, 48, c);
-			P.fillRect(112, 22, 6, 48, c);
-			P.fillRect(64, 70, 48, 6, c);
-			P.fillRect(72, 32, 8, 8, c);
-			P.fillRect(96, 32, 8, 8, c);
-			int open = (int) std::round(m * 3.f);  // the mouth in pixel steps
-			P.fillRect(74, 52, 6, 6, PINK);
-			P.fillRect(96, 52, 6, 6, PINK);
-			P.fillRect(80, 58, 16, 6 + 4.f * open, PINK);
-			for (int k = 0; k < 3; k++) {
-				float a = frozen ? 0.6f : (std::fmod(t * 7.f + k * 0.37f, 1.f) < 0.5f ? 1.f : 0.2f);
-				P.fillRect(124 + (k % 2) * 6, 30 + k * 13, 4, 4, alpha(SOFTV, a));
-			}
-			break;
-		}
 		case CH_TALKBOX: {  // the funk tube wobbles
 			P.circle(72, 52, 22, CYAN);
 			nvgBeginPath(vg);

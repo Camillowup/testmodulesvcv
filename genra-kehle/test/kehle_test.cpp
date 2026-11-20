@@ -100,6 +100,67 @@ static Result playPreset(int pi, float gain) {
 	return r;
 }
 
+/** A sung vowel (no S): the bands must not flutter with the voice's own vibration and nothing may fizz above 6 kHz
+ * (the grit of 2.0.0); a hissed S must still open SIBIL, a vowel must not. */
+static int clean() {
+	int bad = 0;
+	for (int ch = 0; ch < NUM_CHARS; ch++) {
+		std::unique_ptr<Engine> e(new Engine);
+		e->setSampleRate(FS);
+		Params p;
+		p.character = ch;
+		BP f1, f2;
+		f1.set(730, 8, FS);
+		f2.set(1090, 10, FS);
+		float ph = 0.f, x[3] = {}, y[3] = {}, k = std::exp(-2.f * neon::PI * 6000.f / FS);
+		const float notes[3] = {-1.f, -0.75f, -1.f + 7.f / 12.f};
+		double hp = 0.0, tot = 0.0, emin[MAXB], emax[MAXB];
+		for (int b = 0; b < MAXB; b++)
+			emin[b] = 1e9, emax[b] = 0.0;
+		float openVowel = 0.f, openS = 0.f;
+		neon::Rng r;
+		HP1 sh1, sh2;  // an S: noise above ~3 kHz (as in speech)
+		sh1.set(3000.f, FS);
+		sh2.set(3000.f, FS);
+		for (int i = 0; i < (int) (2.5f * FS); i++) {
+			ph += 130.f / FS;
+			if (ph >= 1.f)
+				ph -= 1.f;
+			bool s = i > 2 * FS;  // the last half second: a hissed S
+			float b = 2.f * ph - 1.f;
+			float v = s ? sh2.process(sh1.process(r.bi())) * 4.f : (f1.process(b) * 1.6f + f2.process(b)) * 9.6f;
+			float L, R, env;
+			e->process(p, notes, 3, false, 0.f, 0.f, v, L, R, env);
+			float in = L;
+			for (int j = 0; j < 3; j++) {  // 6 kHz high-pass, three poles
+				y[j] = k * (y[j] + in - x[j]);
+				x[j] = in;
+				in = y[j];
+			}
+			if (i > FS && !s) {
+				hp += (double) in * in, tot += (double) L * L;
+				for (int q = 0; q < e->nb; q++)
+					emin[q] = std::min(emin[q], (double) e->sm2[q]), emax[q] = std::max(emax[q], (double) e->sm2[q]);
+				openVowel = std::max(openVowel, e->sibOpen);
+			}
+			if (i > 2.3f * FS)
+				openS = std::max(openS, e->sibOpen);
+		}
+		double top = 0.0, rip = 0.0;
+		for (int q = 0; q < e->nb; q++)
+			top = std::max(top, emax[q]);
+		for (int q = 0; q < e->nb; q++)
+			if (emax[q] > 0.1 * top)
+				rip = std::max(rip, (emax[q] - emin[q]) / emax[q]);
+		float hf = (float) (10.0 * std::log10(hp / (tot + 1e-12) + 1e-12));
+		bool fail = rip > 0.06 || (ch != CH_WHISPER && hf > -40.f) || openVowel > 0.2f || openS < 0.8f;
+		std::printf("clean %-8s ripple %.0f%%  above 6 kHz %.0f dB  SIBIL vowel %.2f / S %.2f%s\n", CHAR_NAMES[ch], 100.0 * rip, hf,
+		            openVowel, openS, fail ? "  FAIL" : "");
+		bad += fail;
+	}
+	return bad;
+}
+
 /** Extreme and random knobs, FREEZE, an external carrier, silence: never NaN, never stuck, never above the limiter. */
 static int stress() {
 	int bad = 0;
@@ -174,6 +235,7 @@ int main(int argc, char** argv) {
 			            a.rms < 1e-3f ? "  SILENT" : "");
 	}
 	if (!gainsOnly) {
+		bad += clean();
 		bad += stress();
 		if (check)
 			std::printf("worst cpu %.2f us/sample\n", cpu);
