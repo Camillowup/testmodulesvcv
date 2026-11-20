@@ -2,6 +2,9 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### GENRA KEHLE 2.0.0 (eigenes Test-Plugin)
+- Neuer Ordner `genra-kehle/` mit dem Neon-Vocoder KEHLE (Details in `genra-kehle/CHANGELOG.md`).
+
 ### 2.8.0 – Alle Module nach GENRA Instruments umgezogen
 - MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL und KESSEL FX sind getestet (Look und Klang i. O.) und
   mit GENRA 2.38.0 nach GENRA Instruments umgezogen (Repo Camillowup/Genra-for-Vcv, Ordner `instruments/`), mit Code,

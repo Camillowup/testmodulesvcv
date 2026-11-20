@@ -7,6 +7,8 @@ on:
       - ".github/workflows/glanz.yml"
       - "genra-neon/**"
       - ".github/workflows/neon.yml"
+      - "genra-kehle/**"
+      - ".github/workflows/kehle.yml"
   workflow_dispatch:
 
 permissions:

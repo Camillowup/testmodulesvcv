@@ -43,3 +43,10 @@ Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyber
   (fehlt bei WOGE, PULS, GLAS), schmale Panels mit CV-Buchsen unter den Reglern (Panel-Entwurf zuerst zeigen).
 - Warteliste PULS: Clock-Multiplikator (×2 … ×64 bis in den Ton, taktfest).
 - Offen: NEBEL nach dem Laniakea Pro gebaut – Bastian prüft, wie nah es dran ist (eigene Module gehören hierher).
+
+## GENRA KEHLE (eigenes Test-Plugin in `genra-kehle/`, seit 20. Nov. 2026)
+Neon-Vocoder KEHLE (24 HP, NEON-TERRAIN). Bleibt einzeln, bis er funktioniert; dann Umzug nach GENRA Neon Punk
+(`genra-neon/`, Branch `neon-punk`) und im selben Schritt hier raus (Plugin und Workflow `kehle.yml` entfernen).
+- 2.0.0 gebaut (Test): in Rack prüfen – Stimme über Rack's Audio-Modul in MOD, Träger extern (SCHMELZ in CAR L/R)
+  und eingebaut (V/OCT + GATE, Follow GENRA, ohne Kabel C-Moll), alle acht CHARACTER und ihre Figuren, FORMANT/SHIFT,
+  SIBIL, FREEZE, HOLD, Lautstärke der 16 Presets mit echter Stimme (ausgesteuert nur mit einer Test-Stimme), CPU.
