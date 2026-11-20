@@ -22,11 +22,7 @@ Verbeugung am Ende; KESSEL: MIDI-Eingang im Modul) stehen jetzt in der Merkliste
 
 Im eigenen Repo `Camillowup/Genra-Chop` (Merkliste dort in `docs/MERKLISTE.md`).
 
-## GENRA GLANZ (eigenes Plugin in `genra-glanz/`, seit 19. Nov. 2026)
-- 2.0.0 gebaut (Test): in Rack prüfen, ob jede Szene flüssig läuft und mit GENRA in den Spurfarben reagiert.
-- Später: weitere Szenen (immer hinten anhängen), z. B. KALEIDOSKOP, Wellen-Landschaft, Akkordkreis.
-
-## GENRA NEON (eigenes Plugin in `genra-neon/`, seit 19. Nov. 2026)
+## GENRA NEON PUNK (eigenes Plugin in `genra-neon/`, seit 19. Nov. 2026; Slug bleibt `GenraNeon`)
 Neon als Überbegriff: neue Module im NEON-TERRAIN-Look kommen hierher (Name deutsch, alles andere Englisch).
 Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyberdeck und Atom-Terminal).
 - 2.0.0 gebaut (Test): WELLE und NEBEL in Rack prüfen – Klang der Presets (gleich laut? die perkussiven sind etwas
@@ -43,3 +39,9 @@ Entwürfe im Archiv: `genra-neon/docs/archiv/` (dort auch die Ideen BIEST, Cyber
   (fehlt bei WOGE, PULS, GLAS), schmale Panels mit CV-Buchsen unter den Reglern (Panel-Entwurf zuerst zeigen).
 - Warteliste PULS: Clock-Multiplikator (×2 … ×64 bis in den Ton, taktfest).
 - Offen: NEBEL nach dem Laniakea Pro gebaut – Bastian prüft, wie nah es dran ist (eigene Module gehören hierher).
+- 2.2.0 gebaut (Test): Plugin heisst jetzt GENRA Neon Punk. **GLANZ** ist als siebtes Modul hierher umgezogen (das
+  Plugin GENRA GLANZ und `genra-glanz/` sind entfernt; altes GENRA-GLANZ-Plugin aus dem Rack-Plugin-Ordner löschen und
+  GLANZ in Patches neu einsetzen). In Rack prüfen: neues Panel (NEON-TERRAIN, 40 HP, CV unter den Reglern, UNDO/INIT),
+  DANCE FLOOR neu (LED-Wand, DJ, Boxen, Discokugel, Laser, Spots, Nebel, Hintergrund-Tänzer, Publikum), flüssig?
+- GLANZ später: weitere Szenen (immer hinten anhängen), z. B. KALEIDOSKOP, Wellen-Landschaft, Akkordkreis; freier
+  Platz unter TRACKS bleibt für Ideen.
