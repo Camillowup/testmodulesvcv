@@ -241,7 +241,7 @@ struct Verb {
 			ap[i].clear();
 		shimFb[0] = shimFb[1] = 0.f;
 	}
-	float scale = 1.f, g[N] = {}, damp = 0.5f;
+	float scale = 1.f, g[N] = {}, damp = 0.5f, shimK = 0.35f;
 	int type = V_HALL;
 	/** size 0..1 (room), decay 0..1 (tail), tone 0..1 (dark .. bright), t: VerbType. Once per block. */
 	void set(int t, float size, float decay, float tone) {
@@ -251,13 +251,19 @@ struct Verb {
 		float rt = type == V_VOID ? 3.f + 57.f * decay * decay : 0.4f + 14.f * decay * decay;  // seconds (RT60)
 		float cut = type == V_VOID ? 600.f + 5000.f * tone : 1500.f + 14000.f * tone;
 		damp = 1.f - std::exp(-2.f * PI * cut / fs);
-		for (int i = 0; i < N; i++)
+		float gm = 0.f;
+		for (int i = 0; i < N; i++) {
 			g[i] = std::pow(10.f, -3.f * base[i] * scale / rt);
+			gm += g[i] / N;
+		}
+		// NEBULA: the shimmer feeds back into the tank; with a long decay that loop grew without end (FLUT, NEBEL:
+		// after 20–30 s the output sat at the limiter). The feedback now stays below what the tank lets die away.
+		shimK = std::min(0.35f, 0.75f * (1.f - gm));
 	}
 	/** Returns the wet signal (set() before). */
 	void process(float inL, float inR, float& outL, float& outR) {
 		// input diffusion (series allpasses)
-		float x = 0.5f * (inL + inR) + (type == V_NEBULA ? 0.35f * (shimFb[0] + shimFb[1]) : 0.f);
+		float x = 0.5f * (inL + inR) + (type == V_NEBULA ? shimK * (shimFb[0] + shimFb[1]) : 0.f);
 		for (int i = 0; i < 4; i++) {
 			float d = apLen[i] * fs;
 			float y = ap[i].read(d);
@@ -287,7 +293,7 @@ struct Verb {
 				}
 		const float norm = 0.35355339f;  // 1/sqrt(8)
 		for (int i = 0; i < N; i++)
-			line[i].push(h[i] * norm + x * 0.5f);
+			line[i].push(sat(h[i] * norm + x * 0.5f));  // bounded, whatever comes in
 		float l = o[0] + o[2] + o[4] + o[6], r = o[1] + o[3] + o[5] + o[7];
 		l *= 0.6f, r *= 0.6f;
 		if (type == V_NEBULA) {  // the shimmer: an octave up back into the tank

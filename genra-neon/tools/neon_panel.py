@@ -100,6 +100,8 @@ def hexagon(x, y, r):
 def col_w(c):
     if c[0] == "lamps":
         return len(c[2]) * 5.8 + 1.0
+    if c[0] == "steps":
+        return c[2] * 4.8 + 1.0
     return COL
 
 
@@ -221,6 +223,15 @@ def build(S):
                     for i, nm in enumerate(names):
                         o.text(lx0 + i * dx, ky + 4.2, nm, 1.15, LBL2, 700, "middle", 0.15)
                     lay.append((name, [lx0, ky, dx, float(len(names))]))
+                elif kind == "steps":  # PULS: the mask steps, frames the module lights (layout: x, y, pitch, h, n)
+                    _, name, n = c
+                    pitch = (cw - 1.0) / n
+                    sx0, sy0, sh = cx + 0.5, ky - 3.4, 11.6
+                    for i in range(n):
+                        sx = sx0 + i * pitch
+                        o.e(f'<path d="M{sx + 0.3:.2f} {sy0:.2f} h{pitch - 1.6:.2f} l1.0 1.0 v{sh - 1.0:.2f} h-{pitch - 0.6:.2f} z" fill="#120a28" stroke="{C1 if i % 4 == 0 else "#5b3a7a"}" stroke-width="0.25"/>')
+                        o.text(sx + pitch / 2, sy0 + sh + 1.9, str(i + 1), 1.05, LBL2, 700, "middle", 0.1)
+                    lay.append((name, [sx0, sy0, pitch, sh, float(n)]))
                 elif kind == "btn":
                     _, name, label, trig = c
                     bw = min(cw - 1.2, 11.0)
@@ -355,6 +366,111 @@ NEBEL = dict(
             "C_COLOR", "C_SIZE", "C_DECAY", "C_SMIX", "C_ORBIT", "C_DEPTH", "C_MACRO", "C_ATK", "C_REL", "C_GLIDE"],
 )
 
+WOGE = dict(
+    name="WOGE", sub="SCANNED STRING",
+    rows=[
+        [dict(title="STRING", cols=[("knob", "MASS", "MASS", 1, "C_MASS"), ("knob", "TENS", "TENSION", 0, "C_TENS"),
+                                    ("knob", "DAMP", "DAMP", 0, "C_DAMP"), ("knob", "CNTR", "CENTER", 0, "C_CNTR")]),
+         dict(title="EXCITE", fields=[("EXCF", 1.0)],
+              cols=[("knob", "POS", "POSITION", 2, "C_POS"), ("knob", "FORCE", "FORCE", 2, "C_FORCE"),
+                    ("btn", "STRIKE", "STRIKE", "T_STRIKE")]),
+         dict(title="SCAN", fields=[("PATHF", 1.0)],
+              cols=[("knob", "WIDTH", "WIDTH", 0, "C_WIDTH"), ("knob", "DRIFT", "DRIFT", 0, "C_DRIFT")])],
+        [dict(title="FILTER", cols=[("knob", "CUTOFF", "CUTOFF", 1, "C_CUT"), ("knob", "RES", "RES", 0, "C_RES"),
+                                    ("knob", "DRIVE", "DRIVE", 0, "C_DRIVE")]),
+         dict(title="ENVELOPE", cols=[("knob", "ATK", "A", 0, "C_ATK"), ("knob", "DEC", "D", 0, "C_DEC"),
+                                      ("knob", "SUS", "S", 0, None), ("knob", "REL", "R", 0, "C_REL")]),
+         dict(title="VOICE", cols=[("lamps", "VMODE", ["POLY", "MONO", "LEG."]), ("knob", "GLIDE", "GLIDE", 0, "C_GLIDE"),
+                                   ("knob", "ACCENT", "ACCENT", 0, None)]),
+         dict(title="PLAY", cols=[("btn", "FREEZE", "FREEZE", "T_FREEZE"), ("knob", "LEVEL", "LEVEL", 0, None)])],
+    ],
+    bottom=[(GR, [("VOCT", "V/OCT"), ("GATE", "GATE"), ("VEL", "VEL"), ("ACC", "ACC"), ("SLIDE", "SLIDE")]),
+            (SY, [("CLOCK", "CLOCK"), ("RESET", "RESET")]), (AU, [("EXC", "EXC IN"), ("FM", "FM")])],
+    outs=[("O_ENV", "ENV"), ("O_SHAPE", "SHAPE"), ("O_L", "L"), ("O_R", "R")],
+    inputs=["VOCT", "GATE", "VEL", "ACC", "SLIDE", "CLOCK", "RESET", "T_STRIKE", "T_FREEZE", "C_MASS", "C_TENS", "C_DAMP",
+            "C_CNTR", "C_POS", "C_FORCE", "C_WIDTH", "C_DRIFT", "EXC", "FM", "C_CUT", "C_RES", "C_DRIVE", "C_ATK", "C_DEC",
+            "C_REL", "C_GLIDE"],
+)
+
+PULS = dict(
+    name="PULS", sub="PULSAR TRAIN", hp=40,
+    rows=[
+        [dict(title="PULSE", fields=[("PMODEF", 1.0)],
+              cols=[("knob", "RATE", "RATE", 1, "C_RATE"), ("knob", "JITTER", "JITTER", 2, "C_JITTER")]),
+         dict(title="PULSARET", fields=[("SHAPEF", 0.5), ("WINF", 0.5)],
+              cols=[("knob", "F1", "F1", 2, "C_F1"), ("knob", "F2", "F2", 2, "C_F2"),
+                    ("knob", "DUTY", "DUTY", 0, "C_DUTY"), ("knob", "SKEW", "SKEW", 0, "C_SKEW")]),
+         dict(title="FILTER", cols=[("knob", "CUTOFF", "CUTOFF", 0, "C_CUT"), ("knob", "RES", "RES", 0, "C_RES"),
+                                    ("knob", "DRIVE", "DRIVE", 0, "C_DRIVE")]),
+         dict(title="SPACE", cols=[("knob", "SPREAD", "SPREAD", 2, "C_SPREAD"), ("knob", "TAIL", "TAIL", 2, "C_TAIL")]),
+         dict(title="ENVELOPE", cols=[("knob", "ATK", "A", 0, "C_ATK"), ("knob", "DEC", "D", 0, None),
+                                      ("knob", "SUS", "S", 0, None), ("knob", "REL", "R", 0, "C_REL")])],
+        [dict(title="MASK", fields=[("PATF", 1.0)],
+              cols=[("steps", "STEPS", 16), ("knob", "DENS", "DENS", 0, "C_DENS"), ("knob", "ROT", "ROT", 0, "C_ROT"),
+                    ("knob", "PROB", "PROB", 0, "C_PROB"), ("btn", "NEW", "NEW", "T_NEW")]),
+         dict(title="VOICE", cols=[("lamps", "VMODE", ["POLY", "MONO", "LEG."]), ("knob", "GLIDE", "GLIDE", 0, "C_GLIDE"),
+                                   ("knob", "ACCENT", "ACCENT", 0, None), ("knob", "LEVEL", "LEVEL", 0, None)])],
+    ],
+    bottom=[(GR, [("VOCT", "V/OCT"), ("GATE", "GATE"), ("VEL", "VEL"), ("ACC", "ACC"), ("SLIDE", "SLIDE")]),
+            (SY, [("CLOCK", "CLOCK"), ("RESET", "RESET")]), (AU, [("FM", "FM")])],
+    outs=[("O_ENV", "ENV"), ("O_PULSE", "PULSE"), ("O_L", "L"), ("O_R", "R")],
+    inputs=["VOCT", "GATE", "VEL", "ACC", "SLIDE", "CLOCK", "RESET", "T_NEW", "C_RATE", "C_F1", "C_F2", "C_DUTY", "C_SKEW",
+            "C_DENS", "C_ROT", "C_PROB", "FM", "C_SPREAD", "C_JITTER", "C_TAIL", "C_CUT", "C_RES", "C_DRIVE", "C_ATK",
+            "C_REL", "C_GLIDE"],
+)
+
+GLAS = dict(
+    name="GLAS", sub="PAINTED SPECTRUM",
+    rows=[
+        [dict(title="PAINT", fields=[("BANKF", 1.0)],
+              cols=[("lamps", "TOOL", ["PEN", "SPRAY", "LINE", "ERASE"]), ("knob", "SIZE", "SIZE", 0, None),
+                    ("btn", "SNAP", "SNAP", None), ("btn", "NEW", "NEW", "T_NEW"), ("btn", "CLEAR", "CLEAR", "T_CLR"),
+                    ("btn", "REC", "REC", "T_REC")]),
+         dict(title="PLAY", fields=[("LENF", 0.5), ("DIRF", 0.5)],
+              cols=[("knob", "SPEED", "SPEED", 0, "C_SPEED"), ("knob", "POS", "POS", 0, "C_POS")])],
+        [dict(title="TONE", fields=[("SCALEF", 1.0)],
+              cols=[("knob", "LOW", "LOW", 2, "C_LOW"), ("knob", "RNG", "RANGE", 2, "C_RNG"), ("knob", "TILT", "TILT", 2, "C_TILT")]),
+         dict(title="SPACE", cols=[("knob", "SPREAD", "SPREAD", 0, "C_SPREAD"), ("knob", "BLUR", "BLUR", 0, "C_BLUR"),
+                                   ("knob", "SHIMMER", "SHIMMER", 0, "C_SHIMMER")]),
+         dict(title="ENVELOPE", cols=[("knob", "ATK", "A", 0, "C_ATK"), ("knob", "DEC", "D", 0, None),
+                                      ("knob", "SUS", "S", 0, None), ("knob", "REL", "R", 0, "C_REL")]),
+         dict(title="MODE", cols=[("lamps", "PMODE", ["DRONE", "GATE"]), ("knob", "LEVEL", "LEVEL", 0, None)])],
+    ],
+    bottom=[(GR, [("VOCT", "V/OCT"), ("GATE", "GATE"), ("VEL", "VEL"), ("ACC", "ACC"), ("SLIDE", "SLIDE")]),
+            (SY, [("CLOCK", "CLOCK"), ("RESET", "RESET")]), (AU, [("IN", "IN")])],
+    outs=[("O_ENV", "ENV"), ("O_BRIGHT", "BRIGHT"), ("O_L", "L"), ("O_R", "R")],
+    inputs=["VOCT", "GATE", "VEL", "ACC", "SLIDE", "CLOCK", "RESET", "T_NEW", "T_REC", "T_CLR", "C_SPEED", "C_POS", "C_LOW",
+            "C_RNG", "C_TILT", "C_SPREAD", "C_BLUR", "IN", "C_SHIMMER", "C_ATK", "C_REL"],
+)
+
+FLUT = dict(
+    name="FLUT", sub="TIDAL DRONE",
+    rows=[
+        [dict(title="VOICES", cols=[("knob", "VOICES", "VOICES", 0, None), ("knob", "OCT", "OCT", 0, "C_OCT"),
+                                    ("knob", "SPRD", "SPREAD", 2, "C_SPRD"), ("knob", "DRIFT", "DRIFT", 2, "C_DRIFT"),
+                                    ("knob", "MORPH", "MORPH", 2, "C_MORPH"), ("knob", "SUB", "SUB", 0, "C_SUB"),
+                                    ("lamps", "SUBOCT", ["-1 OCT", "-2 OCT"])]),
+         dict(title="TIDE", fields=[("TIDEF", 1.0)],
+              cols=[("knob", "TIME", "TIME", 1, "C_TIME"), ("knob", "DEPTH", "DEPTH", 0, "C_DEPTH"),
+                    ("knob", "PHS", "PHASE", 0, "C_PHS"), ("knob", "SKEW", "SKEW", 0, "C_SKEW")])],
+        [dict(title="TEXTURE", fields=[("TEXF", 1.0)],
+              cols=[("knob", "BRIGHT", "BRIGHT", 0, "C_BRIGHT"), ("knob", "GRIT", "GRIT", 0, "C_GRIT"),
+                    ("knob", "BREATH", "BREATH", 0, "C_BREATH")]),
+         dict(title="SPACE", cols=[("knob", "BLOOM", "BLOOM", 2, "C_BLOOM"), ("knob", "WIDTH", "WIDTH", 2, "C_WIDTH"),
+                                   ("knob", "HAZE", "HAZE", 2, "C_HAZE")]),
+         dict(title="SHAPE", cols=[("knob", "SWELL", "SWELL", 0, None), ("knob", "FADE", "FADE", 0, None),
+                                   ("knob", "LEVEL", "LEVEL", 0, "C_LEVEL")]),
+         dict(title="PLAY", cols=[("lamps", "PMODE", ["DRONE", "GATE"]), ("btn", "FREEZE", "FREEZE", "T_FREEZE"),
+                                  ("btn", "NEW", "NEW", "T_NEW")])],
+    ],
+    bottom=[(GR, [("VOCT", "V/OCT"), ("GATE", "GATE"), ("VEL", "VEL"), ("ACC", "ACC"), ("SLIDE", "SLIDE")]),
+            (SY, [("CLOCK", "CLOCK"), ("RESET", "RESET")]), (AU, [("IN_L", "IN L"), ("IN_R", "IN R")])],
+    outs=[("O_TIDE", "TIDE"), ("O_SUB", "SUB"), ("O_POLY", "POLY"), ("O_L", "L"), ("O_R", "R")],
+    inputs=["VOCT", "GATE", "VEL", "ACC", "SLIDE", "CLOCK", "RESET", "T_NEW", "T_FREEZE", "C_SPRD", "C_DRIFT", "C_MORPH",
+            "C_SUB", "C_OCT", "C_TIME", "C_DEPTH", "IN_L", "IN_R", "C_PHS", "C_SKEW", "C_BRIGHT", "C_GRIT", "C_BREATH",
+            "C_BLOOM", "C_WIDTH", "C_HAZE", "C_LEVEL"],
+)
+
 # ---------------------------------------------------------------- preview stand-ins
 def stand_ins(S, lay):
     W = S["W"]
@@ -394,5 +510,8 @@ def write(S, slug, ns, sub):
     print(f"{slug}: res/{slug}.svg, src/{sub}/{slug}Layout.hpp ({len(ins)} in, {len(outs)} out)")
 
 
-write(WELLE, "Welle", "wl", "welle")
-write(NEBEL, "Nebel", "nl", "nebel")
+MODS = {"welle": (lambda: WELLE, "Welle", "wl"), "nebel": (lambda: NEBEL, "Nebel", "nl"), "woge": (lambda: WOGE, "Woge", "wg"),
+        "puls": (lambda: PULS, "Puls", "pl"), "glas": (lambda: GLAS, "Glas", "gl"), "flut": (lambda: FLUT, "Flut", "fl")}
+for key in (sys.argv[2:] or list(MODS)):  # neon_panel.py real|preview [module …]
+    spec, slug, ns = MODS[key]
+    write(spec(), slug, ns, key)

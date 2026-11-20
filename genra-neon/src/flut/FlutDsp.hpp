@@ -90,6 +90,8 @@ struct Engine {
 	float fs = 48000.f, dt = 1.f / 48000.f;
 	Voice v[MAXV];
 	Rng rng{0xf107u};
+	Rng crackRng{0x5eed1234u};
+	float dcx[3] = {}, dcy[3] = {};  // DC blockers on L, R, SUB (2.1.2)
 	float wts[NP] = {};
 	uint32_t seed = 1;
 	double tidePh = 0.0;
@@ -272,8 +274,12 @@ struct Engine {
 		subOut = sub;
 		// ---- GRIT: crackle
 		if (p.grit > 0.001f) {
-			if (rng.uni() < p.grit * 40.f * dt)
-				crackle = rng.bi() * (0.4f + 0.6f * rng.uni());
+			// its own random numbers: right after a small uni() the next value of the same generator leans to one
+			// side, so the crackle had a sign and the haze summed it up into a large DC offset (2.1.2)
+			if (rng.uni() < p.grit * 40.f * dt) {
+				uint32_t r = crackRng.next();
+				crackle = ((r & 1u) ? 1.f : -1.f) * (0.4f + 0.6f * ((r >> 8) * (1.f / 16777216.f)));
+			}
 			crackle *= 0.985f;
 			float c = crackle * p.grit * 0.9f;
 			sumL += c, sumR += c * 0.8f;
@@ -292,8 +298,17 @@ struct Engine {
 		float hz = clampf(p.haze, 0.f, 1.f);
 		l = (l + il) * (1.f - 0.45f * hz) + wl * hz * 1.4f;
 		r = (r + ir) * (1.f - 0.45f * hz) + wr * hz * 1.4f;
+		// no DC can reach the outputs (a stuck offset drives the limiter to 8 V and nothing is heard)
+		float io[3] = {l, r, sub * g};
+		for (int c = 0; c < 3; c++) {
+			float y = io[c] - dcx[c] + 0.9993f * dcy[c];
+			dcx[c] = io[c], dcy[c] = y;
+			io[c] = y;
+		}
+		l = io[0], r = io[1];
+		float subG = io[2];
 		float lev = p.level * 1.25f;
-		subV = genra_out::limit(sub * g * 5.f * lev * p.outGain);
+		subV = genra_out::limit(subG * 5.f * lev * p.outGain);
 		L = genra_out::limit(l * 3.4f * lev * p.outGain);
 		R = genra_out::limit(r * 3.4f * lev * p.outGain);
 	}

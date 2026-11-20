@@ -44,20 +44,20 @@ inline Params paramsFrom(const float* v, float gain) {
 // clang-format off
 //                                            vox oct  sprd drift morph sub  soct(0: -1, 1: -2) tide time   depth phs  skew   texture  brgt grit brth  bloom wid  haze  swell fade lev  mode
 static const Preset PRESETS[] = {
-	{"AMBIENT", "DEEP HARBOUR",               {6, 0.f, .40f, .30f, .40f, .30f, 0, SY, BR(5), .60f, .00f, .00f, X_GLASS, .50f, .00f, .10f, .30f, .70f, .55f, .40f, .50f, .80f, DRN}, /*gain*/ 0.493f},
-	{"AMBIENT", "MOON CHOIR",                 {6, 0.f, .50f, .35f, .50f, .15f, 0, SY, BR(6), .70f, .00f, .20f, X_CHOIR, .45f, .00f, .20f, .40f, .80f, .65f, .50f, .60f, .80f, DRN}, /*gain*/ 0.354f},
-	{"AMBIENT", "GLASS LAGOON",               {5, 0.f, .60f, .20f, .60f, .10f, 0, FR, .45f, .50f, .00f, .00f, X_GLASS, .65f, .00f, .00f, .60f, .80f, .70f, .50f, .60f, .80f, DRN}, /*gain*/ 0.601f},
-	{"DRONE · BERLIN SCHOOL", "LOW TIDE ORGAN", {6, -1.f, .30f, .25f, .40f, .50f, 0, SY, BR(5), .50f, .00f, .00f, X_REED, .40f, .00f, .05f, .20f, .60f, .45f, .40f, .50f, .80f, DRN}, /*gain*/ 0.435f},
-	{"DRONE · BERLIN SCHOOL", "ENDLESS BOW",  {6, -1.f, .40f, .40f, .60f, .40f, 1, FR, .60f, .70f, .00f, .30f, X_BOWED, .45f, .00f, .10f, .30f, .70f, .60f, .60f, .70f, .80f, DRN}, /*gain*/ 0.409f},
-	{"DRONE · BERLIN SCHOOL", "SALT DUST",    {4, 0.f, .50f, .50f, .50f, .20f, 0, FR, .50f, .60f, .00f, .00f, X_DUST, .50f, .40f, .40f, .20f, .90f, .70f, .50f, .60f, .80f, DRN}, /*gain*/ 0.786f},
-	{"TECHNO · ELECTRO · DETROIT · BERLIN", "DUB TIDE", {5, 0.f, .30f, .20f, .30f, .40f, 0, SY, BR(3), .70f, .00f, .40f, X_REED, .40f, .10f, .10f, .20f, .60f, .60f, .20f, .40f, .80f, DRN}, /*gain*/ 0.463f},
-	{"TECHNO · ELECTRO · DETROIT · BERLIN", "WAREHOUSE MIST", {6, 0.f, .40f, .30f, .20f, .30f, 0, SY, BR(4), .80f, .00f, .00f, X_CHOIR, .50f, .20f, .20f, .30f, .70f, .70f, .30f, .40f, .80f, DRN}, /*gain*/ 0.260f},
-	{"POP · SYNTHWAVE · TRANCE · MELODIC TECHNO", "SUNRISE SWELL", {6, 0.f, .50f, .25f, .40f, .20f, 0, SY, BR(4), .80f, .00f, .50f, X_BOWED, .60f, .00f, .05f, .50f, .80f, .50f, .30f, .40f, .80f, DRN}, /*gain*/ 0.481f},
-	{"HOUSE · GARAGE", "SEA ORGAN",           {4, 0.f, .20f, .15f, .25f, .30f, 0, SY, BR(3), .40f, .00f, .00f, X_REED, .55f, .00f, .05f, .10f, .50f, .35f, .10f, .30f, .80f, GAT}, /*gain*/ 0.714f},
-	{"SOUL · JAZZ · LO-FI", "VINYL FOG",      {5, 0.f, .40f, .40f, .40f, .20f, 0, FR, .40f, .50f, .00f, .00f, X_GLASS, .40f, .50f, .20f, .20f, .60f, .55f, .30f, .40f, .80f, GAT}, /*gain*/ 0.635f},
-	{"DOWNTEMPO · TRIP-HOP", "HARBOUR LIGHTS", {5, 0.f, .40f, .30f, .40f, .30f, 0, SY, BR(4), .60f, .00f, .00f, X_CHOIR, .40f, .20f, .30f, .30f, .70f, .60f, .40f, .50f, .80f, DRN}, /*gain*/ 0.437f},
-	{"WITCH HOUSE · HORROR · DUNGEON SYNTH", "DROWNED BELLS", {6, -1.f, .60f, .60f, .70f, .40f, 1, FR, .70f, .80f, .00f, -.40f, X_GLASS, .30f, .30f, .30f, .50f, .90f, .80f, .60f, .70f, .80f, DRN}, /*gain*/ 0.539f},
-	{"DUB · REGGAE", "ECHO REEF",             {4, 0.f, .30f, .20f, .30f, .50f, 0, SY, BR(3), .50f, .00f, .00f, X_DUST, .40f, .20f, .30f, .20f, .60f, .80f, .30f, .50f, .80f, DRN}, /*gain*/ 0.654f},
+	{"AMBIENT", "DEEP HARBOUR",               {6, 0.f, .40f, .30f, .40f, .30f, 0, SY, BR(5), .60f, .00f, .00f, X_GLASS, .50f, .00f, .10f, .30f, .70f, .55f, .40f, .50f, .80f, DRN}, /*gain*/ 0.692f},
+	{"AMBIENT", "MOON CHOIR",                 {6, 0.f, .50f, .35f, .50f, .15f, 0, SY, BR(6), .70f, .00f, .20f, X_CHOIR, .45f, .00f, .20f, .40f, .80f, .65f, .50f, .60f, .80f, DRN}, /*gain*/ 0.488f},
+	{"AMBIENT", "GLASS LAGOON",               {5, 0.f, .60f, .20f, .60f, .10f, 0, FR, .45f, .50f, .00f, .00f, X_GLASS, .65f, .00f, .00f, .60f, .80f, .70f, .50f, .60f, .80f, DRN}, /*gain*/ 0.778f},
+	{"DRONE · BERLIN SCHOOL", "LOW TIDE ORGAN", {6, -1.f, .30f, .25f, .40f, .50f, 0, SY, BR(5), .50f, .00f, .00f, X_REED, .40f, .00f, .05f, .20f, .60f, .45f, .40f, .50f, .80f, DRN}, /*gain*/ 0.600f},
+	{"DRONE · BERLIN SCHOOL", "ENDLESS BOW",  {6, -1.f, .40f, .40f, .60f, .40f, 1, FR, .60f, .70f, .00f, .30f, X_BOWED, .45f, .00f, .10f, .30f, .70f, .60f, .60f, .70f, .80f, DRN}, /*gain*/ 0.627f},
+	{"DRONE · BERLIN SCHOOL", "SALT DUST",    {4, 0.f, .50f, .50f, .50f, .20f, 0, FR, .50f, .60f, .00f, .00f, X_DUST, .50f, .40f, .40f, .20f, .90f, .70f, .50f, .60f, .80f, DRN}, /*gain*/ 1.070f},
+	{"TECHNO · ELECTRO · DETROIT · BERLIN", "DUB TIDE", {5, 0.f, .30f, .20f, .30f, .40f, 0, SY, BR(3), .70f, .00f, .40f, X_REED, .40f, .10f, .10f, .20f, .60f, .60f, .20f, .40f, .80f, DRN}, /*gain*/ 0.613f},
+	{"TECHNO · ELECTRO · DETROIT · BERLIN", "WAREHOUSE MIST", {6, 0.f, .40f, .30f, .20f, .30f, 0, SY, BR(4), .80f, .00f, .00f, X_CHOIR, .50f, .20f, .20f, .30f, .70f, .70f, .30f, .40f, .80f, DRN}, /*gain*/ 0.519f},
+	{"POP · SYNTHWAVE · TRANCE · MELODIC TECHNO", "SUNRISE SWELL", {6, 0.f, .50f, .25f, .40f, .20f, 0, SY, BR(4), .80f, .00f, .50f, X_BOWED, .60f, .00f, .05f, .50f, .80f, .50f, .30f, .40f, .80f, DRN}, /*gain*/ 0.592f},
+	{"HOUSE · GARAGE", "SEA ORGAN",           {4, 0.f, .20f, .15f, .25f, .30f, 0, SY, BR(3), .40f, .00f, .00f, X_REED, .55f, .00f, .05f, .10f, .50f, .35f, .10f, .30f, .80f, GAT}, /*gain*/ 0.831f},
+	{"SOUL · JAZZ · LO-FI", "VINYL FOG",      {5, 0.f, .40f, .40f, .40f, .20f, 0, FR, .40f, .50f, .00f, .00f, X_GLASS, .40f, .50f, .20f, .20f, .60f, .55f, .30f, .40f, .80f, GAT}, /*gain*/ 0.846f},
+	{"DOWNTEMPO · TRIP-HOP", "HARBOUR LIGHTS", {5, 0.f, .40f, .30f, .40f, .30f, 0, SY, BR(4), .60f, .00f, .00f, X_CHOIR, .40f, .20f, .30f, .30f, .70f, .60f, .40f, .50f, .80f, DRN}, /*gain*/ 0.598f},
+	{"WITCH HOUSE · HORROR · DUNGEON SYNTH", "DROWNED BELLS", {6, -1.f, .60f, .60f, .70f, .40f, 1, FR, .70f, .80f, .00f, -.40f, X_GLASS, .30f, .30f, .30f, .50f, .90f, .80f, .60f, .70f, .80f, DRN}, /*gain*/ 0.749f},
+	{"DUB · REGGAE", "ECHO REEF",             {4, 0.f, .30f, .20f, .30f, .50f, 0, SY, BR(3), .50f, .00f, .00f, X_DUST, .40f, .20f, .30f, .20f, .60f, .80f, .30f, .50f, .80f, DRN}, /*gain*/ 0.867f},
 };
 // clang-format on
 #undef BR
