@@ -16,4 +16,5 @@ void init(Plugin* p) {
 	p->addModel(modelPuls);
 	p->addModel(modelGlas);
 	p->addModel(modelFlut);
+	p->addModel(modelGlanz);
 }

@@ -1,4 +1,4 @@
-# GENRA NEON
+# GENRA NEON PUNK
 
 The neon modules of the GENRA family for VCV Rack (brand **Genra**), in their own look: **NEON-TERRAIN** – dark violet
 glass, pink to cyan neon, a glitch title, knobs with glowing value arcs, hexagon jacks in coloured groups. All labels and
@@ -12,6 +12,7 @@ menus are in English; the module names stay German.
 | **PULS** (44 HP) | Pulsar synthesis. A train of pulses with two formants: a rhythm when slow, a tone when fast. |
 | **GLAS** (44 HP) | ANS synthesizer. Paint on the glass with the mouse; a head plays the picture in time. |
 | **FLUT** (44 HP) | Tidal drone. Up to six voices on GENRA's chord, breathing with a slow tide. |
+| **GLANZ** (40 HP) | Music visuals. Every track lights in its colour with its notes; nine scenes, among them a dance floor. |
 
 All follow **GENRA** and **GENRA TECHNO** without cables (right-click › Follow GENRA; presets change with the genre),
 take MIDI-MAP on every knob, button, field and the preset field, and have many CV inputs (no built-in LFO: patch one).
@@ -105,3 +106,15 @@ g++ -O2 -std=c++11 -I. test/neon_test.cpp -o neon_test && ./neon_test   # the en
 
 Panels: `tools/neon_panel.py real` writes `res/*.svg` and `src/*/…Layout.hpp`; `preview` writes `docs/panels/`.
 GitHub Actions builds Windows on every push (Mac by hand: Actions › Run workflow). License: GPL-3.0-only.
+
+## GLANZ
+
+- **Follows GENRA** (right-click › Follow GENRA; also GENRA CHOP and GENRA TECHNO): every track lights in its colour
+  exactly with its notes – DRUMS violet, BASS green, MELODY cyan, PADS pink. Bars and BPM come from GENRA.
+- **Audio:** IN L/R (the sum: spectrum, scope) and DRUMS, BASS, MELODY, PADS (each track its colour). Without GENRA it
+  reacts to the audio alone.
+- **Nine scenes:** SPECTRUM RING, BARS, SCOPE, TUNNEL, STARFIELD, PLASMA, WATERFALL, PARTICLES, DANCE FLOOR (an LED wall,
+  a DJ, speakers that pump, a disco ball, lasers from the corners, a spot per track, fog with the pads, a crowd). The
+  field at the top picks one (also by MIDI-MAP), or NEXT, SCENE CV, AUTO BARS (a new one every N bars).
+- **REACT:** AMOUNT, SMOOTH, DECAY. **LOOK:** SPEED, COLOR (0: the track colours, up: the hue turns), ZOOM, TRAILS, GLOW.
+  **TRACKS:** each track in the picture on/off. **FREEZE:** the picture stands still. UNDO / INIT.

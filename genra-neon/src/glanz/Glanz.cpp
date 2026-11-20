@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: GPL-3.0-only
-// GENRA GLANZ: music visuals. It follows GENRA (right-click › Follow GENRA: GENRA, GENRA CHOP or GENRA TECHNO), so
+// GLANZ (GENRA Neon Punk, until 2.1.x its own plugin GENRA GLANZ): music visuals. It follows GENRA (right-click › Follow GENRA: GENRA, GENRA CHOP or GENRA TECHNO), so
 // every track lights in its colour exactly with its notes (drums violet, bass green, melody cyan, pads pink); the
 // audio inputs make it livelier (L/R: the sum, DRUMS … PADS: the tracks) and drive it on their own without a GENRA.
 // Nine scenes (the preset field, SCENE CV, NEXT, AUTO BARS). Scenes only ever get appended (patches keep the index).
 //
 // Threads: the audio thread only listens (envelopes, a ring buffer for the spectrum and the scope, GENRA's notes as
 // counters); everything that moves is computed and drawn on the UI thread (the display), at the frame rate.
-#include "plugin.hpp"
-#include "../genra/Follow.hpp"
-#include "../genra/link/GenraPorts.hpp"
-#include "../genra/ui/Look.hpp"
-#include "../genra/ui/MapOverlay.hpp"
-#include "../genra/jiant/JiantUI.hpp"
+#include "../plugin.hpp"
+#include "../../genra/Follow.hpp"
+#include "../../genra/link/GenraPorts.hpp"
+#include "../../genra/ui/Look.hpp"
+#include "../../genra/ui/MapOverlay.hpp"
+#include "../neon/ModuleKit.hpp"
 #include "GlanzLayout.hpp"
 #include <algorithm>
 #include <atomic>
@@ -19,7 +19,7 @@
 #include <complex>
 #include <vector>
 
-namespace L = glanzl;
+namespace L = gz;
 
 namespace glanz {
 
@@ -58,8 +58,7 @@ static NVGcolor tcol(int t, float hue, float a = 1.f) {
 	return c;
 }
 
-} // namespace glanz
-using namespace glanz;
+// (the module and its widgets stay in namespace glanz: other modules of this plugin have a Display too)
 
 struct Glanz : Module {
 	enum ParamId {
@@ -76,6 +75,8 @@ struct Glanz : Module {
 		FREEZE_PARAM,
 		NEXT_PARAM,
 		SCENESEL_PARAM, // the scene field, for MIDI-MAP
+		UNDO_PARAM,
+		INIT_PARAM,
 		PARAMS_LEN
 	};
 	enum InputId {
@@ -156,6 +157,8 @@ struct Glanz : Module {
 		configSwitch(FREEZE_PARAM, 0.f, 1.f, 0.f, "Freeze (the picture stands still)", {"Off", "On"});
 		configButton(NEXT_PARAM, "Next scene");
 		genra_map::configSelect(this, SCENESEL_PARAM, "Scene");
+		configButton(UNDO_PARAM, "Undo the last INIT / scene change");
+		configButton(INIT_PARAM, "Init: all knobs back, the first scene");
 		configInput(L_INPUT, "Audio L (the sum)");
 		configInput(R_INPUT, "Audio R");
 		configInput(SCENE_INPUT, "Scene CV (0..10 V over the scenes)");
@@ -863,35 +866,163 @@ struct Display : widget::Widget {
 		     {{{0, 34}, {0, 30}, {0, 17}, {-8, 30}, {-6, 25}, {8, 30}, {6, 25}, {-6, 8}, {-9, 1}, {6, 8}, {9, 1}}}}};
 		return P[track & 3][i & 3];
 	}
-	void drawFigure(NVGcontext* vg, float x, float foot, float s, int tr, const Dancer& d) {
-		const Pose& a = pose(tr, d.last);
-		const Pose& b = pose(tr, d.pose);
-		float u = d.blend * d.blend * (3 - 2 * d.blend);
-		float lift = d.jump * 18.f;
+	/** A figure between two poses (u 0..1), lifted; plain strokes in one colour (w: line width in figure units). */
+	void figure(NVGcontext* vg, float x, float foot, float s, int tr, int pa, int pb, float u, float lift, NVGcolor c, float w,
+	            float flip = 1.f, bool mirror = false) {
+		const Pose& a = pose(tr, pa);
+		const Pose& b = pose(tr, pb);
 		auto P = [&](int i) {
 			float px = a.p[i][0] + (b.p[i][0] - a.p[i][0]) * u, py = a.p[i][1] + (b.p[i][1] - a.p[i][1]) * u;
-			return Vec(x + px * s, foot - (py + lift) * s);
+			float y = (py + lift) * s;
+			return Vec(x + flip * px * s, mirror ? foot + y : foot - y);
 		};
-		NVGcolor c = col(tr, clamp(0.45f + level[tr], 0.f, 1.f));
 		static const int SEG[][2] = {{1, 2}, {1, 4}, {4, 3}, {1, 6}, {6, 5}, {2, 7}, {7, 8}, {2, 9}, {9, 10}};
+		nvgBeginPath(vg);
 		for (auto& sg : SEG) {
 			Vec p1 = P(sg[0]), p2 = P(sg[1]);
-			line(vg, p1.x, p1.y, p2.x, p2.y, c, 2.6f * s);
+			nvgMoveTo(vg, p1.x, p1.y);
+			nvgLineTo(vg, p2.x, p2.y);
 		}
+		nvgStrokeColor(vg, c);
+		nvgStrokeWidth(vg, w * s);
+		nvgLineCap(vg, NVG_ROUND);
+		nvgLineJoin(vg, NVG_ROUND);
+		nvgStroke(vg);
 		Vec h = P(0);
-		dot(vg, h.x, h.y, 3.2f * s, c);
-		if (d.jump > 0.05f) { // the shadow while in the air
-			nvgBeginPath(vg);
-			nvgEllipse(vg, x, foot + 1, 8 * s, 1.5f * s);
-			nvgFillColor(vg, nvgRGBAf(0, 0, 0, 0.5f));
-			nvgFill(vg);
-		}
+		nvgBeginPath(vg);
+		nvgCircle(vg, h.x, h.y, (3.2f + 0.4f * (w - 2.6f)) * s);
+		nvgFillColor(vg, c);
+		nvgFill(vg);
+	}
+	/** A main dancer: shadow, trails (TRAILS), mirror image on the floor, dark outline, neon line, white core. */
+	void drawFigure(NVGcontext* vg, float x, float foot, float s, int tr, const Dancer& d) {
+		float u = d.blend * d.blend * (3 - 2 * d.blend);
+		float lift = d.jump * 18.f;
+		NVGcolor c = col(tr, clamp(0.55f + level[tr], 0.f, 1.f));
+		// shadow on the floor
+		nvgBeginPath(vg);
+		nvgEllipse(vg, x, foot + 2 * s, 20 * s, 4 * s);
+		nvgFillColor(vg, nvgRGBAf(0.02f, 0.01f, 0.05f, 0.7f));
+		nvgFill(vg);
+		// mirror image in the tiles
+		figure(vg, x, foot, s, tr, d.last, d.pose, u, lift, alpha(c, 0.16f), 2.6f, 1.f, true);
+		// trails: where it was a moment ago
+		float tl = trails();
+		if (tl > 0.02f && d.blend < 1.f)
+			for (int k = 3; k >= 1; k--) {
+				float uk = std::max(0.f, d.blend - 0.22f * k);
+				uk = uk * uk * (3 - 2 * uk);
+				figure(vg, x - k * 9.f * s * tl, foot, s, tr, d.last, d.pose, uk, lift, alpha(c, 0.13f * (4 - k) * tl), 2.6f);
+			}
+		// outline, neon, core
+		figure(vg, x, foot, s, tr, d.last, d.pose, u, lift, nvgRGBAf(0.02f, 0.01f, 0.05f, 0.95f), 5.2f);
+		float g = glow();
+		if (g > 0.02f)
+			figure(vg, x, foot, s, tr, d.last, d.pose, u, lift, alpha(c, 0.3f * g), 3.2f + 5.f * g);
+		figure(vg, x, foot, s, tr, d.last, d.pose, u, lift, c, 3.2f);
+		figure(vg, x, foot, s, tr, d.last, d.pose, u, lift, nvgRGBAf(1, 1, 1, 0.85f), 1.1f);
+	}
+	static NVGcolor alpha(NVGcolor c, float a) {
+		c.a *= a;
+		return c;
 	}
 	void drawDance(NVGcontext* vg, float W, float H) {
-		float hz = H * 0.52f;
-		for (int k = 0; k < NT; k++) // the wall
-			haze(vg, W * (0.12f + 0.25f * k), H * 0.2f, H * 0.5f, col(k), 0.25f + 0.4f * level[k]);
-		// the floor: tiles in perspective, lit in the colours of what plays
+		float hz = H * 0.50f;
+		const NVGcolor DARK = nvgRGB(0x08, 0x04, 0x1a), YEL = nvgRGB(0xff, 0xe1, 0x4d), PINKC = nvgRGB(0xff, 0x2b, 0xd6),
+		               CYANC = nvgRGB(0x22, 0xe6, 0xff);
+		int bar = step16 / 16, beat = step16 / 4;
+		// ---- the LED wall: an equalizer in the colours of the tracks
+		{
+			const int COLS = 50, ROWS = 14;
+			float cw = W / COLS, rs = hz * 0.86f / ROWS;
+			for (int i = 0; i < COLS; i++) {
+				int k = (i / 3) % NT;
+				int lit = on(k) ? (int) (clamp(barOf(k, i, COLS), 0.f, 1.f) * ROWS) : 0;
+				for (int pass = 0; pass < 2; pass++) {
+					nvgBeginPath(vg);
+					for (int j = 0; j < ROWS; j++)
+						if ((j < lit) == (pass == 1))
+							nvgRoundedRect(vg, i * cw + 1, hz - 4 - (j + 1) * rs, cw - 3, rs * 0.72f, 1.2f);
+					nvgFillColor(vg, col(k, pass ? 0.42f : 0.05f));
+					nvgFill(vg);
+				}
+			}
+		}
+		// ---- the speaker stacks (they pump with the kick)
+		for (int side = 0; side < 2; side++) {
+			float bw = W * 0.06f, bh = H * 0.19f, bx = side ? W * 0.94f - bw : W * 0.04f, by = hz - bh + H * 0.01f;
+			nvgBeginPath(vg);
+			nvgRoundedRect(vg, bx, by, bw, bh, 3);
+			nvgFillColor(vg, nvgRGB(0x12, 0x0a, 0x26));
+			nvgFill(vg);
+			nvgStrokeColor(vg, nvgRGB(0x8b, 0x5b, 0xff));
+			nvgStrokeWidth(vg, 1.5f);
+			nvgStroke(vg);
+			for (int c = 0; c < 2; c++) {
+				float r = bw * (c ? 0.3f : 0.22f) * (1.f + 0.14f * kick), cx = bx + bw / 2, cy = by + bh * (c ? 0.68f : 0.27f);
+				nvgBeginPath(vg);
+				nvgCircle(vg, cx, cy, r);
+				nvgFillColor(vg, nvgRGB(0x05, 0x02, 0x0c));
+				nvgFill(vg);
+				nvgStrokeColor(vg, col(0));
+				nvgStrokeWidth(vg, 2.f);
+				nvgStroke(vg);
+				dot(vg, cx, cy, r * 0.35f, col(0, 0.6f + 0.4f * kick));
+			}
+		}
+		// ---- the DJ booth and the DJ
+		{
+			float bw = W * 0.18f, bh = H * 0.1f, bx = W / 2 - bw / 2, by = hz - bh;
+			for (int dk = 0; dk < 2; dk++) { // the decks turn
+				float cx = W / 2 + (dk ? 1 : -1) * bw * 0.3f, cy = by - H * 0.015f, r = bh * 0.22f, a = t * 3.f + dk;
+				nvgBeginPath(vg);
+				nvgCircle(vg, cx, cy, r);
+				nvgFillColor(vg, nvgRGB(0x1d, 0x12, 0x38));
+				nvgFill(vg);
+				nvgStrokeColor(vg, col(1));
+				nvgStrokeWidth(vg, 1.6f);
+				nvgStroke(vg);
+				nvgBeginPath(vg);
+				nvgMoveTo(vg, cx, cy);
+				nvgLineTo(vg, cx + r * std::cos(a), cy + r * std::sin(a));
+				nvgStroke(vg);
+			}
+			// the DJ: the head nods with the kick, one hand goes up every other bar
+			float s = H / 150.f, dx = W / 2, foot = by + bh * 0.2f, nod = 2.5f * kick;
+			NVGcolor c = YEL;
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, dx, foot - 26 * s);
+			nvgLineTo(vg, dx, foot - 10 * s);
+			nvgMoveTo(vg, dx, foot - 24 * s);
+			nvgLineTo(vg, dx - 9 * s, foot - 16 * s);
+			nvgLineTo(vg, dx - 14 * s, foot - 12 * s);
+			nvgMoveTo(vg, dx, foot - 24 * s);
+			bool up = bar % 2 == 1;
+			nvgLineTo(vg, dx + 8 * s, up ? foot - 34 * s : foot - 16 * s);
+			nvgLineTo(vg, dx + (up ? 14 : 15) * s, up ? foot - 44 * s : foot - 12 * s);
+			nvgStrokeColor(vg, c);
+			nvgStrokeWidth(vg, 2.6f * s);
+			nvgLineCap(vg, NVG_ROUND);
+			nvgStroke(vg);
+			dot(vg, dx, foot - (31 - nod) * s, 4.2f * s, c);
+			nvgBeginPath(vg); // headphones
+			nvgArc(vg, dx, foot - (31 - nod) * s, 5.6f * s, M_PI, 2 * M_PI, NVG_CW);
+			nvgStrokeColor(vg, PINKC);
+			nvgStrokeWidth(vg, 1.6f * s);
+			nvgStroke(vg);
+			nvgBeginPath(vg);
+			nvgRect(vg, bx, by, bw, bh);
+			nvgFillColor(vg, nvgRGB(0x12, 0x0a, 0x26));
+			nvgFill(vg);
+			nvgStrokeColor(vg, PINKC);
+			nvgStrokeWidth(vg, 1.6f);
+			nvgStroke(vg);
+			nvgBeginPath(vg);
+			nvgRect(vg, bx + 3, by + 3, bw - 6, 3);
+			nvgFillColor(vg, alpha(CYANC, 0.5f + 0.5f * level[2]));
+			nvgFill(vg);
+		}
+		// ---- the floor: tiles in perspective, lit in the colours of what plays (a little calmer than the dancers)
 		uint32_t seed = (uint32_t) tileSeed * 2654435761u;
 		for (int r = 0; r < 7; r++) {
 			float y0 = hz + std::pow((float) r, 1.6f) * H * 0.021f, y1 = hz + std::pow((float) r + 1, 1.6f) * H * 0.021f;
@@ -906,34 +1037,143 @@ struct Display : widget::Widget {
 				nvgLineTo(vg, px(y1, k + 1), y1);
 				nvgLineTo(vg, px(y1, k), y1);
 				nvgClosePath(vg);
-				nvgFillColor(vg, col(tr, lit ? 0.85f : 0.15f));
+				nvgFillColor(vg, col(tr, lit ? 0.55f : 0.14f));
 				nvgFill(vg);
-				nvgStrokeColor(vg, nvgRGB(0x0b, 0x07, 0x16));
+				nvgStrokeColor(vg, DARK);
 				nvgStrokeWidth(vg, 0.8f);
 				nvgStroke(vg);
 			}
 		}
-		// spotlights that swing with the bars, the disco ball
-		for (int i = 0; i < 3; i++) {
-			float sx = W * (0.2f + 0.3f * i) + W * 0.08f * std::sin(spot * 1.3f + i * 2.f + t * 0.5f);
+		// ---- the crowd at the back (small, they bounce on the beat)
+		{
+			float s2 = H / 210.f * zoom();
+			for (int n = 0; n < 14; n++) {
+				int k = n % NT;
+				if (!on(k))
+					continue;
+				float x = W * (0.06f + 0.066f * n), foot = hz + H * (0.08f + 0.015f * (n % 3));
+				int pa = (beat + n) % 4, pb = (beat + n + 1) % 4;
+				float u = clamp(1.f - kick, 0.f, 1.f);
+				figure(vg, x, foot, s2, 1 + n % 2, pa, pb, u, 4.f * kick * (n % 2), col(k, 0.3f + 0.25f * level[k]), 2.4f,
+				       n % 2 ? 1.f : -1.f);
+			}
+		}
+		// ---- lasers from the corners: drums left, melody right (six each, they sweep)
+		for (int side = 0; side < 2; side++) {
+			int k = side ? 2 : 0;
+			if (!on(k))
+				continue;
+			float a0 = side ? -100.f : -80.f, sw = 12.f * std::sin(t * 0.7f + side * 1.7f + spot);
+			NVGcolor c = col(k, 0.3f + 0.6f * clamp(level[k] + flash[k], 0.f, 1.f));
+			for (int j = 0; j < 6; j++) {
+				float a = (a0 + (side ? -1.f : 1.f) * j * 13.f + sw) * (float) M_PI / 180.f;
+				float x0 = side ? W : 0.f;
+				line(vg, x0, H, x0 + 2.f * W * std::cos(a), H + 2.f * W * std::sin(a), c, 1.4f);
+			}
+		}
+		// ---- a spotlight per track (they swing with the bars)
+		for (int i = 0; i < NT; i++) {
+			static const int ORDER[NT] = {0, 2, 1, 3};
+			int k = ORDER[i];
+			if (!on(k))
+				continue;
+			float sx = W * (0.14f + 0.24f * i) + W * 0.06f * std::sin(spot * 1.3f + i * 2.f + t * 0.5f);
 			nvgBeginPath(vg);
 			nvgMoveTo(vg, sx - 3, 0);
 			nvgLineTo(vg, sx + 3, 0);
-			nvgLineTo(vg, sx + W * 0.08f, H);
-			nvgLineTo(vg, sx - W * 0.08f, H);
+			nvgLineTo(vg, sx + W * 0.07f, H);
+			nvgLineTo(vg, sx - W * 0.07f, H);
 			nvgClosePath(vg);
-			nvgFillPaint(vg, nvgLinearGradient(vg, 0, 0, 0, H, nvgRGBAf(1, 1, 1, 0.22f), nvgRGBAf(1, 1, 1, 0)));
+			nvgFillPaint(vg, nvgLinearGradient(vg, 0, 0, 0, H, col(k, 0.12f + 0.3f * level[k]), col(k, 0.f)));
 			nvgFill(vg);
 		}
-		line(vg, W / 2, 0, W / 2, H * 0.06f, nvgRGB(0x8a, 0x8d, 0x99), 0.8f);
-		dot(vg, W / 2, H * 0.11f, H * 0.045f, nvgRGBf(0.85f + 0.15f * kick, 0.86f + 0.14f * kick, 0.9f));
-		// the dancers (one off: it sits at the edge)
+		// ---- the disco ball and its light dots everywhere (they turn, the kick makes them flash)
+		{
+			float bx = W / 2, by = H * 0.14f, br = H * 0.075f;
+			nvgBeginPath(vg);
+			nvgMoveTo(vg, bx, 0);
+			nvgLineTo(vg, bx, by - br);
+			nvgStrokeColor(vg, nvgRGB(0x8a, 0x8d, 0x99));
+			nvgStrokeWidth(vg, 1.f);
+			nvgStroke(vg);
+			nvgBeginPath(vg);
+			nvgCircle(vg, bx, by, br);
+			nvgFillPaint(vg, nvgRadialGradient(vg, bx - br * 0.3f, by - br * 0.3f, br * 0.1f, br * 1.1f, nvgRGB(0xff, 0xff, 0xff),
+			                                   nvgRGB(0x55, 0x55, 0x6e)));
+			nvgFill(vg);
+			nvgBeginPath(vg);
+			for (int j = 1; j < 7; j++) { // facets: rows, and columns that turn
+				float yy = by - br + j * 2 * br / 7, hw = br * std::sqrt(std::max(0.f, 1.f - std::pow((yy - by) / br, 2.f)));
+				nvgMoveTo(vg, bx - hw, yy);
+				nvgLineTo(vg, bx + hw, yy);
+				float ph = std::fmod(t * 0.6f + j / 7.f, 1.f);
+				float xx = bx + br * std::cos((float) M_PI * ph);
+				nvgMoveTo(vg, xx, by - br * 0.95f);
+				nvgQuadTo(vg, bx + (xx - bx) * 1.25f, by, xx, by + br * 0.95f);
+			}
+			nvgStrokeColor(vg, nvgRGBA(0x6b, 0x6b, 0x88, 200));
+			nvgStrokeWidth(vg, 0.7f);
+			nvgStroke(vg);
+			float fl = 0.45f + 0.55f * kick;
+			dot(vg, bx - br * 0.35f, by - br * 0.4f, br * 0.12f, nvgRGBAf(1, 1, 1, fl));
+			uint32_t sd = 0x9e3779b9u;
+			auto rnd = [&]() {
+				sd ^= sd << 13, sd ^= sd >> 17, sd ^= sd << 5;
+				return (sd >> 8) / 16777216.f;
+			};
+			float turn = t * 0.25f;
+			for (int n = 0; n < 130; n++) {
+				float a = rnd() * 2 * (float) M_PI + turn, d = br * 1.6f + rnd() * W * 0.55f, r = 1.2f + rnd() * 2.f;
+				float x = bx + d * std::cos(a), y = by + std::fabs(d * std::sin(a)) * 0.75f;
+				if (x < 0 || x > W || y > H)
+					continue;
+				int k = n % NT;
+				NVGcolor c = n % 3 ? col(k, 0.5f + 0.4f * fl) : nvgRGBAf(1, 1, 1, 0.5f + 0.4f * fl);
+				nvgBeginPath(vg);
+				nvgCircle(vg, x, y, r);
+				nvgFillColor(vg, c);
+				nvgFill(vg);
+			}
+		}
+		// ---- fog on the floor (pads)
+		if (on(3)) {
+			nvgBeginPath(vg);
+			nvgRect(vg, 0, H * 0.7f, W, H * 0.3f);
+			nvgFillPaint(vg, nvgLinearGradient(vg, 0, H * 0.7f, 0, H, col(3, 0.f), col(3, 0.15f + 0.45f * level[3])));
+			nvgFill(vg);
+			for (int n = 0; n < 7; n++)
+				haze(vg, W * (n + 0.5f) / 7 + W * 0.03f * std::sin(t * 0.3f + n), H * 0.9f, H * 0.16f, col(3), 0.1f + 0.2f * level[3]);
+		}
+		// ---- the four dancers
 		float s = H / 110.f * zoom();
 		static const float X[NT] = {0.18f, 0.4f, 0.62f, 0.82f};
 		for (int k = 0; k < NT; k++) {
 			if (!on(k))
 				continue;
 			drawFigure(vg, W * X[k], H * 0.86f, s, k, dancers[k]);
+		}
+		// ---- the crowd in front: heads, some hands up (they bounce on the kick)
+		{
+			float hr = H * 0.033f;
+			nvgBeginPath(vg);
+			for (int n = 0; n < 22; n++) {
+				float x = (n + 0.25f) * W / 21.f, y = H - hr * 0.2f + (n % 2) * hr * 0.4f - (n % 2 ? 0.f : hr * 0.5f * kick);
+				nvgCircle(vg, x, y - hr * 1.4f, hr);
+				nvgRoundedRect(vg, x - hr * 1.45f, y - hr * 0.6f, hr * 2.9f, hr * 2.4f, hr * 0.9f);
+			}
+			nvgFillColor(vg, nvgRGB(0x05, 0x02, 0x0c));
+			nvgFill(vg);
+			nvgBeginPath(vg);
+			for (int n = 0; n < 22; n += 3) {
+				float x = (n + 0.25f) * W / 21.f, y = H - hr * 0.2f, wv = 0.25f * std::sin(t * 4.f + n);
+				float hx = x + hr * (0.9f + 3.f * wv), hy = y - hr * (4.2f + 0.5f * kick);
+				nvgMoveTo(vg, x + hr * 0.7f, y - hr * 0.4f);
+				nvgLineTo(vg, hx, hy);
+			}
+			nvgStrokeColor(vg, nvgRGB(0x05, 0x02, 0x0c));
+			nvgStrokeWidth(vg, hr * 0.55f);
+			nvgLineCap(vg, NVG_ROUND);
+			nvgStroke(vg);
 		}
 	}
 
@@ -991,66 +1231,80 @@ struct Display : widget::Widget {
 	}
 };
 
-template <int R, int G, int B>
-using TrackButton = VCVLightLatch<jiant::AccentLight<R, G, B>>;
-
 struct GlanzWidget : ModuleWidget {
+	Display* disp = nullptr;
+	neonkit::Undo undo;
+	dsp::BooleanTrigger undoBtn, initBtn;
 	GlanzWidget(Glanz* module) {
+		using namespace neonui;
+		using namespace neonkit;
+		using M = Glanz;
 		setModule(module);
 		setPanel(createPanel(asset::plugin(pluginInstance, "res/Glanz.svg")));
-		jiant::addScrews(this);
 
 		Display* d = new Display;
 		d->m = module;
-		d->box = jiant::area(L::DISPLAY).grow(Vec(-1, -1));
+		d->box.pos = mm2px(Vec(L::DISPLAY[0] + 0.6f, L::DISPLAY[1] + 0.6f));
+		d->box.size = mm2px(Vec(L::DISPLAY[2] - 1.2f, L::DISPLAY[3] - 1.2f));
 		addChild(d);
+		disp = d;
 
 		// the scene field (it shows what plays: SCENE CV may override the pick)
-		genra_look::PickField* pf = createWidget<genra_look::PickField>(Vec(L::PRESETF[0], L::PRESETF[1]));
-		pf->box.size = Vec(L::PRESETF[2], L::PRESETF[3]);
-		pf->accent = ACC;
+		genra_look::PickField* pf = createWidget<genra_look::PickField>(mm2px(Vec(L::PRESETF[0], L::PRESETF[1])));
+		pf->box.size = mm2px(Vec(L::PRESETF[2], L::PRESETF[3]));
+		pf->accent = PINK;
 		pf->count = []() { return (int) NUM_SCENES; };
 		pf->name = [](int i) { return string::f("%02d  %s", i + 1, SCENE[clamp(i, 0, NUM_SCENES - 1)]); };
 		pf->current = [=]() { return d->sceneNow(); };
 		pf->choose = [=](int i) {
 			if (module) {
+				undo.push(module);
 				module->scene = clamp(i, 0, NUM_SCENES - 1);
 				d->barsInScene = 0;
 			}
 		};
 		addChild(pf);
-		genra_map::select(this, pf, module, Glanz::SCENESEL_PARAM, module ? &module->mapCode : nullptr, pf->count, pf->current,
+		genra_map::select(this, pf, module, M::SCENESEL_PARAM, module ? &module->mapCode : nullptr, pf->count, pf->current,
 		                  pf->choose); // MIDI-MAP: a knob goes through the scenes
 
-		addParam(createParamCentered<GKnob>(jiant::at(L::AMOUNT), module, Glanz::AMOUNT_PARAM));
-		addParam(createParamCentered<GKnob>(jiant::at(L::SMOOTH), module, Glanz::SMOOTH_PARAM));
-		addParam(createParamCentered<GKnob>(jiant::at(L::DECAY), module, Glanz::DECAY_PARAM));
-		const float* small[5] = {L::SPEED, L::COLOR, L::TRAILS, L::ZOOM, L::GLOW};
-		for (int i = 0; i < 5; i++)
-			addParam(createParamCentered<GSmallKnob>(jiant::at(small[i]), module, Glanz::SPEED_PARAM + i));
-		addParam(createParamCentered<GSmallKnob>(jiant::at(L::AUTO), module, Glanz::AUTO_PARAM));
-		addParam(createLightParamCentered<TrackButton<0x7b, 0x6c, 0xff>>(jiant::at(L::T[0]), module, Glanz::TRACK_PARAM + 0, Glanz::TRACK_LIGHT + 0));
-		addParam(createLightParamCentered<TrackButton<0xb8, 0xf2, 0x3a>>(jiant::at(L::T[1]), module, Glanz::TRACK_PARAM + 1, Glanz::TRACK_LIGHT + 1));
-		addParam(createLightParamCentered<TrackButton<0x3d, 0xc9, 0xff>>(jiant::at(L::T[2]), module, Glanz::TRACK_PARAM + 2, Glanz::TRACK_LIGHT + 2));
-		addParam(createLightParamCentered<TrackButton<0xe0, 0x77, 0x9e>>(jiant::at(L::T[3]), module, Glanz::TRACK_PARAM + 3, Glanz::TRACK_LIGHT + 3));
-		addParam(createLightParamCentered<VCVLightLatch<jiant::AccentLight<0x8f, 0xd3, 0xff>>>(jiant::at(L::FREEZE), module, Glanz::FREEZE_PARAM,
-		                                                                                        Glanz::FREEZE_LIGHT));
-		addParam(createLightParamCentered<VCVLightBezel<jiant::AccentLight<0x8f, 0xd3, 0xff>>>(jiant::at(L::NEXT), module, Glanz::NEXT_PARAM,
-		                                                                                        Glanz::NEXT_LIGHT));
-		addInput(createInputCentered<PJ301MPort>(jiant::at(L::IN_L), module, Glanz::L_INPUT));
-		addInput(createInputCentered<PJ301MPort>(jiant::at(L::IN_R), module, Glanz::R_INPUT));
+		knob(this, module, L::AMOUNT, M::AMOUNT_PARAM);
+		knob(this, module, L::SMOOTH, M::SMOOTH_PARAM);
+		knob(this, module, L::DECAY, M::DECAY_PARAM);
+		knob(this, module, L::SPEED, M::SPEED_PARAM);
+		knob(this, module, L::COLOR, M::COLOR_PARAM);
+		knob(this, module, L::ZOOM, M::ZOOM_PARAM);
+		knob(this, module, L::TRAILS, M::TRAILS_PARAM);
+		knob(this, module, L::GLOW, M::GLOW_PARAM);
+		knob(this, module, L::AUTO, M::AUTO_PARAM);
+		button(this, module, L::FREEZE, M::FREEZE_PARAM, true, CYAN);
+		NButton* nb = button(this, module, L::NEXT, M::NEXT_PARAM, false, PINK);
+		nb->lit = [=]() { return module && module->lights[M::NEXT_LIGHT].getBrightness() > 0.1f; };
+		const float* tr[NT] = {L::TR0, L::TR1, L::TR2, L::TR3};
 		for (int t = 0; t < NT; t++)
-			addInput(createInputCentered<PJ301MPort>(jiant::at(L::IN_T[t]), module, Glanz::TRACK_INPUT + t));
-		const float* cvs[7] = {L::CV_SCENE, L::CV_COLOR, L::CV_SPEED, L::CV_ZOOM, L::CV_AMOUNT, L::TRIG_NEXT, L::TRIG_FREEZE};
-		for (int i = 0; i < 7; i++)
-			addInput(createInputCentered<PJ301MPort>(jiant::at(cvs[i]), module, Glanz::SCENE_INPUT + i));
+			button(this, module, tr[t], M::TRACK_PARAM + t, true, TCOL[t]);
+		button(this, module, L::UNDO, M::UNDO_PARAM, false, VIOLET);
+		button(this, module, L::INIT, M::INIT_PARAM, false, VIOLET);
+		for (int i = 0; i < M::INPUTS_LEN; i++)
+			addPort<NPort>(this, L::JACK_IN[i], module, i, false, hex(L::JACK_IN_COL[i]));
 	}
 	void step() override {
 		ModuleWidget::step();
 		Glanz* m = dynamic_cast<Glanz*>(module);
 		if (m && m->params[Glanz::NEXT_PARAM].getValue() > 0.5f && !nextDown) {
+			undo.push(m);
 			m->nextReq++; // the NEXT button (the display picks it up)
 		}
+		if (m && initBtn.process(m->params[Glanz::INIT_PARAM].getValue() > 0.5f)) {
+			undo.push(m);
+			for (int i = 0; i < Glanz::PARAMS_LEN; i++)
+				if (i != Glanz::INIT_PARAM && i != Glanz::UNDO_PARAM)
+					m->params[i].setValue(m->paramQuantities[i]->getDefaultValue());
+			m->scene = 0;
+			if (disp)
+				disp->barsInScene = 0;
+		}
+		if (m && undoBtn.process(m->params[Glanz::UNDO_PARAM].getValue() > 0.5f))
+			undo.pop(m);
 		nextDown = m && m->params[Glanz::NEXT_PARAM].getValue() > 0.5f;
 	}
 	bool nextDown = false;
@@ -1088,4 +1342,6 @@ struct GlanzWidget : ModuleWidget {
 	}
 };
 
-Model* modelGlanz = createModel<Glanz, GlanzWidget>("GenraGlanz");
+}  // namespace glanz
+
+Model* modelGlanz = createModel<glanz::Glanz, glanz::GlanzWidget>("Glanz");

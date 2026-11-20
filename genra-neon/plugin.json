@@ -1,7 +1,7 @@
 {
   "slug": "GenraNeon",
-  "name": "GENRA Neon",
-  "version": "2.1.2",
+  "name": "GENRA Neon Punk",
+  "version": "2.2.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -75,6 +75,14 @@
         "Drone",
         "Polyphonic",
         "Reverb"
+      ]
+    },
+    {
+      "slug": "Glanz",
+      "name": "GLANZ",
+      "description": "Music visuals in the neon look: follows GENRA (every track in its colour, exactly with its notes) and listens to audio. Nine scenes, among them a dance floor with DJ, lasers and a disco ball; AUTO BARS, NEXT, SCENE CV, FREEZE.",
+      "tags": [
+        "Visual"
       ]
     }
   ]

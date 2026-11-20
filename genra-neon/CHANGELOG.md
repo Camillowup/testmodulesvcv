@@ -1,4 +1,14 @@
-# GENRA NEON – Versionsgeschichte
+# GENRA NEON PUNK – Versionsgeschichte
+
+### 2.2.0 (20. Nov. 2026, Test-Build, kein Release)
+- Plugin heisst **GENRA Neon Punk** (Slug bleibt `GenraNeon`, Patches laden weiter); Kopfzeile „GENRA // NEON PUNK“.
+- **GLANZ** (Musik-Visualisierungen) ist als siebtes Modul hier (vorher das eigene Plugin GENRA GLANZ, das entfällt;
+  Patches mit dem alten GLANZ: neu einsetzen). Panel im NEON-TERRAIN-Look (40 HP, CV-Buchsen unter den Reglern,
+  SCENE-CV in der Leiste, UNDO/INIT neu).
+- GLANZ DANCE FLOOR aufgepimpt: LED-Wand als Equalizer, DJ-Pult mit DJ, Boxen pumpen zur Kick, grosse Discokugel mit
+  Lichtpunkten, Laserfächer aus den Ecken (Drums links, Melodie rechts), ein Spot pro Spur, Nebel mit den Pads, kleine
+  Tänzer im Hintergrund, Publikum vorne; die vier Tänzer mit dunkler Kontur, Leuchtkern, Schatten, Spiegelbild und
+  Nachzieh-Spuren (TRAILS).
 
 ### 2.1.2 (20. Nov. 2026, Test-Build, kein Release)
 Reparaturen:

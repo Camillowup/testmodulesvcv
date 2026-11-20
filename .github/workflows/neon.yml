@@ -1,6 +1,6 @@
 name: Build GENRA Neon
 
-# GENRA NEON: the neon modules WELLE, NEBEL, WOGE, PULS, GLAS and FLUT, its own plugin in the folder genra-neon/ (builds when something there changes)
+# GENRA NEON PUNK (slug GenraNeon): WELLE, NEBEL, WOGE, PULS, GLAS, FLUT and GLANZ, its own plugin in the folder genra-neon/ (builds when something there changes)
 on:
   push:
     paths:
@@ -61,7 +61,7 @@ jobs:
           test -f $D/plugin.dll
           test -f $D/res/Welle.svg
           test -f $D/res/Nebel.svg
-          for m in Woge Puls Glas Flut; do test -f $D/res/$m.svg; done
+          for m in Woge Puls Glas Flut Glanz; do test -f $D/res/$m.svg; done
           if objdump -p $D/plugin.dll | grep -iE "libstdc"; then echo "plugin.dll loads libstdc++"; exit 1; fi
 
       - uses: actions/upload-artifact@v4

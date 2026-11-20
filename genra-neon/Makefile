@@ -1,4 +1,4 @@
-# GENRA NEON: the neon modules WELLE and NEBEL (its own plugin, in a folder of the GENRA Test repo). Build:
+# GENRA NEON PUNK (slug GenraNeon): the neon modules WELLE … FLUT and GLANZ (its own plugin, in a folder of the GENRA Test repo). Build:
 #   make genra-src && make RACK_DIR=/path/to/Rack-SDK dist
 RACK_DIR ?= ../..
 

@@ -155,7 +155,7 @@ def build(S):
         o.e(f'<rect x="{gx + 2}" y="{gy + 0.55}" width="{gw * 0.6:.1f}" height="0.3" fill="{C2}" fill-opacity="0.8"/>')
     px = W - 58.0
     o.text(53, 6.0, S["sub"], 1.75, C2, 700, "start", 0.5)
-    o.text(53, 8.9, "GENRA // NEON", 1.5, "#7d6aa8", 600, "start", 0.45)
+    o.text(53, 8.9, "GENRA // NEON PUNK", 1.5, "#7d6aa8", 600, "start", 0.45)
     for i, nm in enumerate(("UNDO", "INIT")):
         bx = px - 22.0 + i * 10.6
         o.e(f'<path d="M{bx:.2f} 3.6 h7.8 l1.4 1.4 v4.2 h-9.2 z" fill="#1a0a2e" stroke="{C3}" stroke-width="0.3"/>')
@@ -261,13 +261,15 @@ def build(S):
     ox = W - 13.0 - (len(S["outs"]) - 1) * JS
     if ox - 6.0 < x - GAP:
         sys.exit(f"{S['name']}: the outputs do not fit beside the strip")
-    o.e(f'<rect x="{ox - 4.6:.2f}" y="{jy - 3.6:.2f}" width="{(len(S["outs"]) - 1) * JS + 9.2:.2f}" height="9.4" rx="0.8" fill="{C1}" fill-opacity="0.07" stroke="{C1}" stroke-width="0.25"/>')
+    if S["outs"]:  # GLANZ has none
+        o.e(f'<rect x="{ox - 4.6:.2f}" y="{jy - 3.6:.2f}" width="{(len(S["outs"]) - 1) * JS + 9.2:.2f}" height="9.4" rx="0.8" fill="{C1}" fill-opacity="0.07" stroke="{C1}" stroke-width="0.25"/>')
     for i, (name, lb) in enumerate(S["outs"]):
         x = ox + i * JS
         o.e(f'<polygon points="{hexagon(x, jy, 3.1)}" fill="#141024" stroke="{C1}" stroke-width="0.3"/>')
         o.text(x, jy + 4.6, lb, 1.45, "#ffffff", 700, "middle", 0.2)
         outs.append((name, x, jy, C1))
-    o.text(ox - 6.2, jy + 0.5, "OUT", 1.5, C1, 800, "end", 0.4)
+    if S["outs"]:
+        o.text(ox - 6.2, jy + 0.5, "OUT", 1.5, C1, 800, "end", 0.4)
     for sx in (7.62, W - 7.62):
         for sy in (2.54, H - 2.54):
             o.e(f'<circle cx="{sx:.2f}" cy="{sy:.2f}" r="1.5" fill="#0b0716" stroke="#5b4a8a" stroke-width="0.25"/>')
@@ -290,8 +292,9 @@ def header(S, lay, ins, outs, ns):
              " ".join(n for n, _, _, _ in ins))
     h.append("static const unsigned JACK_IN_COL[] = {" + ", ".join("0x" + c[1:] for _, _, _, c in ins) + "};")
     h.append(f"static const int NUM_JACK_OUT = {len(outs)};")
-    h.append("static const float JACK_OUT[][2] = {" + ", ".join(f"{{{x:.3f}f, {y:.3f}f}}" for _, x, y, _ in outs) + "};  // " +
-             " ".join(n for n, _, _, _ in outs))
+    if outs:  # (GLANZ has no outputs: no zero-size array)
+        h.append("static const float JACK_OUT[][2] = {" + ", ".join(f"{{{x:.3f}f, {y:.3f}f}}" for _, x, y, _ in outs) + "};  // " +
+                 " ".join(n for n, _, _, _ in outs))
     h.append(f"}}  // namespace {ns}")
     return "\n".join(h) + "\n"
 
@@ -495,12 +498,31 @@ def stand_ins(S, lay):
     return s
 
 
+def glanz_pic(lay):
+    import math
+    x, y, w, h = dict(lay)["DISPLAY"]
+    cx, cy = x + w / 2, y + h / 2
+    cols = ["#7a6cff", "#3fbf6f", "#2fd3ff", "#ff5fb8"]
+    out = []
+    for gx in range(1, 12):
+        out.append(f'<line x1="{x + gx * w / 12:.2f}" y1="{y + 2}" x2="{x + gx * w / 12:.2f}" y2="{y + h - 2}" stroke="#2a1d4a" stroke-width="0.15"/>')
+    for i in range(96):
+        a = 2 * math.pi * i / 96
+        v = 0.35 + 0.65 * abs(math.sin(i * 0.37) * math.cos(i * 0.11 + 1.3))
+        r0, r1 = 17.0, 17.0 + 13.0 * v
+        c = cols[(i // 24) % 4]
+        out.append(f'<line x1="{cx + r0 * math.cos(a):.2f}" y1="{cy + r0 * math.sin(a):.2f}" x2="{cx + r1 * math.cos(a):.2f}" y2="{cy + r1 * math.sin(a):.2f}" stroke="{c}" stroke-width="0.9" stroke-linecap="round" opacity="0.9"/>')
+    out.append(f'<circle cx="{cx}" cy="{cy}" r="15" fill="none" stroke="#ff4fd8" stroke-width="0.5" opacity="0.8"/>')
+    out.append(f'<circle cx="{cx}" cy="{cy}" r="6" fill="#2fd3ff" opacity="0.25"/>')
+    return out
+
+
 def write(S, slug, ns, sub):
     o, lay, ins, outs = build(S)
     if len(sys.argv) > 1 and sys.argv[1] == "preview":
         svg = os.path.join(ROOT, "docs", "panels", slug.lower() + ".svg")
         png = svg[:-4] + ".png"
-        open(svg, "w").write("\n".join(o.o + stand_ins(S, lay) + ["</svg>"]))
+        open(svg, "w").write("\n".join(o.o + stand_ins(S, lay) + (glanz_pic(lay) if slug == "Glanz" else []) + ["</svg>"]))
         subprocess.run(["rsvg-convert", "-w", "2400", svg, "-o", png], check=True)
         os.remove(svg)
         print(f"{slug}: preview {png}")
@@ -510,8 +532,31 @@ def write(S, slug, ns, sub):
     print(f"{slug}: res/{slug}.svg, src/{sub}/{slug}Layout.hpp ({len(ins)} in, {len(outs)} out)")
 
 
+GLANZ = dict(
+    name="GLANZ", sub="MUSIC VISUALS", hp=40,
+    rows=[
+        [dict(title="REACT", cols=[("knob", "AMOUNT", "AMOUNT", 1, "C_AMOUNT"), ("knob", "SMOOTH", "SMOOTH", 0, None),
+                                   ("knob", "DECAY", "DECAY", 0, None)]),
+         dict(title="LOOK", cols=[("knob", "SPEED", "SPEED", 0, "C_SPEED"), ("knob", "COLOR", "COLOR", 0, "C_COLOR"),
+                                  ("knob", "ZOOM", "ZOOM", 0, "C_ZOOM"), ("knob", "TRAILS", "TRAILS", 0, None),
+                                  ("knob", "GLOW", "GLOW", 0, None)]),
+         dict(title="SCENE", cols=[("knob", "AUTO", "AUTO BARS", 0, None), ("btn", "FREEZE", "FREEZE", "T_FREEZE"),
+                                   ("btn", "NEXT", "NEXT", "T_NEXT")]),
+         dict(title="TRACKS", cols=[("btn", "TR0", "DRUMS", None), ("btn", "TR1", "BASS", None),
+                                    ("btn", "TR2", "MELODY", None), ("btn", "TR3", "PADS", None)])],
+    ],
+    bottom=[(AU, [("IN_L", "IN L"), ("IN_R", "IN R")]),
+            (GR, [("TI0", "DRUMS"), ("TI1", "BASS"), ("TI2", "MELODY"), ("TI3", "PADS")]),
+            (SY, [("C_SCENE", "SCENE")])],
+    outs=[],
+    # the module's InputId order
+    inputs=["IN_L", "IN_R", "TI0", "TI1", "TI2", "TI3", "C_SCENE", "C_COLOR", "C_SPEED", "C_ZOOM", "C_AMOUNT", "T_NEXT",
+            "T_FREEZE"],
+)
+
 MODS = {"welle": (lambda: WELLE, "Welle", "wl"), "nebel": (lambda: NEBEL, "Nebel", "nl"), "woge": (lambda: WOGE, "Woge", "wg"),
-        "puls": (lambda: PULS, "Puls", "pl"), "glas": (lambda: GLAS, "Glas", "gl"), "flut": (lambda: FLUT, "Flut", "fl")}
+        "puls": (lambda: PULS, "Puls", "pl"), "glas": (lambda: GLAS, "Glas", "gl"), "flut": (lambda: FLUT, "Flut", "fl"),
+        "glanz": (lambda: GLANZ, "Glanz", "gz")}
 for key in (sys.argv[2:] or list(MODS)):  # neon_panel.py real|preview [module …]
     spec, slug, ns = MODS[key]
     write(spec(), slug, ns, key)

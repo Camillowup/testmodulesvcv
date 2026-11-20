@@ -125,7 +125,7 @@ def build(S):
         o.e(f'<rect x="{gx}" y="{gy}" width="{gw}" height="0.55" fill="#05020c"/>')
         o.e(f'<rect x="{gx + 2}" y="{gy + 0.55}" width="{gw * 0.6:.1f}" height="0.3" fill="{C2}" fill-opacity="0.8"/>')
     o.text(56, 6.2, S["sub"], 1.7, C2, 700, "start", 0.6)
-    o.text(56, 9.2, "GENRA // NEON", 1.4, "#7d6aa8", 600, "start", 0.5)
+    o.text(56, 9.2, "GENRA // NEON PUNK", 1.4, "#7d6aa8", 600, "start", 0.5)
     px = W - 66
     for i, (nm, lb) in enumerate((("UNDO", "UNDO"), ("INIT", "INIT"))):
         bx = px - 25 + i * 11.5
