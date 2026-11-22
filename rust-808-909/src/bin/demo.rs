@@ -34,8 +34,13 @@ fn wav_schreiben(pfad: &Path, daten: &[f32]) {
 }
 
 fn einzelschlag(m: Modell, s: Stimme) -> Vec<f32> {
+    einzelschlag_mit(m, s, |_| {})
+}
+
+fn einzelschlag_mit(m: Modell, s: Stimme, vorbereiten: impl Fn(&mut DrumKern)) -> Vec<f32> {
     let mut k = DrumKern::new(FS);
     k.set_modell(m);
+    vorbereiten(&mut k);
     let mut out = Vec::new();
     // normal, nach 1.2 s mit Akzent, dann ausklingen lassen
     k.ausloesen(s, false);
@@ -121,6 +126,20 @@ fn main() {
             println!("{} {:<10} Spitze {:.2}", m.name(), name, spitze);
         }
     }
+    // 808-Varianten (Schalter wie im Original)
+    let v = ziel.join("varianten_808");
+    fs::create_dir_all(&v).unwrap();
+    wav_schreiben(&v.join("SD_tabelle_238_476Hz.wav"), &einzelschlag(Modell::Tr808, Stimme::Snare));
+    wav_schreiben(
+        &v.join("SD_spaet_175_335Hz.wav"),
+        &einzelschlag_mit(Modell::Tr808, Stimme::Snare, |k| k.set_808_snare_spaet(true)),
+    );
+    for (s, n) in [(Stimme::TomTief, "LC"), (Stimme::TomMittel, "MC"), (Stimme::TomHoch, "HC")] {
+        wav_schreiben(&v.join(format!("{}_conga.wav", n)), &einzelschlag_mit(Modell::Tr808, s, |k| k.set_808_congas(true)));
+    }
+    wav_schreiben(&v.join("CL_claves.wav"), &einzelschlag_mit(Modell::Tr808, Stimme::Rimshot, |k| k.set_808_claves(true)));
+    wav_schreiben(&v.join("MA_maracas.wav"), &einzelschlag_mit(Modell::Tr808, Stimme::Clap, |k| k.set_808_maracas(true)));
+
     wav_schreiben(&ziel.join("groove_808.wav"), &groove(8, |_| Modell::Tr808));
     wav_schreiben(&ziel.join("groove_909.wav"), &groove(8, |_| Modell::Tr909));
     wav_schreiben(

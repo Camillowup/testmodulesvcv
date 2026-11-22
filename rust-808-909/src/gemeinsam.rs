@@ -3,8 +3,10 @@
 use crate::dsp::*;
 use crate::{Params, DECAY, EXTRA, PEGEL, TON, TUNE};
 
-/// Handclap: gefiltertes Rauschen, mehrmals schnell angestossen, dann eine
-/// kurze Hallfahne. Beide Maschinen machen das analog.
+/// Handclap (beide Maschinen, laut Service Manual): Rauschen durch ein
+/// Bandpassfilter speist zwei parallele VCAs. Einer bekommt die
+/// Saegezahn-Huellkurve (mehrere schnelle Stoesse), der andere eine lange
+/// Huellkurve = der "Hall".
 pub struct Clap {
     fs: f32,
     n: u32,
@@ -14,42 +16,58 @@ pub struct Clap {
     abstand: f32,
     bursts: u32,
     burst_tau: f32,
-    tail_tau: f32,
-    tail_pegel: f32,
+    hall_tau: f32,
+    hall_pegel: f32,
+    hall: (f32, f32, f32),
+    abstand_bereich: (f32, f32, f32),
     pegel: f32,
     vel: f32,
-    f_min: f32,
-    f_max: f32,
+    f: (f32, f32, f32),
     q: f32,
 }
 
+pub struct ClapConfig {
+    pub bursts: u32,
+    /// Bandpass links / Mitte / rechts (Hz)
+    pub f: (f32, f32, f32),
+    pub q: f32,
+    /// Abstand der Stoesse links / Mitte / rechts (s)
+    pub abstand: (f32, f32, f32),
+    /// Hall-Zeitkonstante links / Mitte / rechts (s)
+    pub hall: (f32, f32, f32),
+    pub hall_pegel: f32,
+    pub seed: u32,
+}
+
 impl Clap {
-    pub fn new(fs: f32, bursts: u32, f_min: f32, f_max: f32, q: f32, seed: u32) -> Self {
+    pub fn new(fs: f32, c: ClapConfig) -> Self {
         Self {
             fs,
             n: 0,
             aktiv: false,
-            rng: Rauschen::new(seed),
-            filter: Svf::new(1000.0, q, fs),
+            rng: Rauschen::new(c.seed),
+            filter: Svf::new(1000.0, c.q, fs),
             abstand: 0.01,
-            bursts,
+            bursts: c.bursts,
             burst_tau: 0.0035,
-            tail_tau: 0.15,
-            tail_pegel: 0.55,
+            hall_tau: c.hall.1,
+            hall_pegel: c.hall_pegel,
+            hall: c.hall,
+            abstand_bereich: c.abstand,
             pegel: 0.8,
             vel: 1.0,
-            f_min,
-            f_max,
-            q,
+            f: c.f,
+            q: c.q,
         }
     }
 
     pub fn update(&mut self, p: &Params) {
         self.pegel = p[PEGEL];
-        self.tail_tau = exp_map(0.04, 0.4, p[DECAY]);
-        let f = exp_map(self.f_min, self.f_max, p[TON]) * exp_map(0.85, 1.18, p[TUNE]);
+        self.hall_tau = drei_punkt(self.hall.0, self.hall.1, self.hall.2, p[DECAY]);
+        let f = drei_punkt(self.f.0, self.f.1, self.f.2, p[TON]) * exp_map(0.85, 1.18, p[TUNE]);
         self.filter.set(f, self.q, self.fs);
-        self.abstand = exp_map(0.006, 0.016, p[EXTRA]);
+        let a = self.abstand_bereich;
+        self.abstand = drei_punkt(a.0, a.1, a.2, p[EXTRA]);
     }
 
     pub fn ausloesen(&mut self, vel: f32) {
@@ -65,22 +83,17 @@ impl Clap {
         }
         let t = self.n as f32 / self.fs;
         self.n += 1;
-        let t_letzt = self.abstand * (self.bursts - 1) as f32;
-        let burst = if t < t_letzt + self.abstand {
+        let ende_bursts = self.abstand * self.bursts as f32;
+        let saege = if t < ende_bursts {
             (-(t % self.abstand) / self.burst_tau).exp()
         } else {
             0.0
         };
-        let tail = if t >= t_letzt {
-            self.tail_pegel * (-(t - t_letzt) / self.tail_tau).exp()
-        } else {
-            0.0
-        };
-        if t > t_letzt + 12.0 * self.tail_tau {
+        let hall = self.hall_pegel * (-t / self.hall_tau).exp();
+        if t > ende_bursts + 12.0 * self.hall_tau {
             self.aktiv = false;
         }
-        let env = burst.max(tail);
         let x = self.filter.process(self.rng.bipolar()).band;
-        soft_clip(x * env * 3.0 * self.vel) * self.pegel
+        ausgang(x * (saege + hall) * 2.2, self.vel, self.pegel)
     }
 }

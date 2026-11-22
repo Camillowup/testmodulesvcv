@@ -30,6 +30,30 @@ pub fn lin_map(min: f32, max: f32, t: f32) -> f32 {
     min + (max - min) * t.clamp(0.0, 1.0)
 }
 
+/// Dreipunkt-Abbildung (links, Mitte = 12 Uhr, rechts), exponentiell.
+/// So liegen die Werte aus Rolands Messtabelle genau auf den Reglerstellungen.
+#[inline]
+pub fn drei_punkt(links: f32, mitte: f32, rechts: f32, t: f32) -> f32 {
+    let t = t.clamp(0.0, 1.0);
+    if t < 0.5 {
+        exp_map(links, mitte, t * 2.0)
+    } else {
+        exp_map(mitte, rechts, (t - 0.5) * 2.0)
+    }
+}
+
+/// Zeit bis 1/10 der Amplitude (so misst Roland "Decay") -> Zeitkonstante.
+#[inline]
+pub fn t10_zu_tau(t10: f32) -> f32 {
+    t10 / std::f32::consts::LN_10
+}
+
+/// Gemeinsame Ausgangsstufe: etwas Headroom, Akzent faehrt sie in die Saettigung.
+#[inline]
+pub fn ausgang(x: f32, vel: f32, pegel: f32) -> f32 {
+    soft_clip(x * 0.5 * vel) * 1.6 * pegel
+}
+
 /// Auf 6 Bit quantisieren (wie die Becken-Samples der echten 909).
 #[inline]
 pub fn sechs_bit(x: f32) -> f32 {
@@ -175,54 +199,79 @@ impl Svf {
     }
 }
 
-/// Angestossener Resonator: das digitale Gegenstueck zum Bridged-T-Netzwerk
-/// der 808. Ein Impuls bringt ihn zum Klingen, danach schwingt er als
-/// gedaempfter Sinus aus (Amplitude 1 beim Anstoss mit Menge 1).
+/// Angestossener Schwinger auf Basis eines Zustandsvariablen-Filters.
+/// Wie das Bridged-T-Netzwerk: ein Impuls bringt ihn zum Klingen, er schwingt
+/// mit Frequenz f aus und faellt mit Zeitkonstante tau ab. Frequenz und Tau
+/// duerfen sich waehrend des Klingens aendern (Attack-Sprung, Pitch-Drop).
 #[derive(Clone)]
-pub struct Resonator {
-    y1: f32,
-    y2: f32,
-    b1: f32,
-    b2: f32,
-    gain: f32,
-    r: f32,
+pub struct Schwinger {
+    ic1: f32,
+    ic2: f32,
+    g: f32,
+    k: f32,
     fs: f32,
     stoss: f32,
 }
 
-impl Resonator {
+impl Schwinger {
     pub fn new(fs: f32) -> Self {
-        Self {
-            y1: 0.0,
-            y2: 0.0,
-            b1: 0.0,
-            b2: 0.0,
-            gain: 0.0,
-            r: 0.0,
+        let mut s = Self {
+            ic1: 0.0,
+            ic2: 0.0,
+            g: 0.0,
+            k: 0.1,
             fs,
             stoss: 0.0,
-        }
+        };
+        s.set(100.0, 0.1);
+        s
     }
-    /// Ausklingzeit (Zeitkonstante in Sekunden). Vor set_freq aufrufen.
-    pub fn set_tau(&mut self, tau: f32) {
-        self.r = (-1.0 / (tau.max(1.0e-4) * self.fs)).exp();
-        self.b2 = -self.r * self.r;
+    pub fn set(&mut self, f: f32, tau: f32) {
+        let f = f.clamp(5.0, 0.45 * self.fs);
+        self.g = (PI * f / self.fs).tan();
+        let w = 2.0 * PI * f;
+        self.k = (2.0 / (tau.max(1.0e-4) * w)).clamp(1.0e-5, 1.9);
     }
-    pub fn set_freq(&mut self, f: f32) {
-        let w = 2.0 * PI * f.clamp(1.0, 0.45 * self.fs) / self.fs;
-        self.b1 = 2.0 * self.r * w.cos();
-        self.gain = w.sin();
-    }
+    /// Anstoss mit Amplitude ~ menge.
     pub fn anstossen(&mut self, menge: f32) {
-        self.stoss += menge * self.gain;
+        self.stoss += menge / (2.0 * self.g);
     }
     #[inline]
     pub fn process(&mut self) -> f32 {
-        let y = self.b1 * self.y1 + self.b2 * self.y2 + self.stoss;
+        let x = self.stoss;
         self.stoss = 0.0;
-        self.y2 = self.y1;
-        self.y1 = flush(y);
-        y
+        let a1 = 1.0 / (1.0 + self.g * (self.g + self.k));
+        let a2 = self.g * a1;
+        let a3 = self.g * a2;
+        let v3 = x - self.ic2;
+        let v1 = a1 * self.ic1 + a2 * v3;
+        let v2 = self.ic2 + a2 * self.ic1 + a3 * v3;
+        self.ic1 = flush(2.0 * v1 - self.ic1);
+        self.ic2 = flush(2.0 * v2 - self.ic2);
+        v1
+    }
+}
+
+/// Abtast-Halte-Glied: simuliert eine niedrigere Abtastrate (z. B. 909-ROM-Takt).
+#[derive(Clone, Default)]
+pub struct Abtaster {
+    phase: f32,
+    inc: f32,
+    wert: f32,
+}
+
+impl Abtaster {
+    pub fn set_rate(&mut self, rate: f32, fs: f32) {
+        self.inc = (rate / fs).clamp(0.0, 1.0);
+    }
+    #[inline]
+    pub fn process(&mut self, x: f32) -> f32 {
+        self.phase += self.inc;
+        if self.phase >= 1.0 {
+            self.phase -= 1.0;
+            self.wert = x;
+        }
+        self.wert
     }
 }
 

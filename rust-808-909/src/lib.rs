@@ -117,25 +117,36 @@ impl Param {
     /// Was der Regler bei dieser Stimme tut (None = ohne Wirkung).
     /// Praktisch fuer Panel-Beschriftungen.
     pub fn bedeutung(self, m: Modell, s: Stimme) -> Option<&'static str> {
+        use Modell::*;
         use Stimme::*;
         match self {
             Param::Pegel => Some("Level"),
-            Param::Tune => Some("Tune"),
-            Param::Decay => Some("Decay"),
+            Param::Tune => match (m, s) {
+                (Tr909, Bassdrum) => Some("Tune (Sweep)"),
+                (Tr808, HiHatZu | HiHatOffen | Becken) => None,
+                _ => Some("Tune"),
+            },
+            Param::Decay => match (m, s) {
+                (Tr808, Snare) => Some("Snappy-Laenge"),
+                (Tr909, Snare) => Some("Koerper"),
+                (_, Clap) => Some("Hall"),
+                _ => Some("Decay"),
+            },
             Param::Ton => match (m, s) {
-                (Modell::Tr909, Bassdrum) => Some("Drive"),
-                (_, Snare) => Some("Tone"),
-                (_, TomTief | TomMittel | TomHoch) => Some("Rauschen"),
+                (Tr909, Bassdrum) => Some("Drive"),
+                (Tr808, TomTief) => Some("Rauschen"),
+                (Tr808, TomMittel | TomHoch) => None,
+                (Tr909, TomTief | TomMittel | TomHoch) => Some("Rauschen"),
                 (_, Clap) => Some("Filter"),
                 _ => Some("Tone"),
             },
             Param::Extra => match (m, s) {
-                (Modell::Tr808, Bassdrum) => Some("Pitch-Drop"),
-                (Modell::Tr909, Bassdrum) => Some("Attack"),
+                (Tr808, Bassdrum) => Some("Attack-Sprung"),
+                (Tr909, Bassdrum) => Some("Attack"),
                 (_, Snare) => Some("Snappy"),
                 (_, TomTief | TomMittel | TomHoch) => Some("Pitch-Drop"),
                 (_, Clap) => Some("Abstand"),
-                (Modell::Tr909, HiHatZu | HiHatOffen | Becken | Extra) => Some("6-Bit"),
+                (Tr909, HiHatZu | HiHatOffen | Becken | Extra) => Some("6-Bit"),
                 _ => None,
             },
         }
@@ -181,7 +192,8 @@ impl DrumKern {
         };
     }
 
-    /// Wie stark ein Akzent-Schlag lauter/kraeftiger wird (0..1).
+    /// Akzent-Regler (0..1). Bei 1 werden Trommeln etwa dreimal so laut wie
+    /// ohne Akzent (Roland-Tabelle), Becken/Cowbell etwa doppelt.
     pub fn set_accent(&mut self, menge: f32) {
         self.accent = menge.clamp(0.0, 1.0);
     }
@@ -192,11 +204,32 @@ impl DrumKern {
 
     /// Schlag ausloesen (im aktuell gewaehlten Modell).
     pub fn ausloesen(&mut self, s: Stimme, akzent: bool) {
-        let vel = if akzent { 1.0 + self.accent } else { 1.0 };
+        let a = if akzent { self.accent } else { 0.0 };
         match self.modell {
-            Modell::Tr808 => self.e808.ausloesen(s, vel),
-            Modell::Tr909 => self.e909.ausloesen(s, vel),
+            Modell::Tr808 => self.e808.ausloesen(s, a),
+            Modell::Tr909 => self.e909.ausloesen(s, a),
         }
+    }
+
+    /// 808-Snare: `false` = Werte aus Rolands Messtabelle (238 + 476 Hz),
+    /// `true` = spaetere Bauteil-Aenderung (ca. 175 + 335 Hz).
+    pub fn set_808_snare_spaet(&mut self, spaet: bool) {
+        self.e808.set_snare_spaet(spaet);
+    }
+
+    /// 808: Toms auf Congas umschalten (wie Schalter SW8-10 im Original).
+    pub fn set_808_congas(&mut self, an: bool) {
+        self.e808.set_congas(an);
+    }
+
+    /// 808: Rimshot auf Claves umschalten.
+    pub fn set_808_claves(&mut self, an: bool) {
+        self.e808.set_claves(an);
+    }
+
+    /// 808: Clap auf Maracas umschalten.
+    pub fn set_808_maracas(&mut self, an: bool) {
+        self.e808.set_maracas(an);
     }
 
     /// Regler im aktuellen Modell setzen (Wert 0..1).
@@ -326,5 +359,99 @@ mod tests {
         k.set_param(Stimme::Snare, Param::Tune, 0.1);
         assert!((k.param(Modell::Tr808, Stimme::Snare, Param::Tune) - 0.9).abs() < 1e-6);
         assert!((k.param(Modell::Tr909, Stimme::Snare, Param::Tune) - 0.1).abs() < 1e-6);
+    }
+    fn einzelschlag(m: Modell, s: Stimme, sek: f32) -> Vec<f32> {
+        einzelschlag_ohne_rauschen(m, s, sek, false)
+    }
+
+    fn einzelschlag_ohne_rauschen(m: Modell, s: Stimme, sek: f32, ohne: bool) -> Vec<f32> {
+        let fs = 48_000.0;
+        let mut k = DrumKern::new(fs);
+        k.set_modell(m);
+        if ohne {
+            k.set_param(s, Param::Ton, 0.0);
+        }
+        k.ausloesen(s, false);
+        (0..(fs * sek) as usize)
+            .map(|_| {
+                k.naechstes_sample();
+                k.einzelausgaenge()[s as usize]
+            })
+            .collect()
+    }
+
+    /// Zeit bis die Amplitude dauerhaft unter 1/10 der Spitze faellt (Rolands Mass).
+    fn t10(v: &[f32]) -> f32 {
+        let spitze = v.iter().fold(0.0f32, |a, b| a.max(b.abs()));
+        let letzt = v.iter().rposition(|x| x.abs() >= spitze / 10.0).unwrap_or(0);
+        letzt as f32 / 48_000.0
+    }
+
+    fn frequenz(v: &[f32], von: f32, bis: f32) -> f32 {
+        let (a, b) = ((von * 48_000.0) as usize, (bis * 48_000.0) as usize);
+        let mut n = 0;
+        let mut erste = None;
+        let mut letzte = 0;
+        for i in a..b {
+            if v[i - 1] < 0.0 && v[i] >= 0.0 {
+                if erste.is_none() {
+                    erste = Some(i);
+                } else {
+                    n += 1;
+                }
+                letzte = i;
+            }
+        }
+        n as f32 / ((letzte - erste.unwrap()) as f32 / 48_000.0)
+    }
+
+    #[test]
+    fn tr808_passt_zur_roland_messtabelle() {
+        use Stimme::*;
+        // Seite 14 der Service Notes, alle Regler auf 12 Uhr.
+        let decay = [
+            (Bassdrum, 0.30),
+            (Snare, 0.06),
+            (TomTief, 0.20),
+            (TomMittel, 0.13),
+            (TomHoch, 0.10),
+            (Rimshot, 0.010),
+            (Clap, 0.10),
+            (HiHatZu, 0.05),
+            (HiHatOffen, 0.45),
+            (Becken, 0.80),
+            (Extra, 0.05),
+        ];
+        for (s, soll) in decay {
+            let ist = t10(&einzelschlag(Modell::Tr808, s, 3.0));
+            let r = ist / soll;
+            assert!(r > 0.6 && r < 1.6, "808 {:?}: Decay {:.3} s statt {:.3} s", s, ist, soll);
+        }
+        let freq = [(Bassdrum, 56.0, 0.05, 0.25), (TomTief, 90.0, 0.03, 0.15), (TomMittel, 135.0, 0.03, 0.12), (TomHoch, 185.0, 0.03, 0.1)];
+        for (s, soll, von, bis) in freq {
+            let ist = frequenz(&einzelschlag_ohne_rauschen(Modell::Tr808, s, 1.0, true), von, bis);
+            assert!((ist / soll - 1.0).abs() < 0.08, "808 {:?}: {:.1} Hz statt {:.1} Hz", s, ist, soll);
+        }
+    }
+
+    #[test]
+    fn varianten_808_klingen() {
+        let fs = 48_000.0;
+        let mut k = DrumKern::new(fs);
+        k.set_808_congas(true);
+        k.set_808_claves(true);
+        k.set_808_maracas(true);
+        k.set_808_snare_spaet(true);
+        for s in [Stimme::TomTief, Stimme::Rimshot, Stimme::Clap, Stimme::Snare] {
+            k.ausloesen(s, false);
+        }
+        let mut spitze = 0.0f32;
+        for _ in 0..4800 {
+            k.naechstes_sample();
+            for s in [Stimme::TomTief, Stimme::Rimshot, Stimme::Clap, Stimme::Snare] {
+                spitze = spitze.max(k.einzelausgaenge()[s as usize].abs());
+            }
+        }
+        assert!(spitze > 0.1);
     }
 }

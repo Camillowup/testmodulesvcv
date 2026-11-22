@@ -3,25 +3,38 @@
 Synthetischer Klangkern für die Stimmen der TR-808 und TR-909, **ohne Samples**, mit Umschalter zwischen den beiden
 Maschinen. Nur der Kern (Rust-Bibliothek), noch ohne Panel, Plugin oder App drumherum.
 
+## Grundlage
+
+- **TR-808 Service Notes (Roland, 1981):** Messtabelle S. 14 (Frequenz und Ausklingzeit jeder Stimme bei Reglern
+  auf 12 Uhr), Schaltplan Voicing Board S. 9/13, Schaltungsbeschreibung S. 5/6.
+- **TR-909 Service Notes (Roland, 1984):** Blockschaltbild S. 4, Schaltungsbeschreibung S. 5/6, Schaltplan
+  Voicing Board S. 11 (Bauteilwerte abgelesen und Zeiten/Frequenzen daraus berechnet), Oszillogramme S. 9.
+- Werner, Abel, Smith (CCRMA 2014): Analysen der 808-Bassdrum und des 808-Cymbals.
+
+Die 808-Werte werden per Test gegen Rolands Messtabelle geprüft (`tr808_passt_zur_roland_messtabelle`).
+
 ## Stimmen (11 Plätze)
 
 | Platz | 808 | 909 |
 |---|---|---|
-| BD | angestossener Resonator (Bridged-T), kleiner Pitch-Drop, Klick | Sinus mit schnellem Pitch-Sweep, Sättigung, Attack-Klick |
-| SD | zwei Resonatoren (180/330 Hz) + Rauschen | zwei Dreiecke mit Pitch-Drop + Rauschen |
-| LT/MT/HT | Resonator + etwas Rauschen | Dreieck mit Pitch-Sweep + Rauschen |
-| RS | zwei kurze Resonatoren | drei kurze Resonatoren |
-| CP | gefiltertes Rauschen, 3 Stösse + Hallfahne | dasselbe, 4 Stösse |
-| CH/OH | 6 Rechteck-Oszillatoren der 808, CH würgt OH ab | synthetisch nachempfunden (Metall + Rauschen), 6-Bit-Körnung |
-| CY / CRASH | 808-Cymbal (zwei Bänder) | Crash, synthetisch nachempfunden |
-| CB / RIDE | 808-Cowbell (540/800 Hz) | Ride, synthetisch nachempfunden |
+| BD | Bridged-T 56 Hz, Decay 50/300/800 ms, Attack-Sprung (~4 ms), leichter Pitch-Seufzer, Tone-Tiefpass 160 Hz–7 kHz | Dreieck-VCO + Diodenformer, Sweep ~370 → 110 Hz, Tune = Sweep-Länge, Decay 15–345 ms, Attack = Impuls + Rauschen (~340 Hz) |
+| SD | 238 + 476 Hz (Tabelle) oder 175 + 335 Hz (spätere Änderung), Snappy-Rauschen über Hochpass ~2,7 kHz | zwei VCOs 1 : 1,47, sinusartig, Pitch-Bend; Tone = Länge des Rauschens, Snappy = Anteil |
+| LT/MT/HT | 90 / 135 / 185 Hz, 200 / 130 / 100 ms, Pitch fällt mit der Lautstärke, rosa Rauschen nur bei LT; umschaltbar auf **Congas** (185 / 280 / 400 Hz) | je drei VCOs (1 : 1,5 : 2,75), Sweep, Tom-Rauschen |
+| RS | 455 + 1667 Hz, 10 ms; umschaltbar auf **Claves** (2500 Hz, 25 ms) | drei Bandpässe ~238 / 538 / 1360 Hz → Clipper → VCA → Hochpass |
+| CP | Bandpass ~1 kHz, 3 Sägezahn-Stösse + paralleler Hall, 100 ms; umschaltbar auf **Maracas** | dasselbe Prinzip, 4 Stösse, enger |
+| CH / OH | gemeinsame 6 Oszillatoren, Band ~7,1 kHz, Swing-VCA; 50 ms / 90–600 ms; CH würgt OH ab | synthetisch → 30-kHz-Abtastung → 6 Bit → VCA → Tiefpass, endet nach ROM-Länge |
+| CY / CRASH | drei Bänder (hoch kurz, mittel regelbar, tief), 350/800/1200 ms | wie Hi-Hat-Kette; Tune ändert den ROM-Takt |
+| CB / RIDE | 540 + 800 Hz, 50 ms, steiler Abfall am Anfang | wie Crash |
 
-Hinweis: Hi-Hats, Crash und Ride der echten 909 sind 6-Bit-Samples. Hier werden sie nachempfunden, nicht kopiert.
+BD, SD und Toms der 909 teilen sich einen Rauschgenerator (wie im Original). Hi-Hat, Crash und Ride der echten 909
+sind 6-Bit-Samples; hier werden sie nachempfunden, nicht kopiert.
 
-## Regler pro Stimme (alle 0..1)
+## Regler pro Stimme (alle 0..1, Mitte = Originalwert)
 
-`Pegel`, `Tune`, `Decay`, `Ton`, `Extra`. Was `Ton` und `Extra` bei welcher Stimme tun (Snappy, Attack, Pitch-Drop,
-6-Bit …), liefert `Param::bedeutung()`. Jedes Modell merkt sich seine eigenen Einstellungen.
+`Pegel`, `Tune`, `Decay`, `Ton`, `Extra`. Was ein Regler bei welcher Stimme tut, liefert `Param::bedeutung()`
+(`None` = ohne Wirkung). Jedes Modell merkt sich seine eigenen Einstellungen. Das endgültige Panel folgt später.
+
+Akzent: Trommeln bis etwa dreimal so laut (laut Tabelle), Becken/Cowbell etwa doppelt.
 
 ## Benutzung
 
@@ -34,10 +47,12 @@ kern.set_param(Stimme::Snare, Param::Extra, 0.8); // Snappy
 kern.ausloesen(Stimme::Bassdrum, true);    // true = Akzent
 let summe = kern.naechstes_sample();
 let einzeln = kern.einzelausgaenge();      // 11 Einzelausgänge
-```
 
-Beim Umschalten klingt, was gerade läuft, natürlich aus. Jeder Schlag hat eine winzige Zufallsabweichung (Tonhöhe,
-Pegel), damit es lebendig klingt.
+kern.set_808_congas(true);                 // 808-Varianten
+kern.set_808_claves(true);
+kern.set_808_maracas(true);
+kern.set_808_snare_spaet(true);
+```
 
 ## Testen und Hörbeispiele
 
@@ -46,7 +61,4 @@ cargo test --release
 cargo run --release --bin demo -- hoerbeispiele
 ```
 
-Das Demo schreibt alle Einzelschläge (normal + Akzent) beider Modelle und drei Grooves als WAV.
-
-Keine Abhängigkeiten, nur Rust-Standardbibliothek. Gedacht als Grundlage für ein späteres VST/CLAP-Plugin,
-VCV-Rack-Modul (über C-Schnittstelle) oder die Android-App.
+Keine Abhängigkeiten, nur Rust-Standardbibliothek.
