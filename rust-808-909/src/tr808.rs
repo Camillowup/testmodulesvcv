@@ -5,81 +5,35 @@
 
 use crate::dsp::*;
 use crate::gemeinsam::{Clap, ClapConfig};
+use crate::va808_bd::Bd808Va;
 use crate::{Params, Stimme, ANZAHL_STIMMEN, DECAY, EXTRA, PEGEL, STANDARD, TON, TUNE};
 
 /// Die sechs Schmitt-Trigger-Oszillatoren (Werner et al. 2014; #5/#6 = Cowbell 800/540).
 const METALL_808: [f32; 6] = [205.3, 304.4, 369.6, 522.7, 540.0, 800.0];
 
 // ---------------------------------------------------------------- Bassdrum
-// Tabelle: 56 Hz, Decay 50 / 300 / 800 ms. Beim Anschlag Resonanz kurz hoeher
-// ("halbierte Zeitkonstante", ~4 ms), danach leichter "Seufzer" nach unten.
-// Tone = Tiefpass R171+VR5 / C45: ca. 160 Hz .. 7 kHz.
+// Virtual Analog: komplette Schaltung von S. 9 wird simuliert (siehe va808_bd.rs).
+// Decay = VR6, Tone = VR5, Tune = Mod ueber C41/C42 (kein Regler im Original).
 struct Bd {
-    fs: f32,
-    s: Schwinger,
-    basis: f32,
-    tau: f32,
-    sprung: f32,
-    sprung_n: u32,
-    klick_n: u32,
-    seufzer: Huellkurve,
-    tone: OnePole,
-    pegel: f32,
-    vel: f32,
-    drift: f32,
+    va: Bd808Va,
 }
 
 impl Bd {
     fn new(fs: f32) -> Self {
-        Self {
-            fs,
-            s: Schwinger::new(fs),
-            basis: 56.0,
-            tau: 0.13,
-            sprung: 2.2,
-            sprung_n: 0,
-            klick_n: 0,
-            seufzer: Huellkurve::new(fs, 0.08),
-            tone: OnePole::new(1000.0, fs),
-            pegel: 0.8,
-            vel: 1.0,
-            drift: 1.0,
-        }
+        Self { va: Bd808Va::new(fs) }
     }
     fn update(&mut self, p: &Params) {
-        self.pegel = p[PEGEL];
-        self.basis = drei_punkt(46.0, 56.0, 68.0, p[TUNE]);
-        self.tau = t10_zu_tau(drei_punkt(0.05, 0.3, 0.8, p[DECAY]));
-        self.tone.set(drei_punkt(160.0, 1000.0, 7000.0, p[TON]), self.fs);
-        self.sprung = lin_map(1.4, 3.0, p[EXTRA]);
+        self.va.pegel = p[PEGEL];
+        self.va.set_decay(p[DECAY]);
+        self.va.set_tone(p[TON]);
+        self.va.set_tune(p[TUNE]);
     }
-    fn ausloesen(&mut self, vel: f32, drift: f32) {
-        self.vel = vel;
-        self.drift = drift;
-        self.sprung_n = (0.004 * self.fs) as u32;
-        self.klick_n = (0.001 * self.fs) as u32;
-        self.seufzer.ausloesen(1.0);
-        self.s.set(self.basis * drift * self.sprung, self.tau);
-        self.s.anstossen(1.0);
+    fn ausloesen(&mut self, akzent: f32) {
+        self.va.ausloesen(akzent);
     }
     #[inline]
     fn process(&mut self) -> f32 {
-        let sprung = if self.sprung_n > 0 {
-            self.sprung_n -= 1;
-            self.sprung
-        } else {
-            1.0
-        };
-        let f = self.basis * self.drift * sprung * (1.0 + 0.1 * self.seufzer.process());
-        self.s.set(f, self.tau);
-        let body = self.s.process();
-        let klick = if self.klick_n > 0 {
-            self.klick_n -= 1;
-            0.6
-        } else {
-            0.0
-        };
-        ausgang(self.tone.lp(body + klick), self.vel, self.pegel)
+        self.va.process()
     }
 }
 
@@ -636,7 +590,7 @@ impl Engine808 {
         let v = (1.0 + 2.0 * akzent) * streu;
         let v_metall = (1.0 + akzent) * streu;
         match s {
-            Stimme::Bassdrum => self.bd.ausloesen(v, drift),
+            Stimme::Bassdrum => self.bd.ausloesen(akzent),
             Stimme::Snare => self.sd.ausloesen(v, drift),
             Stimme::TomTief => self.toms[0].ausloesen(v, drift),
             Stimme::TomMittel => self.toms[1].ausloesen(v, drift),

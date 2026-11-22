@@ -13,6 +13,27 @@ Maschinen. Nur der Kern (Rust-Bibliothek), noch ohne Panel, Plugin oder App drum
 
 Die 808-Werte werden per Test gegen Rolands Messtabelle geprüft (`tr808_passt_zur_roland_messtabelle`).
 
+## Virtual Analog (Schaltungssimulation)
+
+Stimme für Stimme wird die Originalschaltung simuliert: Bauteile aus dem Schaltplan, gelöst wie in SPICE
+(`schaltung.rs`: Knotenanalyse, Trapezregel, Newton, Dioden, Transistoren nach Ebers-Moll, Operationsverstärker
+mit ±13,5 V Begrenzung).
+
+**Fertig: 808-Bassdrum** (`va808_bd.rs`, Schaltplan S. 9, alle Bauteile Q41–Q43, C38–C47, R156–R177, D52/D53,
+IC12a/b). Nicht simuliert: das Trigger-Tor Q39/Q40 (ersetzt durch die Triggerspannung 4 V bzw. bis 14 V mit
+Akzent, 1 ms) und der Emitterfolger Q44 (Verstärkung ~1). Ergebnis gegen Rolands Messtabelle:
+
+| | Roland (S. 14) | Simulation |
+|---|---|---|
+| Decay links / Mitte / rechts | 50 / 300 / 800 ms | 39 / 275 / 821 ms |
+| Amplitude normal / Akzent | 3,5 / 10 Vpp | 3,5–4,1 / 11,4 Vpp |
+| Frequenz | 56 Hz („typisch und variabel“) | 50–52 Hz (Stanford-Analyse derselben Schaltung: 49,5 Hz) |
+
+Attack-Sprung (~110 Hz für die erste Halbwelle, ~4 ms) und der Tonhöhen-„Seufzer“ entstehen von selbst.
+Rechenlast derzeit ca. 30 % eines CPU-Kerns für diese eine Stimme (noch nicht optimiert).
+
+Die übrigen Stimmen sind noch die vereinfachten Modelle unten und folgen nach demselben Verfahren.
+
 ## Stimmen (11 Plätze)
 
 | Platz | 808 | 909 |

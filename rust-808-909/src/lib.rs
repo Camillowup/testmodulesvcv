@@ -21,6 +21,8 @@ mod dsp;
 mod gemeinsam;
 mod tr808;
 mod tr909;
+pub mod schaltung;
+pub mod va808_bd;
 
 use tr808::Engine808;
 use tr909::Engine909;
@@ -123,6 +125,7 @@ impl Param {
             Param::Pegel => Some("Level"),
             Param::Tune => match (m, s) {
                 (Tr909, Bassdrum) => Some("Tune (Sweep)"),
+                (Tr808, Bassdrum) => Some("Tune (Mod C41/C42)"),
                 (Tr808, HiHatZu | HiHatOffen | Becken) => None,
                 _ => Some("Tune"),
             },
@@ -141,7 +144,7 @@ impl Param {
                 _ => Some("Tone"),
             },
             Param::Extra => match (m, s) {
-                (Tr808, Bassdrum) => Some("Attack-Sprung"),
+                (Tr808, Bassdrum) => None,
                 (Tr909, Bassdrum) => Some("Attack"),
                 (_, Snare) => Some("Snappy"),
                 (_, TomTief | TomMittel | TomHoch) => Some("Pitch-Drop"),
@@ -427,7 +430,7 @@ mod tests {
             let r = ist / soll;
             assert!(r > 0.6 && r < 1.6, "808 {:?}: Decay {:.3} s statt {:.3} s", s, ist, soll);
         }
-        let freq = [(Bassdrum, 56.0, 0.05, 0.25), (TomTief, 90.0, 0.03, 0.15), (TomMittel, 135.0, 0.03, 0.12), (TomHoch, 185.0, 0.03, 0.1)];
+        let freq = [(Bassdrum, 51.0, 0.1, 0.3), (TomTief, 90.0, 0.03, 0.15), (TomMittel, 135.0, 0.03, 0.12), (TomHoch, 185.0, 0.03, 0.1)];
         for (s, soll, von, bis) in freq {
             let ist = frequenz(&einzelschlag_ohne_rauschen(Modell::Tr808, s, 1.0, true), von, bis);
             assert!((ist / soll - 1.0).abs() < 0.08, "808 {:?}: {:.1} Hz statt {:.1} Hz", s, ist, soll);
