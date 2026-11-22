@@ -1,0 +1,19 @@
+[package]
+name = "drumkern"
+version = "0.1.0"
+edition = "2021"
+description = "Synthetischer Klangkern fuer TR-808- und TR-909-Stimmen (ohne Samples), mit Umschalter"
+license = "MIT"
+
+[lib]
+name = "drumkern"
+path = "src/lib.rs"
+
+[[bin]]
+name = "demo"
+path = "src/bin/demo.rs"
+
+[dependencies]
+
+[profile.release]
+opt-level = 3
