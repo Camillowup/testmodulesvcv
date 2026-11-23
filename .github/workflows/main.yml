@@ -9,6 +9,8 @@ on:
       - ".github/workflows/neon.yml"
       - "genra-kehle/**"
       - ".github/workflows/kehle.yml"
+      - "genra-kratz/**"
+      - ".github/workflows/kratz.yml"
   workflow_dispatch:
 
 permissions:

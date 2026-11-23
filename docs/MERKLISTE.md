@@ -50,3 +50,12 @@ Neon-Vocoder KEHLE (24 HP, NEON-TERRAIN). Bleibt einzeln, bis er funktioniert; d
 - 2.0.0 gebaut (Test): in Rack prüfen – Stimme über Rack's Audio-Modul in MOD, Träger extern (SCHMELZ in CAR L/R)
   und eingebaut (V/OCT + GATE, Follow GENRA, ohne Kabel C-Moll), alle acht CHARACTER und ihre Figuren, FORMANT/SHIFT,
   SIBIL, FREEZE, HOLD, Lautstärke der 16 Presets mit echter Stimme (ausgesteuert nur mit einer Test-Stimme), CPU.
+
+## GENRA KRATZ VCV (eigenes Test-Plugin in `genra-kratz/`, seit 24. Nov. 2026)
+Scratch-Modul KRATZ (24 HP, Look von GENRA TECHNO). Bleibt einzeln, bis es funktioniert; dann Umzug ins Plugin
+GENRA TECHNO (Repo Technogen; dort die eigene Kopie von Follow/Link statt `genra/Follow.cpp`) und im selben Schritt hier
+raus (Plugin und Workflow `kratz.yml` entfernen).
+- 2.0.0 gebaut (Test): in Rack prüfen – Laden (Root wie SCHLAG), REC, Plattenteller, LVL/SCR mit MIDI-Fadern, alle
+  Muster, HOLD/SLIP/LOOP/REV, Cues, MOTION, SYNC mit GENRA (VIN/STR), TUNE KEY/BASS, Tonart-/Tempo-Erkennung, CPU.
+- Später (braucht Umbau in GENRA): GENRA richtet sich nach dem Sample; Melodie aus Samples herauslesen (evtl. MOTIV).
+

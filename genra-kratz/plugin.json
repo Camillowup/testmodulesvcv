@@ -1,0 +1,23 @@
+{
+  "slug": "GenraKratz",
+  "name": "GENRA Kratz VCV",
+  "version": "2.0.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv/tree/main/genra-kratz",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-kratz/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/genra-kratz/CHANGELOG.md",
+  "modules": [
+    {
+      "slug": "Kratz",
+      "name": "KRATZ",
+      "description": "A scratch module with one record: load a WAV or record IN L/R, scratch with the mouse on the platter, two faders (LVL, SCR, made for MIDI faders) or 23 scratch patterns in time (baby, chirp, flares, crab, tear, boomerang …). HOLD, SLIP, LOOP, REV, 8 cues, MOTION records your hand. SYNC to GENRA or to the sample's own tempo (vinyl or stretch), TUNE to GENRA's key or bass.",
+      "tags": ["Sampler", "Effect", "Sequencer"]
+    }
+  ]
+}
