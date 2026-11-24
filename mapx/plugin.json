@@ -1,0 +1,23 @@
+{
+  "slug": "GenraMapX",
+  "name": "GENRA MapX",
+  "version": "2.0.0",
+  "license": "GPL-3.0-only",
+  "brand": "Genra",
+  "author": "Bastian Ofner",
+  "authorEmail": "",
+  "authorUrl": "https://github.com/Camillowup",
+  "pluginUrl": "https://github.com/Camillowup/testmodulesvcv/tree/main/mapx",
+  "manualUrl": "https://github.com/Camillowup/testmodulesvcv/blob/main/mapx/README.md",
+  "sourceUrl": "https://github.com/Camillowup/testmodulesvcv",
+  "donateUrl": "",
+  "changelogUrl": "",
+  "modules": [
+    {
+      "slug": "GenraMapX",
+      "name": "GENRA MAP-X",
+      "description": "MIDI mapper for GENRA: maps notes, CCs, program changes and SysEx of two controllers to any parameter. Ready-made map for Akai MIDImix and MPD218.",
+      "tags": ["External", "Controller", "Utility"]
+    }
+  ]
+}

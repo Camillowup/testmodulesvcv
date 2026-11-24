@@ -11,6 +11,8 @@ on:
       - ".github/workflows/kehle.yml"
       - "genra-kratz/**"
       - ".github/workflows/kratz.yml"
+      - "mapx/**"
+      - ".github/workflows/mapx.yml"
   workflow_dispatch:
 
 permissions:

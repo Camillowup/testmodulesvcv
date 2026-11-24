@@ -1,0 +1,10 @@
+genra/
+res/knob/
+sdk/
+sdk.zip
+dist/
+build/
+.genra-repo/
+plugin.dll
+plugin.so
+plugin.dylib
