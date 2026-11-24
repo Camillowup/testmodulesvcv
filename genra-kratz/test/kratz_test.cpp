@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 
 	// ---- every pattern scratches the record
 	float beatSamples = SR * 60.f / 120.f;
-	for (int p = P_BABY; p < NUM_PATS; p++) {
+	for (int p = P_BABY; p < NUM_SINGLES; p++) {
 		Deck d;
 		d.setSampleRate(SR);
 		d.setSample(&rec);
@@ -96,6 +96,54 @@ int main(int argc, char** argv) {
 		CHECK(finite, "%s: not finite", PAT_NAMES[p]);
 		CHECK(rms > 0.01f, "%s: silent", PAT_NAMES[p]);
 		CHECK(rms < 1.5f, "%s: too loud", PAT_NAMES[p]);
+	}
+	// ---- every phrase: 1 or 2 bars, known characters, plays over the running record and ends in time
+	for (int p = P_PHRASE0; p < NUM_PATS; p++) {
+		const char* st = PHRASES[p - P_PHRASE0].steps;
+		int n = (int) std::strlen(st);
+		CHECK(n == 16 || n == 32, "%s: %d sixteenths (16 or 32)", patName(p), n);
+		CHECK(st[0] != '-', "%s starts with '-'", patName(p));
+		for (int i = 0; i < n; i++) {
+			int sp;
+			float cy;
+			char ch = st[i];
+			CHECK(ch == '-' || ch == 'P' || ch == '.' || ch == 'R' || ch == 'H' || ch == 'V' || ch == 'J' || ch == 'j' ||
+			          ch == 'S' || ch == 'K' || phraseScratch(ch, sp, cy),
+			      "%s: unknown '%c'", patName(p), ch);
+		}
+		Deck d;
+		d.setSampleRate(SR);
+		d.setSample(&rec);
+		DeckIn in;
+		in.rate = rec.rate / SR;
+		in.slip = true;
+		in.hand = true;
+		float fpq = in.rate * SR * 60.f / 120.f;
+		double base0 = rec.rate * 1.0;
+		int total = (int) (beatSamples * n / 4);
+		double e2 = 0.0;
+		bool fin = true;
+		for (int i = 0; i < total; i++) {
+			float e = (float) i / beatSamples, off, g;
+			bool pl;
+			phraseAt(p, e, 0.25f, off, g, pl);
+			in.handPos = d.wrap(base0 + (e + off) * fpq, in);
+			in.gain = g;
+			float l, r;
+			d.process(in, l, r);
+			if (!std::isfinite(l))
+				fin = false;
+			e2 += l * l;
+		}
+		float rms = (float) std::sqrt(e2 / total);
+		std::printf("%-20s %d bar  rms %.3f\n", patName(p), n / 16, rms);
+		CHECK(fin, "%s: not finite", patName(p));
+		CHECK(rms > 0.01f, "%s: silent", patName(p));
+		float off, g;
+		bool pl;
+		phraseAt(p, 0.001f, 0.25f, off, g, pl);
+		if (st[0] == 'P')
+			CHECK(std::fabs(off) < 1e-3f, "%s: starts in time", patName(p));
 	}
 	// the shapes stay in their range and every fader pattern closes somewhere
 	for (int p = P_BABY; p < P_RANDOM; p++) {
@@ -209,6 +257,41 @@ int main(int argc, char** argv) {
 				fin = false;
 		}
 		CHECK(fin, "jumps stay finite");
+	}
+	// ---- the mouse at 60 frames a second: spread, the record moves on (no jump and standstill in turn)
+	{
+		Deck d;
+		d.setSampleRate(SR);
+		d.setSample(&rec);
+		DeckIn in;
+		in.hand = true;
+		in.gain = 1.f;
+		Spread sp;
+		double hp = rec.rate * 2.0;
+		int still = 0, moving = 0;
+		for (int i = 0; i < (int) SR; i++) {
+			sp.add(i % 800 == 0 ? 400.0 : 0.0, SR); // 400 frames every frame of the screen: a slow push
+			hp += sp.step();
+			in.handPos = hp;
+			float l, r;
+			d.process(in, l, r);
+			if (i > 2000) {
+				moving++;
+				if (std::fabs(d.vel) < 0.05f)
+					still++;
+			}
+		}
+		std::printf("mouse: standing %.1f %% of the time\n", 100.f * still / moving);
+		CHECK(still < moving / 50, "the record stutters under the mouse (%d of %d samples standing)", still, moving);
+		Glide gl;
+		float last = gl.next(), maxStep = 0.f;
+		for (int i = 0; i < 48000; i++) {
+			gl.set((float) ((i / 800) % 128) / 127.f, SR);
+			float v = gl.next();
+			maxStep = std::max(maxStep, std::fabs(v - last));
+			last = v;
+		}
+		CHECK(maxStep < 0.002f, "the fader glides (largest step %.4f)", maxStep);
 	}
 	// ---- the curves
 	CHECK(faderGain(0.f, true) == 0.f && faderGain(0.1f, true) == 1.f, "sharp fader");

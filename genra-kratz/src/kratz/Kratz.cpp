@@ -146,11 +146,20 @@ struct Kratz : Module, follow::Host {
 	int handSrc = H_NONE;
 	double handPos = 0.0, scrAnchor = 0.0;
 	float scrSm = 0.5f, scrLast = -1.f, lvlSm = 1.f, scrIdle = 1.f, jogIdle = 1.f;
+	Spread mouseSpread, jogSpread;
+	Glide scrGlide;
+	bool holdWas = false;
+	double holdPos = 0.0;
 
 	// ---- the patterns and MOTION
 	bool patWas = false;
 	double patAnchor = 0.0;
-	int midiPat = -1;
+	int midiPat = -1, midiPatWas = -1;
+	std::atomic<int> phraseMode{M_LOOP};
+	int phrasePat = -1;
+	bool phraseOn = false, phraseArmed = false, phraseHandWas = false;
+	float phraseStart = 0.f, phraseNext = NAN;
+	double phraseBase = 0.0;
 	int motion = 0;                        // 0 off, 1 recording, 2 playing
 	float motBeat0 = 0.f;
 	double motAnchor = 0.0;
@@ -182,6 +191,7 @@ struct Kratz : Module, follow::Host {
 	// ---- for the panel
 	std::atomic<float> pubPos{0.f}, pubTempo{120.f}, pubShift{0.f};
 	std::atomic<int> pubFrames{0}, pubPat{0};
+	std::atomic<float> pubPhrase{-1.f};
 	std::atomic<bool> pubGenra{false}, pubHand{false};
 	std::atomic<int> pubMotion{0};
 
@@ -469,23 +479,44 @@ struct Kratz : Module, follow::Host {
 		float l = 0.f, r = 0.f;
 		if (smp) {
 			float strokeF = stroke(smp);
-			// ---- the hand: the mouse, the SCR fader (or its CV), a jog wheel
+			// ---- the motor
+			float speed = speedOf(params[SPEED_PARAM].getValue() + inputs[SPD_INPUT].getVoltage() * 0.1f);
+			float ratio = (genraTime && sb > 1.f) ? tempo / sb : 1.f;
+			bool rv = rev.load();
+			DeckIn in;
+			in.rate = smp->rate / sr * speed * ratio * (rv ? -1.f : 1.f);
+			in.drag = dragTime(params[DRAG_PARAM].getValue());
+			in.slip = slip.load();
+			if (loopOn.load() && !loopWas)
+				loopStart = lastCue >= 0 && cues[lastCue].load() >= 0.0 ? cues[lastCue].load() : deck.pos;
+			in.loop = loopOn.load();
+			in.loopStart = loopStart;
+			float lb = sb > 1.f ? sb : tempo;
+			in.loopLen = LOOP_BEATS[clamp(loopLen.load(), 0, NUM_LOOPS - 1)] * 60.f / lb * smp->rate;
+
+			// ---- the hand: the mouse, the SCR fader (or its CV), a jog wheel. They arrive in steps (the screen's
+			// frames, a MIDI fader's 128 values): each step is spread over the time until the next one, so the record
+			// moves on and does not jump (a jump and a standstill in turn sounds like a scratchy needle).
 			float scrSrc = inputs[SCR_INPUT].isConnected() ? clamp(inputs[SCR_INPUT].getVoltage() * 0.1f, 0.f, 1.f)
 			                                               : params[SCR_PARAM].getValue();
-			scrSm += (scrSrc - scrSm) * (1.f - std::exp(-1.f / (0.004f * sr)));
 			bool scrMoved = scrLast >= 0.f && std::fabs(scrSrc - scrLast) > 1e-6f;
 			scrLast = scrSrc;
+			scrGlide.set(scrSrc, sr);
+			scrSm += (scrGlide.next() - scrSm) * (1.f - std::exp(-1.f / (0.002f * sr)));
 			scrIdle = scrMoved ? 0.f : scrIdle + 1.f / sr;
 			float jd = jogDelta.exchange(0.f);
 			jogIdle = jd != 0.f ? 0.f : jogIdle + 1.f / sr;
 			float md = mouseDelta.exchange(0.f);
 			float fpr = smp->rate * REV_SECONDS / (2.f * PI); // frames per radian of the platter
+			mouseSpread.add(md * fpr, sr);
+			jogSpread.add(jd * smp->rate * REV_SECONDS / 128.f, sr);
+			float mStep = mouseSpread.step(), jStep = jogSpread.step();
 			bool hl = hold.load();
 			if (mouseDown.load()) {
 				if (handSrc != H_MOUSE)
 					handPos = deck.pos;
 				handSrc = H_MOUSE;
-				handPos += md * fpr;
+				handPos += mStep;
 			} else if (scrIdle < 0.12f || (hl && handSrc == H_SCR)) {
 				if (handSrc != H_SCR)
 					scrAnchor = deck.pos - scrSm * strokeF;
@@ -495,12 +526,20 @@ struct Kratz : Module, follow::Host {
 				if (handSrc != H_JOG)
 					handPos = deck.pos;
 				handSrc = H_JOG;
-				handPos += jd * smp->rate * REV_SECONDS / 128.f;
+				handPos += jStep;
 			} else if (!(hl && handSrc != H_NONE))
 				handSrc = H_NONE;
 			if (handSrc != H_NONE)
 				handPos = std::max(0.0, std::min((double) smp->frames - 1.0, handPos));
 			bool manual = handSrc != H_NONE;
+			// HOLD: a hand lies on the record. It stands still (silent) wherever it is – also under a pattern, a
+			// phrase, MOTION or the motor – until the hand moves it; HOLD off lets go (with SLIP: where it would be).
+			if (hl && !holdWas)
+				holdPos = deck.pos;
+			if (manual)
+				holdPos = handPos;
+			holdWas = hl;
+			bool held = hl && !manual;
 
 			// ---- MOTION: one bar of the hand, recorded and looped
 			float mGate = 1.f;
@@ -516,49 +555,113 @@ struct Kratz : Module, follow::Host {
 					motG[slot] = faderGain(lvlSm, sharpFader.load());
 					if (rel >= 4.f)
 						motion = 2;
-				} else if (!manual && std::isfinite(motX[slot])) {
+				} else if (!manual && !held && std::isfinite(motX[slot])) {
 					motHand = true;
 					motPos = motAnchor + motX[slot];
 					mGate = motG[slot];
 				}
 			}
 
-			// ---- the pattern
+			// ---- the pattern: a single scratch (in time with RATE) or a phrase (LOOP, HOLD, ONE SHOT; from the next
+			// bar on, over the running record)
 			int p = midiPat >= 0 ? midiPat : pat.load();
-			bool patGate = !inputs[PAT_INPUT].isConnected() || inputs[PAT_INPUT].getVoltage() >= 1.f || midiPat >= 0;
-			bool patOn = p != P_OFF && patGate && !manual && !motHand;
+			bool patIn = inputs[PAT_INPUT].isConnected();
+			bool gateHigh = (patIn && inputs[PAT_INPUT].getVoltage() >= 1.f) || midiPat >= 0;
+			bool patEdge = patTrig.process(patIn ? inputs[PAT_INPUT].getVoltage() : 0.f, 0.1f, 1.f) || (midiPat >= 0 && midiPatWas < 0);
+			midiPatWas = midiPat;
+			bool free = !manual && !motHand && !held;
 			float pGate = 1.f;
 			double pPos = 0.0;
+			bool patOn = false, phraseShift = false;
 			int shown = 0;
-			if (patOn) {
-				if (!patWas)
-					patAnchor = lastCue >= 0 && cues[lastCue].load() >= 0.0 ? cues[lastCue].load() : deck.pos;
-				float ph = beat / RATE_BEATS[clamp(rate.load(), 0, NUM_RATES - 1)];
-				int cyc = (int) std::floor(ph);
-				shown = resolvePattern(p, cyc, seed);
-				float x, g;
-				shape(shown, ph - cyc, x, g);
-				pPos = patAnchor + x * strokeF;
-				pGate = g;
+			if (isPhrase(p)) {
+				int mode = clamp(phraseMode.load(), 0, NUM_MODES - 1);
+				if (p != phrasePat) {
+					phrasePat = p;
+					phraseOn = false;
+					phraseArmed = mode == M_ONESHOT; // choosing a one-shot plays it once
+				}
+				bool want;
+				if (mode == M_ONESHOT) {
+					if (patEdge)
+						phraseArmed = true;
+					want = phraseArmed || phraseOn;
+				} else
+					want = mode == M_HOLD ? ((!patIn && midiPat < 0) || gateHigh) : (!patIn || gateHigh || midiPat >= 0);
+				float len = phraseSteps(p) * 0.25f;
+				if (!want)
+					phraseOn = false;
+				else if (!phraseOn) {
+					if (std::isnan(phraseNext))
+						phraseNext = std::ceil(beat / 4.f - 1e-4f) * 4.f; // from the next bar on
+					if (beat >= phraseNext || beat < phraseNext - 8.f) {
+						phraseOn = true;
+						phraseArmed = false;
+						phraseStart = beat >= phraseNext ? phraseNext : beat;
+						phraseBase = deck.pos;
+					}
+				}
+				if (!phraseOn && !want)
+					phraseNext = NAN;
+				if (phraseOn) {
+					float e = beat - phraseStart;
+					if (e < 0.f) { // the time went back (RESET): start again here
+						phraseStart = beat;
+						phraseBase = deck.pos;
+						e = 0.f;
+					}
+					if (e >= len) {
+						if (mode == M_ONESHOT && !phraseArmed) {
+							phraseOn = false;
+							phraseNext = NAN;
+						} else {
+							phraseArmed = false;
+							int k = (int) (e / len);
+							phraseStart += k * len;
+							e -= k * len;
+							phraseBase = deck.ghost;
+						}
+					}
+				}
+				if (phraseOn && free) {
+					float fpq = std::fabs(in.rate) * sr * 60.f / tempo; // record frames per quarter
+					float off, g;
+					bool playLike;
+					phraseAt(p, beat - phraseStart, strokeF / std::max(1.f, fpq), off, g, playLike);
+					double base = phraseBase + (double) (beat - phraseStart) * fpq * (rv ? -1.0 : 1.0);
+					pPos = deck.wrap(base + (double) off * fpq * (rv ? -1.0 : 1.0), in);
+					pGate = g;
+					patOn = true;
+					phraseShift = playLike;
+					in.slip = true; // underneath, the record keeps its place in time
+					shown = p;
+				}
+			} else {
+				phrasePat = -1;
+				phraseOn = false;
+				phraseNext = NAN;
+				bool patGate = !patIn || gateHigh;
+				if (p != P_OFF && patGate && free) {
+					patOn = true;
+					if (!patWas)
+						patAnchor = lastCue >= 0 && cues[lastCue].load() >= 0.0 ? cues[lastCue].load() : deck.pos;
+					float ph = beat / RATE_BEATS[clamp(rate.load(), 0, NUM_RATES - 1)];
+					int cyc = (int) std::floor(ph);
+					shown = resolvePattern(p, cyc, seed);
+					float x, g;
+					shape(shown, ph - cyc, x, g);
+					pPos = patAnchor + x * strokeF;
+					pGate = g;
+				}
 			}
 			patWas = patOn;
 
-			// ---- the motor, the pitch, the loop
-			float speed = speedOf(params[SPEED_PARAM].getValue() + inputs[SPD_INPUT].getVoltage() * 0.1f);
-			float ratio = (genraTime && sb > 1.f) ? tempo / sb : 1.f;
-			bool rv = rev.load();
-			DeckIn in;
-			in.rate = smp->rate / sr * speed * ratio * (rv ? -1.f : 1.f);
-			in.drag = dragTime(params[DRAG_PARAM].getValue());
-			in.hand = manual || motHand || patOn;
-			in.handPos = manual ? handPos : (motHand ? motPos : pPos);
-			in.slip = slip.load();
-			if (loopOn.load() && !loopWas)
-				loopStart = lastCue >= 0 && cues[lastCue].load() >= 0.0 ? cues[lastCue].load() : deck.pos;
-			in.loop = loopOn.load();
-			in.loopStart = loopStart;
-			float lb = sb > 1.f ? sb : tempo;
-			in.loopLen = LOOP_BEATS[clamp(loopLen.load(), 0, NUM_LOOPS - 1)] * 60.f / lb * smp->rate;
+			if (!patOn && phraseHandWas)
+				in.slip = true; // a phrase ends: the record is where it would have been
+			phraseHandWas = patOn && isPhrase(p);
+			in.hand = manual || held || motHand || patOn;
+			in.handPos = manual ? handPos : (held ? holdPos : (motHand ? motPos : pPos));
+			in.shiftHand = patOn && phraseShift;
 			// TUNE: the sample's root onto GENRA's key or bass note
 			float semis = params[PITCH_PARAM].getValue() + inputs[VOCT_INPUT].getVoltage() * 12.f;
 			int tm = tune.load(), sroot = sampleRoot.load();
@@ -593,10 +696,12 @@ struct Kratz : Module, follow::Host {
 			pubFrames = smp->frames;
 			pubShift = semis;
 			pubPat = patOn ? shown : 0;
+			pubPhrase = phraseOn ? (beat - phraseStart) / std::max(0.25f, phraseSteps(phrasePat) * 0.25f) : -1.f;
 			pubHand = in.hand;
 		} else {
 			pubFrames = 0;
 			pubPat = 0;
+			pubPhrase = -1.f;
 		}
 		pubTempo = tempo;
 		pubGenra = genraTime;
@@ -738,6 +843,7 @@ struct Kratz : Module, follow::Host {
 		json_t* j = json_object();
 		json_object_set_new(j, "pat", json_integer(pat));
 		json_object_set_new(j, "rate", json_integer(rate));
+		json_object_set_new(j, "phraseMode", json_integer(phraseMode));
 		json_object_set_new(j, "sync", json_integer(sync));
 		json_object_set_new(j, "tune", json_integer(tune));
 		json_object_set_new(j, "loopLen", json_integer(loopLen));
@@ -775,6 +881,7 @@ struct Kratz : Module, follow::Host {
 		};
 		gi("pat", pat, 0, NUM_PATS - 1);
 		gi("rate", rate, 0, NUM_RATES - 1);
+		gi("phraseMode", phraseMode, 0, NUM_MODES - 1);
 		gi("sync", sync, 0, NUM_SYNCS - 1);
 		gi("tune", tune, 0, NUM_TUNES - 1);
 		gi("loopLen", loopLen, 0, NUM_LOOPS - 1);
@@ -826,7 +933,10 @@ struct Kratz : Module, follow::Host {
 // ---------------------------------------------------------------- the panel
 /** A field: the name grey, the value white, the arrow in KRATZ's violet (the frame is printed on the panel). */
 struct KField : TField {
+	std::function<std::string()> prefixOf;
 	void draw(const DrawArgs& args) override {
+		if (prefixOf)
+			prefix = prefixOf();
 		std::string v = want >= 0 && item ? item(want) : (value ? value() : "");
 		nvgSave(args.vg);
 		nvgIntersectScissor(args.vg, 0, 0, box.size.x - 10.f, box.size.y);
@@ -1056,9 +1166,23 @@ struct Display : widget::OpaqueWidget {
 		// the pattern that plays now
 		int pp = module ? module->pubPat.load() : 0;
 		if (pp > 0)
-			text(vg, bold(), W - mm2px(2.5f), mm2px(4.5f), PAT_NAMES[pp], 8.f, AC, NVG_ALIGN_RIGHT);
+			textFit(vg, bold(), mm2px(2.5f), mm2px(4.5f), patName(pp), 8.f, mm2px(20.f), AC);
+		int sel = module ? module->pat.load() : 0;
+		if (module && isPhrase(sel)) {
+			// the phrase: its length, its mode, and where it is (a bar that fills)
+			float ph = module->pubPhrase.load();
+			std::string info = string::f("%d BAR · %s", phraseBars(sel), MODE_NAMES[clamp(module->phraseMode.load(), 0, NUM_MODES - 1)]);
+			if (pp == 0)
+				info = std::string(ph < 0.f ? "NEXT BAR … " : "") + info;
+			textFit(vg, bold(), mm2px(2.5f), mm2px(pp > 0 ? 8.5f : 4.5f), info, 7.f, mm2px(20.f), DIM);
+			if (ph >= 0.f) {
+				float bw = mm2px(18.f), bx = mm2px(2.5f), byy = mm2px(11.f);
+				roundRect(vg, bx, byy, bw, 2.f, 1.f, nvgRGB(0x21, 0x23, 0x29));
+				roundRect(vg, bx, byy, bw * clamp(ph, 0.f, 1.f), 2.f, 1.f, AC);
+			}
+		}
 		if (module && module->pubRec.load())
-			text(vg, bold(), W - mm2px(2.5f), mm2px(9.f), "● REC", 8.f, RED, NVG_ALIGN_RIGHT);
+			text(vg, bold(), mm2px(2.5f), mm2px(15.5f), "● REC", 8.f, RED);
 		// the line at the bottom: the sample, its tempo › the tempo it plays in, the key
 		float by = H - mm2px(2.2f);
 		std::string name = s ? string::uppercase(s->name) : "LOAD OR DROP A WAV · REC RECORDS IN L/R";
@@ -1128,20 +1252,34 @@ struct KratzWidget : ModuleWidget {
 			return f;
 		};
 		KField* fp = field(
-		    L::F_PAT, "PAT", [=]() { return std::string(PAT_NAMES[mod ? mod->pat.load() : 0]); }, NUM_PATS,
-		    [=]() { return mod ? mod->pat.load() : 0; }, [](int i) { return std::string(PAT_NAMES[i]); },
+		    L::F_PAT, "PAT", [=]() { return std::string(patName(mod ? mod->pat.load() : 0)); }, NUM_PATS,
+		    [=]() { return mod ? mod->pat.load() : 0; }, [](int i) { return std::string(patName(i)); },
 		    [=](int i) {
 			    if (mod)
 				    mod->pat = i;
 		    });
 		fp->groupOf = [](int i) { return std::string(patGroup(i)); };
-		field(
-		    L::F_RATE, "RATE", [=]() { return std::string(RATE_NAMES[mod ? mod->rate.load() : 3]); }, NUM_RATES,
-		    [=]() { return mod ? mod->rate.load() : 3; }, [](int i) { return std::string(RATE_NAMES[i]); },
-		    [=](int i) {
-			    if (mod)
-				    mod->rate = i;
-		    });
+		// RATE for a single scratch, MODE for a phrase (LOOP, HOLD, ONE SHOT)
+		auto phr = [=]() { return mod && isPhrase(mod->pat.load()); };
+		KField* fr = place<KField>(this, L::F_RATE);
+		fr->prefix = "RATE";
+		fr->prefixOf = [=]() { return std::string(phr() ? "MODE" : "RATE"); };
+		fr->value = [=]() {
+			if (phr())
+				return std::string(MODE_NAMES[clamp(mod->phraseMode.load(), 0, NUM_MODES - 1)]);
+			return std::string(RATE_NAMES[mod ? clamp(mod->rate.load(), 0, NUM_RATES - 1) : 3]);
+		};
+		fr->count = [=]() { return phr() ? (int) NUM_MODES : NUM_RATES; };
+		fr->current = [=]() { return phr() ? mod->phraseMode.load() : (mod ? mod->rate.load() : 3); };
+		fr->item = [=](int i) { return std::string(phr() ? MODE_NAMES[clamp(i, 0, NUM_MODES - 1)] : RATE_NAMES[clamp(i, 0, NUM_RATES - 1)]); };
+		fr->choose = [=](int i) {
+			if (!mod)
+				return;
+			if (phr())
+				mod->phraseMode = clamp(i, 0, NUM_MODES - 1);
+			else
+				mod->rate = clamp(i, 0, NUM_RATES - 1);
+		};
 		field(
 		    L::F_SYNC, "SYNC", [=]() { return std::string(SYNC_NAMES[mod ? mod->sync.load() : 1]); }, NUM_SYNCS,
 		    [=]() { return mod ? mod->sync.load() : 1; }, [](int i) { return std::string(SYNC_NAMES[i]); },
@@ -1365,7 +1503,7 @@ struct KratzWidget : ModuleWidget {
 			m->ccLvl = -1;
 			m->ccJog = -1;
 		}));
-		menu->addChild(createMenuLabel("Notes: C1–G1 cues 1–8 · G#1 CUT · from C2 the patterns (held: it plays)"));
+		menu->addChild(createMenuLabel("Notes: C1–G1 cues 1–8 · G#1 CUT · from C2 the patterns and phrases (in the order of PAT)"));
 		menu->addChild(createMenuLabel("Every knob, fader, key and field can be mapped with MIDI-MAP too"));
 	}
 };

@@ -19,7 +19,12 @@ its own; once it works it moves into GENRA TECHNO.
   SPINBACK · CHIRP, TRANSFORMER, 1-/2-/3-CLICK FLARE, ORBIT, CRAB, TWIDDLE · MILITARY, AQUAMAN, BOOMERANG · RANDOM (one
   per cycle), COMBO (a phrase). A gate on **PAT** plays the pattern while it is high (unplugged: always). Your hand
   always wins over a pattern.
-- **HOLD**: the record stands still while the hand rests on it (off: it runs on after a moment) · **SLIP**: when the
+- **Phrases** (after Akai's Flex Beat): 33 combos over 1 or 2 bars in their own groups of PAT – DJ Scratch (Boom
+  Bap, Techno / House), Turntablist, Backspins & Stops, Breaks / DnB / Big Beat, DJ Patterns. They play over the running
+  record, which keeps its place in time underneath, and start on the next bar. With a phrase the RATE field becomes
+  **MODE**: LOOP, HOLD (while the PAT gate or a MIDI note is held), ONE SHOT (once; a PAT trigger plays it again).
+- **HOLD**: a hand lies on the record – it stands still wherever it is (also under a pattern, a phrase or MOTION)
+  until you move it; HOLD off lets go · **SLIP**: when the
   hand lets go, the record is where it would have been · **LOOP** (length: right-click on LOOP) starts at the last
   cue · **REV** · **CUT** silences while held.
 - **Cues 1–8**: empty: a click sets it, set: a click jumps (right-click: clear). A polyphonic trigger on **CUE**: channel

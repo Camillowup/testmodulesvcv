@@ -57,5 +57,7 @@ GENRA TECHNO (Repo Technogen; dort die eigene Kopie von Follow/Link statt `genra
 raus (Plugin und Workflow `kratz.yml` entfernen).
 - 2.0.0 gebaut (Test): in Rack prüfen – Laden (Root wie SCHLAG), REC, Plattenteller, LVL/SCR mit MIDI-Fadern, alle
   Muster, HOLD/SLIP/LOOP/REV, Cues, MOTION, SYNC mit GENRA (VIN/STR), TUNE KEY/BASS, Tonart-/Tempo-Erkennung, CPU.
+- 2.1.0 gebaut (Test): Bewegung ohne Kratzen (Maus/Jog/SCR verteilt), HOLD hält immer, 33 Phrasen (Flex-Beat-Stil,
+  LOOP / HOLD / ONE SHOT). In Rack prüfen, ob es jetzt nach Scratch klingt und die Phrasen im Takt bleiben.
 - Später (braucht Umbau in GENRA): GENRA richtet sich nach dem Sample; Melodie aus Samples herauslesen (evtl. MOTIV).
 

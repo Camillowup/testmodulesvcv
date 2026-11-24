@@ -33,24 +33,13 @@ enum Pat {
 	P_CHIRP, P_TRANSFORMER, P_FLARE1, P_FLARE2, P_FLARE3, P_ORBIT, P_CRAB, P_TWIDDLE,                 // with the fader
 	P_MILITARY, P_AQUAMAN, P_BOOMERANG,                                                               // combinations
 	P_RANDOM, P_COMBO,                                                                                // KRATZ's own
-	NUM_PATS
+	NUM_SINGLES,
+	P_PHRASE0 = NUM_SINGLES // the phrases follow (PHRASES[])
 };
-static const char* const PAT_NAMES[NUM_PATS] = {
+static const char* const PAT_NAMES[NUM_SINGLES] = {
     "OFF", "BABY", "FORWARD", "BACKWARD", "DRAG", "SCRIBBLE", "UZI", "TEAR", "CLOVER TEAR", "SWIPE", "SPINBACK",
     "CHIRP", "TRANSFORMER", "1-CLICK FLARE", "2-CLICK FLARE", "3-CLICK FLARE", "ORBIT", "CRAB", "TWIDDLE",
     "MILITARY", "AQUAMAN", "BOOMERANG", "RANDOM", "COMBO"};
-inline const char* patGroup(int p) {
-	if (p == P_OFF)
-		return "Off";
-	if (p <= P_SPINBACK)
-		return "Record (fader open)";
-	if (p <= P_TWIDDLE)
-		return "With the fader (clicks)";
-	if (p <= P_BOOMERANG)
-		return "Combinations";
-	return "Auto";
-}
-
 inline float tri(float t) { return t < 0.5f ? 2.f * t : 2.f - 2.f * t; }
 /** n clicks (short closings of the fader) in a stroke s (0..1): the fader is closed near (k + 1) / (n + 1). */
 inline float clicks(float s, int n, float w = 0.045f) {
@@ -149,6 +138,167 @@ inline int resolvePattern(int p, int cycle, uint32_t seed) {
 	return p;
 }
 
+// ---------------------------------------------------------------- the phrases (after Akai's Flex Beat)
+// A phrase plays over the running record: the record keeps its place in time underneath (as with SLIP), the phrase
+// says where the hand moves it and when the fader is open, on a grid of 16ths (16 per bar, 1 or 2 bars). At its end the
+// record is where it would have been. One character per 16th; '-' lengthens the action before it:
+//   P play  . rest (fader closed)  R repeat the action's first 16th  H half speed  V backwards  J / j one beat later /
+//   earlier (a juggle: kick and snare change places)  S tape stop  K backspin
+//   scratches (a stroke over RANGE): b baby  k forward  h backward  d drag  s scribble  u uzi  r tear  y clover tear
+//   w swipe  c chirp  t transformer  f 1-click flare  F 2-click flare  o orbit  x crab  g twiddle  m military
+//   a aquaman  q boomerang
+struct Phrase {
+	const char* name;
+	const char* group;
+	const char* steps;
+};
+static const Phrase PHRASES[] = {
+    {"PREMIER HOOK", "DJ Scratch: Boom Bap", "PPPPPPPPb-b-b-b-PPPPPPPPc-c-k-k-"},
+    {"TWO-FOUR CHIRPS", "DJ Scratch: Boom Bap", "PPPPc-c-PPPPc-c-"},
+    {"BABY TALK", "DJ Scratch: Boom Bap", "b-b-b-b-PPPPb-b-"},
+    {"FORWARD STABS", "DJ Scratch: Boom Bap", "PPPPk-PPPPk-k-PP"},
+    {"TEAR DOWN", "DJ Scratch: Boom Bap", "PPPPPPPPr---r---"},
+    {"HOOK FILL", "DJ Scratch: Boom Bap", "PPPPPPPPPPPPPPPPb-c-f-F-b-c-t---"},
+    {"OFFBEAT STAB", "DJ Scratch: Techno / House", "PPk-PPk-PPk-PPk-"},
+    {"TRANSFORMER ROLL", "DJ Scratch: Techno / House", "PPPPPPPPt---t---"},
+    {"GATE CHOPS", "DJ Scratch: Techno / House", "P.P.P.P.PP..PP.."},
+    {"DROP BRAKE", "DJ Scratch: Techno / House", "PPPPPPPPPPPPPPPPPPPPPPPPS-------"},
+    {"ACID WOBBLE", "DJ Scratch: Techno / House", "PPPPd---PPPPd---"},
+    {"FLARE RUN", "Turntablist", "f-f-F---F---f-f-"},
+    {"CRAB ATTACK", "Turntablist", "PPPPx-x-x-x-PPPP"},
+    {"TRANSFORMER BATTLE", "Turntablist", "t---t---t---t---"},
+    {"BOOMERANG COMBO", "Turntablist", "b-b-q---PPPPPPPPPPPPPPPPx-x-q---"},
+    {"ORBIT FLOW", "Turntablist", "o-o-o-o-a-a-a-a-"},
+    {"BATTLE BURST", "Turntablist", "u---s---x-g-m---"},
+    {"BACKSPIN", "Backspins & Stops", "PPPPPPPPPPPPK---"},
+    {"TAPE STOP", "Backspins & Stops", "PPPPPPPPS-------"},
+    {"LONG BRAKE", "Backspins & Stops", "PPPPPPPPPPPPPPPPS---------------"},
+    {"SPIN & DROP", "Backspins & Stops", "PPPPPPPPK---...."},
+    {"REWIND", "Backspins & Stops", "PPPPPPPPPPPPPPPPPPPPPPPPV-------"},
+    {"SCRIBBLE FILL", "Breaks / DnB / Big Beat", "PPPPPPPPPPPPs---"},
+    {"UZI BREAK", "Breaks / DnB / Big Beat", "PPPPPPPPu---u---"},
+    {"AMEN CUTS", "Breaks / DnB / Big Beat", "PPk-PPk-PPPPb-b-"},
+    {"BIG BEAT RISE", "Breaks / DnB / Big Beat", "PPPPPPPPPPPPPPPPR-R-RRRRRRRRK---"},
+    {"SPINBACK SWITCH", "Breaks / DnB / Big Beat", "PPPPPPPPPPPPPPPPPPPPPPPPs---K---"},
+    {"KICK SWAP", "DJ Patterns", "PPPPJJJJPPPPjjjj"},
+    {"HALF TIME", "DJ Patterns", "H-------H-------"},
+    {"STUTTER REPEAT", "DJ Patterns", "PPPPPPPPR-------"},
+    {"REVERSE SNARE", "DJ Patterns", "PPPPV-PPPPPPV-PP"},
+    {"JUGGLE SHUFFLE", "DJ Patterns", "PPPPjjjjPPPPJJJJPPPPPPPPjjjjPPPP"},
+    {"DOUBLE BACK", "DJ Patterns", "PPPPPPPPV---PPPP"},
+};
+static const int NUM_PHRASES = (int) (sizeof(PHRASES) / sizeof(PHRASES[0]));
+static const int NUM_PATS = NUM_SINGLES + NUM_PHRASES; // everything in the PAT field
+
+inline bool isPhrase(int p) { return p >= P_PHRASE0 && p < NUM_PATS; }
+inline const char* patName(int p) {
+	if (p >= 0 && p < NUM_SINGLES)
+		return PAT_NAMES[p];
+	if (isPhrase(p))
+		return PHRASES[p - P_PHRASE0].name;
+	return "?";
+}
+inline const char* patGroup(int p) {
+	if (p == P_OFF)
+		return "Off";
+	if (p <= P_SPINBACK)
+		return "Single: the record (fader open)";
+	if (p <= P_TWIDDLE)
+		return "Single: with the fader (clicks)";
+	if (p <= P_BOOMERANG)
+		return "Single: combinations";
+	if (p < NUM_SINGLES)
+		return "Single: auto";
+	if (isPhrase(p))
+		return PHRASES[p - P_PHRASE0].group;
+	return "";
+}
+/** A phrase's length in 16ths. */
+inline int phraseSteps(int p) { return isPhrase(p) ? (int) std::strlen(PHRASES[p - P_PHRASE0].steps) : 0; }
+inline int phraseBars(int p) { return phraseSteps(p) / 16; }
+
+/** The scratch behind a character of a phrase, and the length of its cycle in quarters. */
+inline bool phraseScratch(char ch, int& pat, float& cycle) {
+	switch (ch) {
+		case 'b': pat = P_BABY; cycle = 0.5f; return true;
+		case 'k': pat = P_FORWARD; cycle = 0.5f; return true;
+		case 'h': pat = P_BACKWARD; cycle = 0.5f; return true;
+		case 'd': pat = P_DRAG; cycle = 1.f; return true;
+		case 's': pat = P_SCRIBBLE; cycle = 1.f; return true;
+		case 'u': pat = P_UZI; cycle = 1.f; return true;
+		case 'r': pat = P_TEAR; cycle = 1.f; return true;
+		case 'y': pat = P_CLOVER; cycle = 1.f; return true;
+		case 'w': pat = P_SWIPE; cycle = 0.5f; return true;
+		case 'c': pat = P_CHIRP; cycle = 0.5f; return true;
+		case 't': pat = P_TRANSFORMER; cycle = 1.f; return true;
+		case 'f': pat = P_FLARE1; cycle = 0.5f; return true;
+		case 'F': pat = P_FLARE2; cycle = 1.f; return true;
+		case 'o': pat = P_ORBIT; cycle = 0.5f; return true;
+		case 'x': pat = P_CRAB; cycle = 0.5f; return true;
+		case 'g': pat = P_TWIDDLE; cycle = 0.5f; return true;
+		case 'm': pat = P_MILITARY; cycle = 1.f; return true;
+		case 'a': pat = P_AQUAMAN; cycle = 0.5f; return true;
+		case 'q': pat = P_BOOMERANG; cycle = 1.f; return true;
+		default: return false;
+	}
+}
+
+/** Phrase p at e quarters from its start (0 .. its length): off = how far (in quarters) the record is from where it
+ * would be, g the fader, playLike: the record moves as it plays (the pitch shifter may stay in). strokeQ: a stroke in
+ * quarters (RANGE). */
+inline void phraseAt(int p, float e, float strokeQ, float& off, float& g, bool& playLike) {
+	off = 0.f;
+	g = 1.f;
+	playLike = true;
+	if (!isPhrase(p))
+		return;
+	const char* st = PHRASES[p - P_PHRASE0].steps;
+	int n = (int) std::strlen(st);
+	int i = clampf(std::floor(e * 4.f), 0.f, (float) (n - 1));
+	int a = i;
+	while (a > 0 && st[a] == '-')
+		a--;
+	int b = i + 1;
+	while (b < n && st[b] == '-')
+		b++;
+	float s = a * 0.25f, L = (b - a) * 0.25f, el = e - s, u = clampf(el / L, 0.f, 1.f);
+	float rel = el;
+	char ch = st[a];
+	int sp;
+	float cyc;
+	if (phraseScratch(ch, sp, cyc)) {
+		float x, gg;
+		shape(sp, el / cyc, x, gg);
+		rel = x * strokeQ;
+		g = gg;
+		playLike = false;
+	} else
+		switch (ch) {
+			case '.': g = 0.f; break;
+			case 'R': rel = std::fmod(el, 0.25f); break;
+			case 'H': rel = el * 0.5f; break;
+			case 'V': rel = -el; break;
+			case 'J': rel = el + 1.f; break;
+			case 'j': rel = el - 1.f; break;
+			case 'S':
+				rel = L * (u - 0.5f * u * u);
+				g = u > 0.9f ? (1.f - u) * 10.f : 1.f;
+				playLike = false;
+				break;
+			case 'K':
+				rel = -2.f * L * u * u;
+				g = 1.f - u * u * u;
+				playLike = false;
+				break;
+			default: break;
+		}
+	off = rel - el;
+}
+
+// the modes of a phrase (as Flex Beat)
+enum PhraseMode { M_LOOP, M_HOLD, M_ONESHOT, NUM_MODES };
+static const char* const MODE_NAMES[NUM_MODES] = {"LOOP", "HOLD", "ONE SHOT"};
+
 // RATE: one cycle (a stroke forward and back) in quarters
 static const int NUM_RATES = 8;
 static const char* const RATE_NAMES[NUM_RATES] = {"1 BAR", "1/2", "1/4", "1/8", "1/16", "1/4 T", "1/8 T", "1/16 T"};
@@ -220,6 +370,51 @@ struct Shifter {
 	}
 };
 
+// ---------------------------------------------------------------- the hand
+/** A movement that arrives in steps, spread over the time until the next step (mouse, jog wheel). */
+struct Spread {
+	double rem = 0.0, rate = 0.0;
+	float since = 1e9f;
+	void add(double d, float sr) {
+		if (d != 0.0) {
+			float iv = clampf(since, 0.004f * sr, 0.05f * sr);
+			rem += d;
+			rate = rem / iv;
+			since = 0.f;
+		} else
+			since += 1.f;
+	}
+	double step() {
+		double s = rate;
+		if (std::fabs(s) >= std::fabs(rem)) {
+			s = rem;
+			rate = 0.0;
+		}
+		rem -= s;
+		return s;
+	}
+};
+/** A value that arrives in steps (a fader), glided in a straight line over the time until the next step. */
+struct Glide {
+	float cur = 0.5f, target = 0.5f, inc = 0.f, since = 1e9f;
+	void set(float v, float sr) {
+		if (v != target) {
+			float iv = clampf(since, 0.003f * sr, 0.04f * sr);
+			inc = (v - cur) / iv;
+			target = v;
+			since = 0.f;
+		} else
+			since += 1.f;
+	}
+	float next() {
+		if (std::fabs(target - cur) <= std::fabs(inc))
+			cur = target;
+		else
+			cur += inc;
+		return cur;
+	}
+};
+
 // ---------------------------------------------------------------- the record
 struct DeckIn {
 	float rate = 1.f;       // the motor's speed in sample frames per output sample (signed: REV is negative)
@@ -232,6 +427,7 @@ struct DeckIn {
 	float gain = 1.f;       // the fader (and CUT)
 	float shift = 1.f;      // pitch ratio for the shifter (1: off)
 	bool shiftOn = false;   // the shifter is in the path (the motor plays; a scratch goes past it)
+	bool shiftHand = false; // … also while a hand moves the record as it plays (a phrase's PLAY, REPEAT, JUGGLE)
 	float tone = 0.5f;      // 0 low pass .. 0.5 open .. 1 high pass
 };
 
@@ -242,7 +438,7 @@ struct Deck {
 	double handSm = 0.0;
 	float vel = 0.f;        // frames per output sample
 	bool wasHand = false;
-	float gainSm = 0.f, shiftMix = 0.f, shiftSm = 1.f;
+	float gainSm = 0.f, shiftMix = 0.f, shiftSm = 1.f, needle = 0.f;
 	float lp1 = 0.f, lp2 = 0.f, bpL = 0.f, bpR = 0.f, lpL = 0.f, lpR = 0.f; // the DJ filter (state variable)
 	float dcxL = 0.f, dcyL = 0.f, dcxR = 0.f, dcyR = 0.f;
 	Shifter sh;
@@ -323,7 +519,10 @@ struct Deck {
 				handSm = pos;
 			// the hand: a short glide (0.6 ms) so a stepping fader does not click
 			float k = 1.f - std::exp(-1.f / (0.0006f * sr));
-			handSm += (in.handPos - handSm) * k;
+			if (std::fabs(in.handPos - handSm) > smp->rate * 0.05f)
+				handSm = in.handPos; // a jump (a cue, the loop going round): no sweep through the record
+			else
+				handSm += (in.handPos - handSm) * k;
 			double np = std::max(0.0, std::min((double) n - 1.0, handSm));
 			vel = (float) (np - pos);
 			pos = np;
@@ -339,14 +538,16 @@ struct Deck {
 		wasHand = in.hand;
 		float l, r;
 		read(pos, l, r);
-		// a record that barely moves is silent (the stylus sees no groove)
+		// a record that barely moves is silent (the stylus sees no groove): a soft curve, smoothed (2 ms)
 		float sp = std::fabs(vel);
-		float mv = clampf(sp * 40.f, 0.f, 1.f);
-		l *= mv;
-		r *= mv;
+		float mv = clampf(sp * 60.f, 0.f, 1.f);
+		mv = mv * mv * (3.f - 2.f * mv);
+		needle += (mv - needle) * (1.f - std::exp(-1.f / (0.002f * sr)));
+		l *= needle;
+		r *= needle;
 		// the shifter (only while the motor plays: a scratch goes past it)
 		float mk = 1.f - std::exp(-1.f / (0.008f * sr));
-		shiftMix += ((in.shiftOn && !in.hand ? 1.f : 0.f) - shiftMix) * mk;
+		shiftMix += ((in.shiftOn && (!in.hand || in.shiftHand) ? 1.f : 0.f) - shiftMix) * mk;
 		shiftSm += (in.shift - shiftSm) * (1.f - std::exp(-1.f / (0.02f * sr)));
 		float sl, sr2;
 		sh.process(l, r, shiftSm, sl, sr2);
