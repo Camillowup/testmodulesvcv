@@ -4,6 +4,7 @@
 //
 //  - The ready-made map (field MAP): Akai MIDImix and Akai MPD218 (factory settings) on the GENRA main module, found in
 //    the rack by itself. OFF, both, or only one of them. The controls the map leaves free are listed as FREE.
+//    MPD218 bank B plays the looper SCHLEIFE (GENRA Test), when there is one in the rack (2.1.0).
 //  - Own mappings: LEARN, move a control, click a parameter of any module (or the other way round). An own mapping always
 //    wins over the ready-made map; CLEAR on a control of the ready-made map switches it off (OFF), CLEAR again brings it
 //    back. UNDO takes back the last change of the own mappings.
@@ -85,7 +86,12 @@ struct PEntry {
 	int8_t mode;
 	int8_t dir;
 	const char* name; // what it does (the display)
+	int8_t target;    // T_GENRA (0, the default) or T_LOOP (SCHLEIFE)
 };
+enum Target { T_GENRA, T_LOOP };
+
+// SCHLEIFE's parameter ids (src/schleife/Schleife.cpp in GENRA Test; new ones are appended there)
+enum LoopParam { S_REC = 8, S_UNDO = 12, S_CLEAR = 16, S_CLRALL = 21 };
 
 // Akai MIDImix, factory settings: knobs (top, middle, bottom) and faders CC, MUTE / REC ARM / SOLO+MUTE / BANK notes
 static const int MIX_KNOB[8] = {16, 20, 24, 28, 46, 50, 54, 58}; // + 0, 1, 2 the knobs, + 3 the fader
@@ -98,18 +104,18 @@ static std::vector<PEntry> presetTable() {
 	for (int i = 0; i < 4; i++) {
 		static const int ROW2[4] = {G_FILL, G_MOVE, G_RANGE, G_VOICING};
 		static const char* ROW2N[4] = {"FILL", "MOVE", "RANGE", "VOICING"};
-		t.push_back({D_MIX, K_CC, (int16_t) MIX_KNOB[i], (int16_t) (G_TGENRE + i), M_DIRECT, 1, nullptr});
+		t.push_back({D_MIX, K_CC, (int16_t) MIX_KNOB[i], (int16_t) (G_TGENRE + i), M_DIRECT, 1, nullptr, T_GENRA});
 		t.back().name = strdup(string::f("%s GENRE", TR[i]).c_str());
-		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 1), (int16_t) ROW2[i], M_DIRECT, 1, ROW2N[i]});
-		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 2), (int16_t) (i == 0 ? G_GHOST : G_OCT + i - 1), M_DIRECT, 1, nullptr});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 1), (int16_t) ROW2[i], M_DIRECT, 1, ROW2N[i], T_GENRA});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 2), (int16_t) (i == 0 ? G_GHOST : G_OCT + i - 1), M_DIRECT, 1, nullptr, T_GENRA});
 		t.back().name = i == 0 ? "GHOST" : strdup(string::f("%s OCT", TR[i]).c_str());
-		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 3), (int16_t) (G_DENS + i), M_DIRECT, 1, nullptr});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[i] + 3), (int16_t) (G_DENS + i), M_DIRECT, 1, nullptr, T_GENRA});
 		t.back().name = strdup(string::f("%s DENS", TR[i]).c_str());
-		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * i), (int16_t) (G_MUTE + i), M_TOGGLE, 1, nullptr});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * i), (int16_t) (G_MUTE + i), M_TOGGLE, 1, nullptr, T_GENRA});
 		t.back().name = strdup(string::f("%s MUTE", TR[i]).c_str());
-		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * i), (int16_t) (G_TNEW + i), M_ONCE, 1, nullptr});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * i), (int16_t) (G_TNEW + i), M_ONCE, 1, nullptr, T_GENRA});
 		t.back().name = strdup(string::f("%s NEW", TR[i]).c_str());
-		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * i), (int16_t) (G_LOCK + i), M_TOGGLE, 1, nullptr});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * i), (int16_t) (G_LOCK + i), M_TOGGLE, 1, nullptr, T_GENRA});
 		t.back().name = strdup(string::f("%s LOCK", TR[i]).c_str());
 	}
 	// channels 5-8: global
@@ -128,15 +134,15 @@ static std::vector<PEntry> presetTable() {
 	for (int i = 0; i < 4; i++) {
 		int c = 4 + i;
 		for (int k = 0; k < 3; k++)
-			t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + k), KN[i][k], M_DIRECT, 1, KNN[i][k]});
-		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 3), FD[i], M_DIRECT, 1, FDN[i]});
-		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * c), MU[i], MUM[i], 1, MUN[i]});
-		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * c), RE[i], REM[i], 1, REN[i]});
-		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * c), G_FREE, M_ONCE, 1, nullptr});
+			t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + k), KN[i][k], M_DIRECT, 1, KNN[i][k], T_GENRA});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 3), FD[i], M_DIRECT, 1, FDN[i], T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * c), MU[i], MUM[i], 1, MUN[i], T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * c), RE[i], REM[i], 1, REN[i], T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * c), G_FREE, M_ONCE, 1, nullptr, T_GENRA});
 	}
-	t.push_back({D_MIX, K_CC, 62, G_FREE, M_DIRECT, 1, nullptr});        // master fader
-	t.push_back({D_MIX, K_NOTE, 25, G_GENRE, M_STEP, -1, "GENRE <"});    // BANK LEFT
-	t.push_back({D_MIX, K_NOTE, 26, G_GENRE, M_STEP, 1, "GENRE >"});     // BANK RIGHT
+	t.push_back({D_MIX, K_CC, 62, G_FREE, M_DIRECT, 1, nullptr, T_GENRA});        // master fader
+	t.push_back({D_MIX, K_NOTE, 25, G_GENRE, M_STEP, -1, "GENRE <", T_GENRA});    // BANK LEFT
+	t.push_back({D_MIX, K_NOTE, 26, G_GENRE, M_STEP, 1, "GENRE >", T_GENRA});     // BANK RIGHT
 
 	// Akai MPD218, preset 1: pads bank A notes 36-51 from the bottom left, knobs CC 3, 9, 12-15
 	static const int16_t PAD[16] = {G_RUN, G_STOP, G_FILLPAD, G_TAP, G_TNEW, G_TNEW + 1, G_TNEW + 2, G_TNEW + 3,
@@ -146,11 +152,26 @@ static std::vector<PEntry> presetTable() {
 	static const char* PADN[16] = {"RUN", "STOP", "FILL", "TAP", "DR NEW", "BS NEW", "ML NEW", "PD NEW",
 	                               "DR MUTE", "BS MUTE", "ML MUTE", "PD MUTE", "NEW ALL", "HARM NEW", "HARM LOCK", "MAKE SONG"};
 	for (int i = 0; i < 16; i++)
-		t.push_back({D_MPD, K_NOTE, (int16_t) (36 + i), PAD[i], PADM[i], 1, PADN[i]});
+		t.push_back({D_MPD, K_NOTE, (int16_t) (36 + i), PAD[i], PADM[i], 1, PADN[i], T_GENRA});
 	static const int16_t MK[6] = {G_GENRE, G_VARIANT, G_COMPLEX, G_COLOR, G_MUTATE, G_SWING};
 	static const char* MKN[6] = {"GENRE", "VARIANT", "COMPLEX", "COLOR", "MUTATE", "SWING"};
 	for (int i = 0; i < 6; i++)
-		t.push_back({D_MPD, K_CC, (int16_t) MPD_KNOB[i], MK[i], M_DIRECT, 1, MKN[i]});
+		t.push_back({D_MPD, K_CC, (int16_t) MPD_KNOB[i], MK[i], M_DIRECT, 1, MKN[i], T_GENRA});
+
+	// MPD218 bank B (notes 52-67): the looper SCHLEIFE. A column per track: REC/DUB, UNDO, CLEAR from the bottom; the
+	// top row CLR ALL (press twice), GENRA's RUN and STOP, one pad free
+	static const char* RN[4] = {"T1 REC/DUB", "T2 REC/DUB", "T3 REC/DUB", "T4 REC/DUB"};
+	static const char* UN[4] = {"T1 UNDO", "T2 UNDO", "T3 UNDO", "T4 UNDO"};
+	static const char* CN[4] = {"T1 CLEAR", "T2 CLEAR", "T3 CLEAR", "T4 CLEAR"};
+	for (int i = 0; i < 4; i++) {
+		t.push_back({D_MPD, K_NOTE, (int16_t) (52 + i), (int16_t) (S_REC + i), M_ONCE, 1, RN[i], T_LOOP});
+		t.push_back({D_MPD, K_NOTE, (int16_t) (56 + i), (int16_t) (S_UNDO + i), M_ONCE, 1, UN[i], T_LOOP});
+		t.push_back({D_MPD, K_NOTE, (int16_t) (60 + i), (int16_t) (S_CLEAR + i), M_ONCE, 1, CN[i], T_LOOP});
+	}
+	t.push_back({D_MPD, K_NOTE, 64, S_CLRALL, M_ONCE, 1, "CLR ALL", T_LOOP});
+	t.push_back({D_MPD, K_NOTE, 65, G_RUN, M_ONCE, 1, "RUN", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 66, G_STOP, M_ONCE, 1, "STOP", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 67, G_FREE, M_ONCE, 1, nullptr, T_GENRA});
 	return t;
 }
 
@@ -458,6 +479,9 @@ struct MapX : Module {
 	int devType[NDEV] = {D_OTHER, D_OTHER};
 	int64_t genraId = -1;
 	bool genraFound = false;
+	int64_t loopId = -1; // the looper SCHLEIFE (MPD218 bank B)
+	/** The module an entry of the ready-made map goes to (-1: not in the rack). */
+	int64_t targetId(int target) const { return target == T_LOOP ? loopId : genraId; }
 
 	bool presetHas(int type) const {
 		return (type == D_MIX && (preset == P_BOTH || preset == P_MIX)) || (type == D_MPD && (preset == P_BOTH || preset == P_MPD));
@@ -500,6 +524,20 @@ struct MapX : Module {
 		return -1;
 	}
 
+	int64_t findLoop() {
+		if (loopId >= 0) {
+			Module* m = APP->engine->getModule(loopId);
+			if (m && m->model && m->model->slug == "GenraSchleife")
+				return loopId;
+		}
+		for (int64_t id : APP->engine->getModuleIds()) {
+			Module* m = APP->engine->getModule(id);
+			if (m && m->model && m->model->slug == "GenraSchleife") // (GENRA Test now, maybe another GENRA plugin later)
+				return id;
+		}
+		return -1;
+	}
+
 	/** Binds a handle to (module, param): one already on it, else a free one. -1: none free / taken by another. */
 	int bind(int64_t moduleId, int paramId, bool overwrite, std::vector<bool>& used) {
 		for (int i = 0; i < MAXH; i++)
@@ -525,6 +563,7 @@ struct MapX : Module {
 			devType[d] = devTypeOfName(deviceName(d));
 		genraId = findGenra();
 		genraFound = genraId >= 0;
+		loopId = findLoop();
 		int mixDev = devOfType(D_MIX), mpdDev = devOfType(D_MPD);
 
 		struct Want {
@@ -563,8 +602,9 @@ struct MapX : Module {
 			} else {
 				r.to = e.name ? e.name : "?";
 				r.mode = MODE_NAME[e.mode];
-				if (genraFound)
-					want.push_back({r.src, genraId, (int) e.param, e.mode, e.dir, false, (int) nr.size()});
+				int64_t tid = targetId(e.target);
+				if (tid >= 0)
+					want.push_back({r.src, tid, (int) e.param, e.mode, e.dir, false, (int) nr.size()});
 				else
 					r.to += " ·";
 			}
@@ -696,11 +736,11 @@ struct MapX : Module {
 		int8_t nm = (was == mode) ? M_DIRECT : (int8_t) mode;
 		if (r.userIdx >= 0)
 			users[r.userIdx].mode = nm;
-		else if (r.presetIdx >= 0 && genraFound) {
+		else if (r.presetIdx >= 0 && targetId(PRESET()[r.presetIdx].target) >= 0) {
 			const PEntry& e = PRESET()[r.presetIdx];
 			UserMap um;
 			um.src = r.src;
-			um.moduleId = genraId;
+			um.moduleId = targetId(e.target);
 			um.paramId = e.param;
 			um.mode = nm;
 			um.dir = e.dir;

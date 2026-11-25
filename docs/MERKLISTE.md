@@ -14,9 +14,15 @@ schmal wie möglich. Alle Dropdown-Felder wechseln auch per Mausrad.
 
 ## Stand
 
-Zurzeit keine Module (2.8.0): MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL und KESSEL FX sind getestet
+Seit 2.9.0: SCHLEIFE (Looper, Test). Frühere Module: MATH, KURBEL, SWARM, LIED, CANTA, MIAOU, SAURUS, FUMI, KESSEL und KESSEL FX sind getestet
 und mit GENRA 2.38.0 nach GENRA Instruments umgezogen. Ihre offenen Punkte (CANTA: „Arme hoch im Refrain“ und
 Verbeugung am Ende; KESSEL: MIDI-Eingang im Modul) stehen jetzt in der Merkliste im GENRA-Repo.
+
+## SCHLEIFE (Looper, seit 2.9.0)
+- 2.9.0 gebaut (Test): in Rack prüfen – Aufnahme im Takt mit GENRA (CLOCK + RESET), 1–16 Takte pro Spur, REC/DUB,
+  UNDO/Redo, CLEAR, CLR ALL, MAIN IN gegen IN 1–4, OUT 1–4 und MIX L/R, Stopp/Start von GENRA (Schleifen warten und
+  starten von vorn), Speichern im Patch und Laden, Export (Spur, alle, Mix), MPD218 Bank B über MAP-X 2.1.0.
+- Später: Presets (z. B. Längen aller Spuren), evtl. mehr Spuren (Expander).
 
 ## GENRA CHOP
 

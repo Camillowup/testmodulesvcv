@@ -1,7 +1,7 @@
 {
   "slug": "GenraMapX",
   "name": "GENRA MapX",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "license": "GPL-3.0-only",
   "brand": "Genra",
   "author": "Bastian Ofner",
@@ -16,8 +16,12 @@
     {
       "slug": "GenraMapX",
       "name": "GENRA MAP-X",
-      "description": "MIDI mapper for GENRA: maps notes, CCs, program changes and SysEx of two controllers to any parameter. Ready-made map for Akai MIDImix and MPD218.",
-      "tags": ["External", "Controller", "Utility"]
+      "description": "MIDI mapper for GENRA: maps notes, CCs, program changes and SysEx of two controllers to any parameter. Ready-made map for Akai MIDImix and MPD218 (bank B: the looper SCHLEIFE).",
+      "tags": [
+        "External",
+        "Controller",
+        "Utility"
+      ]
     }
   ]
 }

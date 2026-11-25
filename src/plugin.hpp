@@ -5,5 +5,6 @@
 #pragma once
 #include "../genra/plugin.hpp"
 
-// No modules at the moment (2.8.0): MATH … KESSEL FX moved to GENRA Instruments with 2.38.0. A new test module adds
-// its `extern Model* model…;` here and its addModel in plugin.cpp.
+// MATH … KESSEL FX moved to GENRA Instruments with 2.38.0. A new test module adds its `extern Model* model…;` here and
+// its addModel in plugin.cpp.
+extern Model* modelSchleife; // 2.9.0: the four-track looper (src/schleife/)

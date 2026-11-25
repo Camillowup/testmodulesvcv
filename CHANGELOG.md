@@ -2,6 +2,13 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+### 2.9.0 – SCHLEIFE (Looper, Test-Build, kein Release)
+- Neues Modul **SCHLEIFE** (`src/schleife/`, Slug GenraSchleife, 32 HP, hellblau): vier Spuren mit BARS (1–16 Takte),
+  LEVEL, REC/DUB, UNDO/Redo, CLEAR, Status-Lämpchen; MASTER und CLR ALL (zweimal drücken). CLOCK/RESET von GENRA
+  (Auflösung wählbar), Eingang pro Spur mit Vorrang vor MAIN IN, OUT 1–4 und MIX L/R (auch für MIX ohne Kabel).
+  Schleifen im Patch gespeichert (WAV im Patch-Speicher, bis 48 s pro Spur), Export per Rechtsklick (Spur, alle, Mix).
+- GENRA MAP-X 2.1.0: MPD218 Bank B spielt SCHLEIFE (siehe `mapx/CHANGELOG.md`).
+
 ### GENRA KEHLE 2.0.0 (eigenes Test-Plugin)
 - Neuer Ordner `genra-kehle/` mit dem Neon-Vocoder KEHLE (Details in `genra-kehle/CHANGELOG.md`).
 

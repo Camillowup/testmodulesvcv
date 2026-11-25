@@ -13,7 +13,10 @@ NEW ALL, MUTE oder RUN von GENRA mit einer Taste am Controller drücken.
     MUTATE, SWING, MUTE-Reihe NEW ALL, HARMONY NEW, HARMONY LOCK, MAKE SONG, REC-Reihe RUN, STOP, FILL (halten), TAP.
     BANK ◀ ▶ = Genre zurück/weiter. Master-Fader frei.
   - MPD218 (Bank A, von unten): RUN, STOP, FILL, TAP · NEW der vier Spuren · MUTE der vier Spuren · NEW ALL, HARMONY NEW,
-    HARMONY LOCK, MAKE SONG. Knöpfe 1–6: GENRE, VARIANT, COMPLEX, COLOR, MUTATE, SWING. Bank B und C frei.
+    HARMONY LOCK, MAKE SONG. Knöpfe 1–6: GENRE, VARIANT, COMPLEX, COLOR, MUTATE, SWING.
+  - MPD218 **Bank B: der Looper SCHLEIFE** (GENRA Test 2.9.0, wird im Rack von selbst gefunden). Eine Spalte pro Spur,
+    von unten: REC/DUB, UNDO, CLEAR (Pads 1–12). Oberste Reihe: CLR ALL (zweimal drücken), GENRA RUN, GENRA STOP, frei.
+    Bank C frei.
 - **LEARN:** LEARN drücken, am Controller etwas bewegen, auf einen Regler/Taster eines beliebigen Moduls klicken (oder
   umgekehrt). Eigene Belegungen (im Display mit *) gehen immer vor der fertigen Belegung und bleiben erhalten, auch wenn
   MAP auf OFF steht.

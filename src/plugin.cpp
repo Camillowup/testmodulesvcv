@@ -10,4 +10,5 @@ void GenraKnob::load(const char* n) {
 
 void init(Plugin* p) {
 	pluginInstance = p;
+	p->addModel(modelSchleife);
 }
