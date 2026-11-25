@@ -17,6 +17,20 @@ NEW ALL, MUTE oder RUN von GENRA mit einer Taste am Controller drücken.
   - MPD218 **Bank B: der Looper SCHLEIFE** (GENRA Test 2.9.0, wird im Rack von selbst gefunden). Eine Spalte pro Spur,
     von unten: REC/DUB, UNDO, CLEAR (Pads 1–12). Oberste Reihe: CLR ALL (zweimal drücken), GENRA RUN, GENRA STOP, frei.
     Bank C frei.
+- **GENRA TECHNO (ab 2.2.0):** steht statt GENRA ein GENRA TECHNO im Rack, nimmt MAP-X von selbst dessen Belegung
+  (Rechtsklick › „Ready-made map for“: Automatisch, GENRA oder GENRA TECHNO fest).
+  - MIDImix Kanal 1–5 = DRUMS, BASS, LEAD, ATMO, STAB: Knopf oben TYPE, Mitte der Regler der Spur (GROOVE, ACID, LOOP,
+    MOVE, DUB), unten **PRESET** des Instruments, das der Spur per Follow GENRA folgt (MONO, FUNKE …; ohne Follow
+    bleibt er leer), Fader DENSITY, MUTE, REC ARM = NEW, SOLO+MUTE = LOCK.
+  - Kanal 6–8: nur was nicht auf dem MPD218 liegt: Knöpfe KEY, SCALE, BUILD, LENGTH; MUTE-Reihe NEW ALL, MUTATE, LOCK
+    ALL; REC-Reihe PLAY, STOP, UNDO; BANK ◀ ▶ = PREV / NEXT. Frei: fünf Knöpfe, die Fader 6–8, Master, SOLO+MUTE 6–8.
+  - MPD218 Bank A (von unten): PLAY, STOP, UNDO, MUTATE · NEW DRUMS, BASS, LEAD, ATMO · MUTE derselben · NEW ALL,
+    PATTERN/LIVE (schaltet um, braucht GENRA TECHNO 2.0.10), frei, MUTE STAB. Knöpfe 1–6: STYLE, ENERGY, EVOLVE, SWING,
+    FEEL, BPM.
+  - Bank B: SCHLEIFE wie oben, RUN/STOP = PLAY/STOP von GENRA TECHNO.
+  - Bank C (von unten): BUILD, DROP, BREAK, FILL (halten = bleiben) · LOCK DRUMS, BASS, LEAD, ATMO · NEW STAB, LOCK STAB,
+    LOCK ALL, frei · PREV, NEXT, frei, frei.
+  - GENRA TECHNO liest seine Tasten beim Zeichnen (60-mal pro Sekunde): MAP-X hält sie deshalb so lange wie das Pad.
 - **LEARN:** LEARN drücken, am Controller etwas bewegen, auf einen Regler/Taster eines beliebigen Moduls klicken (oder
   umgekehrt). Eigene Belegungen (im Display mit *) gehen immer vor der fertigen Belegung und bleiben erhalten, auch wenn
   MAP auf OFF steht.

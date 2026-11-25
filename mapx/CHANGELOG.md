@@ -1,5 +1,12 @@
 # GENRA MAP-X – Versionsgeschichte
 
+### 2.2.0 (25. Nov. 2026, Test-Build, kein Release)
+- Fertige Belegung auch für **GENRA TECHNO**: MIDImix Kanal 1–5 = DRUMS, BASS, LEAD, ATMO, STAB (TYPE, Spur-Regler,
+  PRESET des folgenden Instruments, DENSITY, MUTE, NEW, LOCK), Kanal 6–8 nur KEY, SCALE, BUILD, LENGTH und sechs Tasten
+  (Rest frei); MPD218 Bank A Transport, NEW/MUTE pro Spur, NEW ALL, PATTERN/LIVE; Bank B SCHLEIFE (RUN/STOP =
+  PLAY/STOP); Bank C BUILD/DROP/BREAK/FILL, LOCK pro Spur, PREV/NEXT. Tasten von GENRA TECHNO werden gehalten (HOLD).
+- Automatische Wahl GENRA / GENRA TECHNO nach dem Rack, per Rechtsklick fest einstellbar.
+
 ### 2.1.0 (25. Nov. 2026, Test-Build, kein Release)
 - Fertige Belegung: MPD218 Bank B (Noten 52–67) spielt den Looper **SCHLEIFE** aus GENRA Test: pro Spur REC/DUB, UNDO,
   CLEAR (eine Spalte pro Spur), dazu CLR ALL, GENRA RUN und STOP, ein Pad frei. SCHLEIFE wird im Rack von selbst

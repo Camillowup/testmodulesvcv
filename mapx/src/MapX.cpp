@@ -16,6 +16,7 @@
 // table it works from is built on the UI thread (the widget's step) and swapped in whole (two buffers).
 #include "plugin.hpp"
 #include "../genra/ui/GenraUI.hpp"
+#include "../genra/Follow.hpp"
 #include "../genra/jiant/JiantUI.hpp"
 #include "MapXLayout.hpp"
 #include <algorithm>
@@ -88,7 +89,8 @@ struct PEntry {
 	const char* name; // what it does (the display)
 	int8_t target;    // T_GENRA (0, the default) or T_LOOP (SCHLEIFE)
 };
-enum Target { T_GENRA, T_LOOP };
+enum Target { T_GENRA, T_LOOP, T_FOLLOW }; // T_GENRA: the main module (GENRA or GENRA TECHNO); T_FOLLOW: param =
+                                            // a TECHNO track, the preset of the instrument that follows it
 
 // SCHLEIFE's parameter ids (src/schleife/Schleife.cpp in GENRA Test; new ones are appended there)
 enum LoopParam { S_REC = 8, S_UNDO = 12, S_CLEAR = 16, S_CLRALL = 21 };
@@ -96,6 +98,8 @@ enum LoopParam { S_REC = 8, S_UNDO = 12, S_CLEAR = 16, S_CLRALL = 21 };
 // Akai MIDImix, factory settings: knobs (top, middle, bottom) and faders CC, MUTE / REC ARM / SOLO+MUTE / BANK notes
 static const int MIX_KNOB[8] = {16, 20, 24, 28, 46, 50, 54, 58}; // + 0, 1, 2 the knobs, + 3 the fader
 static const int MPD_KNOB[6] = {3, 9, 12, 13, 14, 15};
+
+static void addLoopBank(std::vector<PEntry>& t, int16_t run, int16_t stop, int8_t mode);
 
 static std::vector<PEntry> presetTable() {
 	std::vector<PEntry> t;
@@ -158,8 +162,13 @@ static std::vector<PEntry> presetTable() {
 	for (int i = 0; i < 6; i++)
 		t.push_back({D_MPD, K_CC, (int16_t) MPD_KNOB[i], MK[i], M_DIRECT, 1, MKN[i], T_GENRA});
 
-	// MPD218 bank B (notes 52-67): the looper SCHLEIFE. A column per track: REC/DUB, UNDO, CLEAR from the bottom; the
-	// top row CLR ALL (press twice), GENRA's RUN and STOP, one pad free
+	addLoopBank(t, G_RUN, G_STOP, M_ONCE);
+	return t;
+}
+
+/** MPD218 bank B (notes 52-67): the looper SCHLEIFE. A column per track: REC/DUB, UNDO, CLEAR from the bottom; the top
+ * row CLR ALL (press twice), RUN and STOP of the main module (GENRA: RUN / STOP, GENRA TECHNO: PLAY / STOP), one free. */
+static void addLoopBank(std::vector<PEntry>& t, int16_t run, int16_t stop, int8_t mode) {
 	static const char* RN[4] = {"T1 REC/DUB", "T2 REC/DUB", "T3 REC/DUB", "T4 REC/DUB"};
 	static const char* UN[4] = {"T1 UNDO", "T2 UNDO", "T3 UNDO", "T4 UNDO"};
 	static const char* CN[4] = {"T1 CLEAR", "T2 CLEAR", "T3 CLEAR", "T4 CLEAR"};
@@ -169,16 +178,128 @@ static std::vector<PEntry> presetTable() {
 		t.push_back({D_MPD, K_NOTE, (int16_t) (60 + i), (int16_t) (S_CLEAR + i), M_ONCE, 1, CN[i], T_LOOP});
 	}
 	t.push_back({D_MPD, K_NOTE, 64, S_CLRALL, M_ONCE, 1, "CLR ALL", T_LOOP});
-	t.push_back({D_MPD, K_NOTE, 65, G_RUN, M_ONCE, 1, "RUN", T_GENRA});
-	t.push_back({D_MPD, K_NOTE, 66, G_STOP, M_ONCE, 1, "STOP", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 65, run, mode, 1, "RUN", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 66, stop, mode, 1, "STOP", T_GENRA});
 	t.push_back({D_MPD, K_NOTE, 67, G_FREE, M_ONCE, 1, nullptr, T_GENRA});
-	return t;
 }
 
 static const std::vector<PEntry>& PRESET() {
 	static std::vector<PEntry> t = presetTable();
 	return t;
 }
+
+// ---------------------------------------------------------------- the ready-made map for GENRA TECHNO (2.2.0)
+// GENRA TECHNO's parameter ids (src/TechnoModule.hpp in Technogen; new ones are appended there). Its tracks: 0 drums,
+// 1 bass, 2 stab, 3 lead, 4 atmo. Its buttons are read where they are drawn (60 times a second), so MAP-X holds them as
+// long as the pad is held (M_HOLD) instead of a short press.
+enum TechnoParam {
+	X_BPM = 0, X_SWING = 1, X_ENERGY = 2, X_EVOLVE = 3, X_LENGTH = 4, X_DENS = 5, X_FLAV = 10, X_LEN = 15, X_BTN = 20,
+	X_FLD = 49, X_MODETGL = 59
+};
+enum TechnoBtn {
+	XB_PLAY = 0, XB_STOP, XB_BUILD, XB_DROP, XB_BREAK, XB_FILL, XB_NEWALL, XB_MUTATE, XB_LOCKALL, XB_UNDO, XB_NEW,
+	XB_LOCK = XB_NEW + 5, XB_MUTE = XB_LOCK + 5, XB_PREV = XB_MUTE + 5, XB_NEXT, XB_PATTERN, XB_LIVE
+};
+enum TechnoField { XF_STYLE = 0, XF_KEY, XF_SCALE, XF_FEEL, XF_BUILD, XF_TYPE };
+// the MIDImix channels 1-5 and the pad columns: drums, bass, lead, atmo, stab (stab last)
+static const int X_ORDER[5] = {0, 1, 3, 4, 2};
+static const char* const X_TR[5] = {"DR", "BS", "ST", "LD", "AT"};
+// GENRA TECHNO track -> the track an instrument follows (follow::Track), as GenraTechno::rollPresets
+static const int X_TO_FOLLOW[5] = {follow::T_DRUMS, follow::T_BASS, follow::T_STAB, follow::T_MEL, follow::T_PAD};
+
+static const char* xname(const char* what, int track) {
+	return strdup(string::f("%s %s", X_TR[track], what).c_str());
+}
+
+static std::vector<PEntry> technoTable() {
+	std::vector<PEntry> t;
+	static const char* FLAVN[5] = {"GROOVE", "ACID", "DUB", "LOOP", "MOVE"};
+	// MIDImix channels 1-5: the tracks. Knobs TYPE, the track's own knob, PRESET (of the instrument that follows);
+	// fader DENSITY; MUTE, REC ARM = NEW, SOLO+MUTE = LOCK
+	for (int c = 0; c < 5; c++) {
+		int k = X_ORDER[c];
+		t.push_back({D_MIX, K_CC, (int16_t) MIX_KNOB[c], (int16_t) (X_FLD + XF_TYPE + k), M_DIRECT, 1, xname("TYPE", k), T_GENRA});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 1), (int16_t) (X_FLAV + k), M_DIRECT, 1, xname(FLAVN[k], k), T_GENRA});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 2), (int16_t) k, M_DIRECT, 1, xname("PRESET", k), T_FOLLOW});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 3), (int16_t) (X_DENS + k), M_DIRECT, 1, xname("DENS", k), T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * c), (int16_t) (X_BTN + XB_MUTE + k), M_HOLD, 1, xname("MUTE", k), T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * c), (int16_t) (X_BTN + XB_NEW + k), M_HOLD, 1, xname("NEW", k), T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * c), (int16_t) (X_BTN + XB_LOCK + k), M_HOLD, 1, xname("LOCK", k), T_GENRA});
+	}
+	// channels 6-8: only what is not on the MPD218 (the rest is free for LEARN)
+	static const int16_t KN[3][3] = {{X_FLD + XF_KEY, X_FLD + XF_SCALE, G_FREE}, {X_FLD + XF_BUILD, X_LENGTH, G_FREE},
+	                                 {G_FREE, G_FREE, G_FREE}};
+	static const char* KNN[3][3] = {{"KEY", "SCALE", nullptr}, {"BUILD", "LENGTH", nullptr}, {nullptr, nullptr, nullptr}};
+	static const int16_t MU[3] = {X_BTN + XB_NEWALL, X_BTN + XB_MUTATE, X_BTN + XB_LOCKALL};
+	static const char* MUN[3] = {"NEW ALL", "MUTATE", "LOCK ALL"};
+	static const int16_t RE[3] = {X_BTN + XB_PLAY, X_BTN + XB_STOP, X_BTN + XB_UNDO};
+	static const char* REN[3] = {"PLAY", "STOP", "UNDO"};
+	for (int i = 0; i < 3; i++) {
+		int c = 5 + i;
+		for (int k = 0; k < 3; k++)
+			t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + k), KN[i][k], M_DIRECT, 1, KNN[i][k], T_GENRA});
+		t.push_back({D_MIX, K_CC, (int16_t) (MIX_KNOB[c] + 3), G_FREE, M_DIRECT, 1, nullptr, T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (1 + 3 * c), MU[i], M_HOLD, 1, MUN[i], T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (3 + 3 * c), RE[i], M_HOLD, 1, REN[i], T_GENRA});
+		t.push_back({D_MIX, K_NOTE, (int16_t) (2 + 3 * c), G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	}
+	t.push_back({D_MIX, K_CC, 62, G_FREE, M_DIRECT, 1, nullptr, T_GENRA});                       // master fader
+	t.push_back({D_MIX, K_NOTE, 25, X_BTN + XB_PREV, M_HOLD, 1, "PREV", T_GENRA});               // BANK LEFT
+	t.push_back({D_MIX, K_NOTE, 26, X_BTN + XB_NEXT, M_HOLD, 1, "NEXT", T_GENRA});               // BANK RIGHT
+
+	// MPD218 bank A (notes 36-51, from the bottom left): PLAY STOP UNDO MUTATE · NEW of four tracks · MUTE of the same ·
+	// NEW ALL, PATTERN/LIVE, free, MUTE STAB
+	static const int16_t A[4] = {X_BTN + XB_PLAY, X_BTN + XB_STOP, X_BTN + XB_UNDO, X_BTN + XB_MUTATE};
+	static const char* AN[4] = {"PLAY", "STOP", "UNDO", "MUTATE"};
+	for (int i = 0; i < 4; i++)
+		t.push_back({D_MPD, K_NOTE, (int16_t) (36 + i), A[i], M_HOLD, 1, AN[i], T_GENRA});
+	for (int c = 0; c < 4; c++) {
+		int k = X_ORDER[c];
+		t.push_back({D_MPD, K_NOTE, (int16_t) (40 + c), (int16_t) (X_BTN + XB_NEW + k), M_HOLD, 1, xname("NEW", k), T_GENRA});
+		t.push_back({D_MPD, K_NOTE, (int16_t) (44 + c), (int16_t) (X_BTN + XB_MUTE + k), M_HOLD, 1, xname("MUTE", k), T_GENRA});
+	}
+	t.push_back({D_MPD, K_NOTE, 48, X_BTN + XB_NEWALL, M_HOLD, 1, "NEW ALL", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 49, X_MODETGL, M_HOLD, 1, "PATTERN/LIVE", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 50, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 51, X_BTN + XB_MUTE + 2, M_HOLD, 1, xname("MUTE", 2), T_GENRA});
+	// the six knobs
+	static const int16_t MK[6] = {X_FLD + XF_STYLE, X_ENERGY, X_EVOLVE, X_SWING, X_FLD + XF_FEEL, X_BPM};
+	static const char* MKN[6] = {"STYLE", "ENERGY", "EVOLVE", "SWING", "FEEL", "BPM"};
+	for (int i = 0; i < 6; i++)
+		t.push_back({D_MPD, K_CC, (int16_t) MPD_KNOB[i], MK[i], M_DIRECT, 1, MKN[i], T_GENRA});
+
+	// bank B: SCHLEIFE, RUN / STOP = TECHNO's PLAY / STOP
+	addLoopBank(t, X_BTN + XB_PLAY, X_BTN + XB_STOP, M_HOLD);
+
+	// bank C (notes 68-83): BUILD DROP BREAK FILL (held: they stay) · LOCK of four tracks · NEW STAB, LOCK STAB, LOCK ALL,
+	// free · PREV, NEXT, free, free
+	static const int16_t C1[4] = {X_BTN + XB_BUILD, X_BTN + XB_DROP, X_BTN + XB_BREAK, X_BTN + XB_FILL};
+	static const char* C1N[4] = {"BUILD", "DROP", "BREAK", "FILL"};
+	for (int i = 0; i < 4; i++)
+		t.push_back({D_MPD, K_NOTE, (int16_t) (68 + i), C1[i], M_HOLD, 1, C1N[i], T_GENRA});
+	for (int c = 0; c < 4; c++) {
+		int k = X_ORDER[c];
+		t.push_back({D_MPD, K_NOTE, (int16_t) (72 + c), (int16_t) (X_BTN + XB_LOCK + k), M_HOLD, 1, xname("LOCK", k), T_GENRA});
+	}
+	t.push_back({D_MPD, K_NOTE, 76, X_BTN + XB_NEW + 2, M_HOLD, 1, xname("NEW", 2), T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 77, X_BTN + XB_LOCK + 2, M_HOLD, 1, xname("LOCK", 2), T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 78, X_BTN + XB_LOCKALL, M_HOLD, 1, "LOCK ALL", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 79, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 80, X_BTN + XB_PREV, M_HOLD, 1, "PREV", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 81, X_BTN + XB_NEXT, M_HOLD, 1, "NEXT", T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 82, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	t.push_back({D_MPD, K_NOTE, 83, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	return t;
+}
+
+static const std::vector<PEntry>& TECHNO() {
+	static std::vector<PEntry> t = technoTable();
+	return t;
+}
+
+/** Which ready-made map (right-click): from what is in the rack, or one of the two for good. */
+enum Engine { E_AUTO, E_GENRA, E_TECHNO, NUM_ENGINES };
+static const char* const ENGINE_NAME[NUM_ENGINES] = {"Automatic (what is in the rack)", "GENRA", "GENRA TECHNO"};
 
 /** The name of a control on the panel of a known controller (else NOTE / CC / PC / SYSEX and the number). */
 static std::string srcName(const Src& s, int devType) {
@@ -274,9 +395,17 @@ struct MapX : Module {
 	std::atomic<int> lastDev{-1}, lastKind{0}, lastNum{0}, lastCh{0}, lastVal{0};
 	std::atomic<uint32_t> lastSeq{0};
 
+	// the PRESET knobs (GENRA TECHNO map): the audio thread notes the knob's value, the UI thread loads the preset of the
+	// instrument that follows the track. presetKey: the control (packed Src, -1: none)
+	std::atomic<int64_t> presetKey[5];
+	std::atomic<float> presetVal[5];
+	std::atomic<uint32_t> presetSeq[5];
+	uint32_t presetSeen[5] = {};
+
 	// saved
 	std::vector<UserMap> users;
 	int preset = P_BOTH;
+	int engineSel = E_AUTO; // which ready-made map (right-click)
 	bool autoPicked = false;
 
 	// UI side
@@ -296,7 +425,14 @@ struct MapX : Module {
 		}
 		for (int d = 0; d < NDEV; d++)
 			midiIn[d].setChannel(-1);
+		for (int k = 0; k < 5; k++) {
+			presetKey[k].store(-1);
+			presetVal[k].store(0.f);
+			presetSeq[k].store(0);
+		}
 	}
+
+	static int64_t packSrc(const Src& s) { return ((int64_t) s.dev << 40) | ((int64_t) s.kind << 32) | (uint32_t) s.num; }
 
 	~MapX() {
 		for (int i = 0; i < MAXH; i++)
@@ -445,6 +581,14 @@ struct MapX : Module {
 		for (int i = 0; i < n; i++)
 			if (A[i].src.same(s))
 				apply(i, A[i], s.kind == K_CC, v01, press, release);
+		if (s.kind == K_CC) {
+			int64_t key = packSrc(s);
+			for (int k = 0; k < 5; k++)
+				if (presetKey[k].load(std::memory_order_relaxed) == key) {
+					presetVal[k].store(v01);
+					presetSeq[k].fetch_add(1);
+				}
+		}
 	}
 
 	void process(const ProcessArgs& args) override {
@@ -480,8 +624,10 @@ struct MapX : Module {
 	int64_t genraId = -1;
 	bool genraFound = false;
 	int64_t loopId = -1; // the looper SCHLEIFE (MPD218 bank B)
-	/** The module an entry of the ready-made map goes to (-1: not in the rack). */
-	int64_t targetId(int target) const { return target == T_LOOP ? loopId : genraId; }
+	bool techno = false; // genraId is a GENRA TECHNO: its map (TECHNO()), else GENRA's (PRESET())
+	/** The module an entry of the ready-made map goes to (-1: not in the rack; T_FOLLOW: no parameter handle). */
+	int64_t targetId(int target) const { return target == T_LOOP ? loopId : target == T_FOLLOW ? -1 : genraId; }
+	const std::vector<PEntry>& table() const { return techno ? TECHNO() : PRESET(); }
 
 	bool presetHas(int type) const {
 		return (type == D_MIX && (preset == P_BOTH || preset == P_MIX)) || (type == D_MPD && (preset == P_BOTH || preset == P_MPD));
@@ -524,6 +670,49 @@ struct MapX : Module {
 		return -1;
 	}
 
+	static bool isTechno(Module* m) {
+		return m && m->model && m->model->plugin && m->model->plugin->slug == "GenraTechno" && m->model->slug == "GenraTechno";
+	}
+	int64_t findTechno() {
+		if (genraId >= 0 && isTechno(APP->engine->getModule(genraId)))
+			return genraId;
+		for (int64_t id : APP->engine->getModuleIds())
+			if (isTechno(APP->engine->getModule(id)))
+				return id;
+		return -1;
+	}
+
+	/** The instrument that follows GENRA TECHNO's track k (Follow GENRA, without a cable), nullptr: none. */
+	follow::Host* follower(int k) {
+		Module* g = genraId >= 0 ? APP->engine->getModule(genraId) : nullptr;
+		if (!g || k < 0 || k >= 5)
+			return nullptr;
+		for (int64_t id : APP->engine->getModuleIds()) {
+			Module* m = APP->engine->getModule(id);
+			follow::Host* h = m ? follow::host(m) : nullptr;
+			if (h && h->follows && h->fol.genra.to.load() == g && h->fol.track.load() == X_TO_FOLLOW[k])
+				return h;
+		}
+		return nullptr;
+	}
+
+	/** UI thread: a PRESET knob moved: its share of the follower's preset list. */
+	void presetStep() {
+		for (int k = 0; k < 5; k++) {
+			uint32_t q = presetSeq[k].load();
+			if (q == presetSeen[k])
+				continue;
+			presetSeen[k] = q;
+			follow::Host* h = follower(k);
+			int n = h ? h->hostPresetCount() : 0;
+			if (n <= 0)
+				continue;
+			int i = clamp((int) std::round(presetVal[k].load() * (n - 1)), 0, n - 1);
+			if (i != h->hostPresetCurrent())
+				h->hostPresetLoad(i);
+		}
+	}
+
 	int64_t findLoop() {
 		if (loopId >= 0) {
 			Module* m = APP->engine->getModule(loopId);
@@ -561,9 +750,17 @@ struct MapX : Module {
 		dirty = false;
 		for (int d = 0; d < NDEV; d++)
 			devType[d] = devTypeOfName(deviceName(d));
-		genraId = findGenra();
+		// the main module: GENRA or GENRA TECHNO (automatic: GENRA if there is one, else GENRA TECHNO)
+		int64_t gid = engineSel == E_TECHNO ? -1 : findGenra();
+		techno = false;
+		if (gid < 0 && engineSel != E_GENRA) {
+			gid = findTechno();
+			techno = gid >= 0 || engineSel == E_TECHNO;
+		}
+		genraId = gid;
 		genraFound = genraId >= 0;
 		loopId = findLoop();
+		int64_t pk[5] = {-1, -1, -1, -1, -1};
 		int mixDev = devOfType(D_MIX), mpdDev = devOfType(D_MPD);
 
 		struct Want {
@@ -578,8 +775,9 @@ struct MapX : Module {
 		std::vector<Row> nr;
 		std::vector<bool> userShown(users.size(), false);
 
-		for (int pi = 0; pi < (int) PRESET().size(); pi++) {
-			const PEntry& e = PRESET()[pi];
+		const std::vector<PEntry>& T = table();
+		for (int pi = 0; pi < (int) T.size(); pi++) {
+			const PEntry& e = T[pi];
 			if (!presetHas(e.dev))
 				continue;
 			int d = e.dev == D_MIX ? mixDev : mpdDev;
@@ -603,7 +801,12 @@ struct MapX : Module {
 				r.to = e.name ? e.name : "?";
 				r.mode = MODE_NAME[e.mode];
 				int64_t tid = targetId(e.target);
-				if (tid >= 0)
+				if (e.target == T_FOLLOW) { // no handle: the knob loads the follower's presets (presetStep)
+					pk[clamp((int) e.param, 0, 4)] = packSrc(r.src);
+					if (!follower(e.param))
+						r.to += " ·";
+				}
+				else if (tid >= 0)
 					want.push_back({r.src, tid, (int) e.param, e.mode, e.dir, false, (int) nr.size()});
 				else
 					r.to += " ·";
@@ -669,6 +872,8 @@ struct MapX : Module {
 			}
 		actN[nxt] = n;
 		cur.store(nxt);
+		for (int k = 0; k < 5; k++)
+			presetKey[k].store(pk[k]);
 		rows = nr;
 	}
 
@@ -732,12 +937,12 @@ struct MapX : Module {
 		if (r.userIdx >= 0)
 			was = users[r.userIdx].mode;
 		else if (r.presetIdx >= 0)
-			was = PRESET()[r.presetIdx].mode;
+			was = table()[r.presetIdx].mode;
 		int8_t nm = (was == mode) ? M_DIRECT : (int8_t) mode;
 		if (r.userIdx >= 0)
 			users[r.userIdx].mode = nm;
-		else if (r.presetIdx >= 0 && targetId(PRESET()[r.presetIdx].target) >= 0) {
-			const PEntry& e = PRESET()[r.presetIdx];
+		else if (r.presetIdx >= 0 && targetId(table()[r.presetIdx].target) >= 0) {
+			const PEntry& e = table()[r.presetIdx];
 			UserMap um;
 			um.src = r.src;
 			um.moduleId = targetId(e.target);
@@ -753,7 +958,7 @@ struct MapX : Module {
 		if (r.userIdx >= 0 && !users[r.userIdx].off)
 			return users[r.userIdx].mode;
 		if (r.userIdx < 0 && r.presetIdx >= 0 && !r.free)
-			return PRESET()[r.presetIdx].mode;
+			return table()[r.presetIdx].mode;
 		return -1;
 	}
 
@@ -781,6 +986,7 @@ struct MapX : Module {
 	json_t* dataToJson() override {
 		json_t* root = json_object();
 		json_object_set_new(root, "preset", json_integer(preset));
+		json_object_set_new(root, "engine", json_integer(engineSel));
 		json_object_set_new(root, "autoPicked", json_boolean(true));
 		for (int d = 0; d < NDEV; d++)
 			json_object_set_new(root, string::f("midi%d", d).c_str(), midiIn[d].toJson());
@@ -804,6 +1010,8 @@ struct MapX : Module {
 	void dataFromJson(json_t* root) override {
 		if (json_t* j = json_object_get(root, "preset"))
 			preset = clamp((int) json_integer_value(j), 0, NUM_PRESETS - 1);
+		if (json_t* j = json_object_get(root, "engine"))
+			engineSel = clamp((int) json_integer_value(j), 0, NUM_ENGINES - 1);
 		autoPicked = true;
 		for (int d = 0; d < NDEV; d++)
 			if (json_t* j = json_object_get(root, string::f("midi%d", d).c_str()))
@@ -1047,7 +1255,7 @@ std::string MapXDisplay::headLine() {
 		return "LEARN · CONTROL + PARAMETER";
 	int d = m->lastDev.load();
 	if (d < 0)
-		return m->genraFound || m->preset == P_OFF ? "WAITING FOR MIDI" : "NO GENRA IN THE RACK";
+		return m->genraFound || m->preset == P_OFF ? "WAITING FOR MIDI" : "NO GENRA / TECHNO IN THE RACK";
 	static const char* DN[3] = {"MIX", "MPD", ""};
 	std::string dn = d < NDEV && m->devType[d] != D_OTHER ? DN[m->devType[d]] : string::f("IN%d", d + 1);
 	int k = m->lastKind.load(), num = m->lastNum.load(), ch = m->lastCh.load();
@@ -1194,6 +1402,7 @@ struct MapXWidget : ModuleWidget {
 			return;
 		if (!m->autoPicked)
 			m->autoPick();
+		m->presetStep();
 
 		// the buttons (here, on the UI thread: they change the own mappings)
 		bool btn[3];
@@ -1280,6 +1489,13 @@ struct MapXWidget : ModuleWidget {
 			m->users.clear();
 			m->dirty = true;
 		}, m->users.empty()));
+		menu->addChild(createIndexSubmenuItem(
+		    "Ready-made map for", std::vector<std::string>(ENGINE_NAME, ENGINE_NAME + NUM_ENGINES),
+		    [=]() -> size_t { return (size_t) m->engineSel; }, [=](size_t i) {
+			    m->engineSel = (int) i;
+			    m->dirty = true;
+		    }));
+		menu->addChild(createMenuLabel(m->genraFound ? (m->techno ? "Now: GENRA TECHNO" : "Now: GENRA") : "Now: none in the rack"));
 		menu->addChild(createMenuLabel("The ready-made map expects the factory settings"));
 		menu->addChild(createMenuLabel("(MIDImix: as delivered, MPD218: preset 1)"));
 	}
