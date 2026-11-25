@@ -5,6 +5,8 @@
 //  - The ready-made map (field MAP): Akai MIDImix and Akai MPD218 (factory settings) on the GENRA main module, found in
 //    the rack by itself. OFF, both, or only one of them. The controls the map leaves free are listed as FREE.
 //    MPD218 bank B plays the looper SCHLEIFE (GENRA Test), when there is one in the rack (2.1.0).
+//    Novation Launchpad X (2.3.0, GENRA TECHNO only): Custom 1 on channel 1 (the tracks), Custom 2 on channel 2 (SCHLEIFE
+//    and ABLAUF), Custom 3 on channel 3 (faders, free for LEARN). Its messages carry the channel (Src.num = ch*128 + n).
 //  - Own mappings: LEARN, move a control, click a parameter of any module (or the other way round). An own mapping always
 //    wins over the ready-made map; CLEAR on a control of the ready-made map switches it off (OFF), CLEAR again brings it
 //    back. UNDO takes back the last change of the own mappings.
@@ -37,9 +39,10 @@ static const int MAXA = 160;  // active mappings
 enum Kind : int8_t { K_NONE, K_NOTE, K_CC, K_PC, K_SYSEX };
 enum Mode : int8_t { M_ONCE, M_TOGGLE, M_HOLD, M_STEP, M_DIRECT };
 static const char* const MODE_NAME[5] = {"ONCE", "ON/OFF", "HOLD", "STEP", ""};
-enum DevType { D_MIX, D_MPD, D_OTHER };
-enum Preset { P_OFF, P_BOTH, P_MIX, P_MPD, NUM_PRESETS };
-static const char* const PRESET_NAME[NUM_PRESETS] = {"OFF", "MIDI MIX+MPD 218", "MIDI MIX", "MPD 218"};
+enum DevType { D_MIX, D_MPD, D_OTHER, D_LPX }; // (D_LPX appended: 2.3.0)
+enum Preset { P_OFF, P_BOTH, P_MIX, P_MPD, P_MIXLPX, P_LPX, NUM_PRESETS }; // (only ever append: saved in patches)
+static const char* const PRESET_NAME[NUM_PRESETS] = {"OFF", "MIDI MIX+MPD 218", "MIDI MIX", "MPD 218",
+                                                     "MIDI MIX+LAUNCHPAD X", "LAUNCHPAD X"};
 
 /** A control of a controller: which input, what kind of message, its number (SysEx: a hash of the bytes). */
 struct Src {
@@ -80,17 +83,17 @@ enum GenraParam {
 };
 
 struct PEntry {
-	int8_t dev;  // D_MIX or D_MPD
+	int8_t dev;  // D_MIX, D_MPD or D_LPX
 	int8_t kind;
-	int16_t num;
+	int16_t num;   // D_LPX: channel * 128 + note / CC
 	int16_t param; // G_FREE: listed, not mapped
 	int8_t mode;
 	int8_t dir;
 	const char* name; // what it does (the display)
-	int8_t target;    // T_GENRA (0, the default) or T_LOOP (SCHLEIFE)
+	int8_t target;    // T_GENRA (0, the default), T_LOOP (SCHLEIFE), T_ABLAUF (GENRA TECHNO ABLAUF)
 };
-enum Target { T_GENRA, T_LOOP, T_FOLLOW }; // T_GENRA: the main module (GENRA or GENRA TECHNO); T_FOLLOW: param =
-                                            // a TECHNO track, the preset of the instrument that follows it
+enum Target { T_GENRA, T_LOOP, T_FOLLOW, T_ABLAUF }; // T_GENRA: the main module (GENRA or GENRA TECHNO); T_FOLLOW:
+                                                     // param = a TECHNO track, the preset of the instrument following it
 
 // SCHLEIFE's parameter ids (src/schleife/Schleife.cpp in GENRA Test; new ones are appended there)
 enum LoopParam { S_REC = 8, S_UNDO = 12, S_CLEAR = 16, S_CLRALL = 21 };
@@ -100,6 +103,7 @@ static const int MIX_KNOB[8] = {16, 20, 24, 28, 46, 50, 54, 58}; // + 0, 1, 2 th
 static const int MPD_KNOB[6] = {3, 9, 12, 13, 14, 15};
 
 static void addLoopBank(std::vector<PEntry>& t, int16_t run, int16_t stop, int8_t mode);
+static void addLaunchpad(std::vector<PEntry>& t);
 
 static std::vector<PEntry> presetTable() {
 	std::vector<PEntry> t;
@@ -289,7 +293,70 @@ static std::vector<PEntry> technoTable() {
 	t.push_back({D_MPD, K_NOTE, 81, X_BTN + XB_NEXT, M_HOLD, 1, "NEXT", T_GENRA});
 	t.push_back({D_MPD, K_NOTE, 82, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
 	t.push_back({D_MPD, K_NOTE, 83, G_FREE, M_HOLD, 1, nullptr, T_GENRA});
+	addLaunchpad(t);
 	return t;
+}
+
+/** Novation Launchpad X, the Custom Modes of the drawing entwuerfe/launchpad (Project-2501): every pad a note, momentary;
+ * the notes count from 36 at the bottom left, 8 per row (row r, column c: 36 + 8 r + c). */
+static int16_t lpx(int ch, int row, int col) { return (int16_t) (ch * 128 + 36 + 8 * row + col); }
+
+// GENRA TECHNO ABLAUF's buttons (BTN_PARAM = 4, then its table BTNS in src/TechnoAblauf.cpp; only ever appended there)
+enum AblaufBtn {
+	AB_PLAY = 0, AB_STOP, AB_LOOP, AB_PATT, AB_SONG, AB_TAKE, AB_MAKE, AB_DJ, AB_BANK, AB_VAR = AB_BANK + 4,
+	AB_INSERT = AB_VAR + 6, AB_DELETE, AB_COPY, AB_CLEAR, AB_CLEARALL, AB_UNDO
+};
+static const int A_BTN = 4;
+
+static void addLaunchpad(std::vector<PEntry>& t) {
+	// Custom 1 (channel 1): the tracks in GENRA TECHNO's order (drums, bass, stab, lead, atmo) in columns 1-5.
+	// Row 1: PLAY STOP UNDO MUTATE NEW ALL PATTERN/LIVE PREV NEXT · row 2: NEW per track, LOCK ALL · row 3: MUTE ·
+	// row 4: LOCK · row 6: BUILD DROP BREAK FILL (held: they stay)
+	static const int16_t R1[8] = {X_BTN + XB_PLAY, X_BTN + XB_STOP, X_BTN + XB_UNDO, X_BTN + XB_MUTATE, X_BTN + XB_NEWALL,
+	                              X_MODETGL, X_BTN + XB_PREV, X_BTN + XB_NEXT};
+	static const char* R1N[8] = {"PLAY", "STOP", "UNDO", "MUTATE", "NEW ALL", "PATTERN/LIVE", "PREV", "NEXT"};
+	for (int c = 0; c < 8; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(0, 0, c), R1[c], M_HOLD, 1, R1N[c], T_GENRA});
+	for (int k = 0; k < 5; k++) {
+		t.push_back({D_LPX, K_NOTE, lpx(0, 1, k), (int16_t) (X_BTN + XB_NEW + k), M_HOLD, 1, xname("NEW", k), T_GENRA});
+		t.push_back({D_LPX, K_NOTE, lpx(0, 2, k), (int16_t) (X_BTN + XB_MUTE + k), M_HOLD, 1, xname("MUTE", k), T_GENRA});
+		t.push_back({D_LPX, K_NOTE, lpx(0, 3, k), (int16_t) (X_BTN + XB_LOCK + k), M_HOLD, 1, xname("LOCK", k), T_GENRA});
+	}
+	t.push_back({D_LPX, K_NOTE, lpx(0, 1, 5), X_BTN + XB_LOCKALL, M_HOLD, 1, "LOCK ALL", T_GENRA});
+	static const int16_t R6[4] = {X_BTN + XB_BUILD, X_BTN + XB_DROP, X_BTN + XB_BREAK, X_BTN + XB_FILL};
+	static const char* R6N[4] = {"BUILD", "DROP", "BREAK", "FILL"};
+	for (int c = 0; c < 4; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(0, 5, c), R6[c], M_HOLD, 1, R6N[c], T_GENRA});
+
+	// Custom 2 (channel 2): SCHLEIFE bottom left like MPD218 bank B (a column per track: REC/DUB, UNDO, CLEAR; above
+	// CLR ALL, PLAY, STOP), ABLAUF on top: row 6 edit, row 7 variations + MAKE SONG, TAKE LIVE, row 8 banks + modes
+	static const char* RN[4] = {"T1 REC/DUB", "T2 REC/DUB", "T3 REC/DUB", "T4 REC/DUB"};
+	static const char* UN[4] = {"T1 UNDO", "T2 UNDO", "T3 UNDO", "T4 UNDO"};
+	static const char* CN[4] = {"T1 CLEAR", "T2 CLEAR", "T3 CLEAR", "T4 CLEAR"};
+	for (int i = 0; i < 4; i++) {
+		t.push_back({D_LPX, K_NOTE, lpx(1, 0, i), (int16_t) (S_REC + i), M_ONCE, 1, RN[i], T_LOOP});
+		t.push_back({D_LPX, K_NOTE, lpx(1, 1, i), (int16_t) (S_UNDO + i), M_ONCE, 1, UN[i], T_LOOP});
+		t.push_back({D_LPX, K_NOTE, lpx(1, 2, i), (int16_t) (S_CLEAR + i), M_ONCE, 1, CN[i], T_LOOP});
+	}
+	t.push_back({D_LPX, K_NOTE, lpx(1, 3, 0), S_CLRALL, M_ONCE, 1, "CLR ALL", T_LOOP});
+	t.push_back({D_LPX, K_NOTE, lpx(1, 3, 1), X_BTN + XB_PLAY, M_HOLD, 1, "PLAY", T_GENRA});
+	t.push_back({D_LPX, K_NOTE, lpx(1, 3, 2), X_BTN + XB_STOP, M_HOLD, 1, "STOP", T_GENRA});
+	static const int R6A[6] = {AB_INSERT, AB_DELETE, AB_COPY, AB_CLEAR, AB_CLEARALL, AB_UNDO};
+	static const char* R6AN[6] = {"AB INSERT", "AB DELETE", "AB COPY", "AB CLEAR", "AB CLEAR ALL", "AB UNDO"};
+	for (int c = 0; c < 6; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(1, 5, c), (int16_t) (A_BTN + R6A[c]), M_HOLD, 1, R6AN[c], T_ABLAUF});
+	static const char* VN[6] = {"VAR INTRO", "VAR GROOVE", "VAR BUILD", "VAR DROP", "VAR BREAK", "VAR OUTRO"};
+	for (int c = 0; c < 6; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(1, 6, c), (int16_t) (A_BTN + AB_VAR + c), M_HOLD, 1, VN[c], T_ABLAUF});
+	t.push_back({D_LPX, K_NOTE, lpx(1, 6, 6), A_BTN + AB_MAKE, M_HOLD, 1, "MAKE SONG", T_ABLAUF});
+	t.push_back({D_LPX, K_NOTE, lpx(1, 6, 7), A_BTN + AB_TAKE, M_HOLD, 1, "TAKE LIVE", T_ABLAUF});
+	static const char* BN[4] = {"BANK 1", "BANK 2", "BANK 3", "BANK 4"};
+	for (int c = 0; c < 4; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(1, 7, c), (int16_t) (A_BTN + AB_BANK + c), M_HOLD, 1, BN[c], T_ABLAUF});
+	static const int R8[4] = {AB_PATT, AB_SONG, AB_LOOP, AB_DJ};
+	static const char* R8N[4] = {"PATT", "SONG", "LOOP", "DJ"};
+	for (int c = 0; c < 4; c++)
+		t.push_back({D_LPX, K_NOTE, lpx(1, 7, 4 + c), (int16_t) (A_BTN + R8[c]), M_HOLD, 1, R8N[c], T_ABLAUF});
 }
 
 static const std::vector<PEntry>& TECHNO() {
@@ -330,6 +397,15 @@ static std::string srcName(const Src& s, int devType) {
 				if (s.num == MPD_KNOB[i])
 					return string::f("KNOB %d", i + 1);
 	}
+	if (devType == D_LPX) { // P = the Custom page (= the channel), R = the row from the bottom, then the column
+		int ch = s.num / 128, n = s.num % 128;
+		if (s.kind == K_NOTE && n >= 36 && n < 100)
+			return string::f("P%d R%d·%d", ch + 1, (n - 36) / 8 + 1, (n - 36) % 8 + 1);
+		if (s.kind == K_NOTE)
+			return string::f("P%d NOTE %d", ch + 1, n);
+		if (s.kind == K_CC)
+			return string::f("P%d CC %d", ch + 1, n);
+	}
 	std::string in = string::f("IN%d ", s.dev + 1);
 	switch (s.kind) {
 		case K_NOTE: return in + string::f("NOTE %d", (int) s.num);
@@ -354,6 +430,8 @@ static int devTypeOfName(const std::string& name) {
 		return D_MIX;
 	if (n.find("MPD218") != std::string::npos)
 		return D_MPD;
+	if (n.find("LPX") != std::string::npos || n.find("LAUNCHPADX") != std::string::npos)
+		return D_LPX;
 	return D_OTHER;
 }
 
@@ -382,6 +460,7 @@ struct MapX : Module {
 
 	midi::InputQueue midiIn[NDEV];
 	ParamHandle handles[MAXH];
+	std::atomic<bool> isLpx[NDEV]; // the input is a Launchpad X: its messages carry the channel (set on the UI thread)
 
 	// the table of the audio thread (two buffers; the UI thread fills the other one and swaps)
 	Active act[2][MAXA];
@@ -423,8 +502,10 @@ struct MapX : Module {
 			handles[i].text = "MAP-X";
 			APP->engine->addParamHandle(&handles[i]);
 		}
-		for (int d = 0; d < NDEV; d++)
+		for (int d = 0; d < NDEV; d++) {
 			midiIn[d].setChannel(-1);
+			isLpx[d].store(false);
+		}
 		for (int k = 0; k < 5; k++) {
 			presetKey[k].store(-1);
 			presetVal[k].store(0.f);
@@ -526,13 +607,14 @@ struct MapX : Module {
 		float v01 = 0.f;
 		bool press = false, release = false;
 		int ch = st & 0x0f;
+		int chOff = isLpx[d].load(std::memory_order_relaxed) ? ch * 128 : 0; // Launchpad: the Custom page is the channel
 		switch (st >> 4) {
 			case 0x9:
 			case 0x8: {
 				if (msg.bytes.size() < 3)
 					return;
 				s.kind = K_NOTE;
-				s.num = msg.bytes[1];
+				s.num = msg.bytes[1] + chOff;
 				bool on = (st >> 4) == 0x9 && msg.bytes[2] > 0;
 				press = on;
 				release = !on;
@@ -542,7 +624,7 @@ struct MapX : Module {
 				if (msg.bytes.size() < 3)
 					return;
 				s.kind = K_CC;
-				s.num = msg.bytes[1];
+				s.num = msg.bytes[1] + chOff;
 				v01 = msg.bytes[2] / 127.f;
 				break;
 			case 0xc:
@@ -624,20 +706,24 @@ struct MapX : Module {
 	int64_t genraId = -1;
 	bool genraFound = false;
 	int64_t loopId = -1; // the looper SCHLEIFE (MPD218 bank B)
+	int64_t ablaufId = -1; // GENRA TECHNO ABLAUF (Launchpad Custom 2)
 	bool techno = false; // genraId is a GENRA TECHNO: its map (TECHNO()), else GENRA's (PRESET())
 	/** The module an entry of the ready-made map goes to (-1: not in the rack; T_FOLLOW: no parameter handle). */
-	int64_t targetId(int target) const { return target == T_LOOP ? loopId : target == T_FOLLOW ? -1 : genraId; }
+	int64_t targetId(int target) const {
+		return target == T_LOOP ? loopId : target == T_ABLAUF ? ablaufId : target == T_FOLLOW ? -1 : genraId;
+	}
 	const std::vector<PEntry>& table() const { return techno ? TECHNO() : PRESET(); }
 
 	bool presetHas(int type) const {
-		return (type == D_MIX && (preset == P_BOTH || preset == P_MIX)) || (type == D_MPD && (preset == P_BOTH || preset == P_MPD));
+		return (type == D_MIX && (preset == P_BOTH || preset == P_MIX || preset == P_MIXLPX)) ||
+		       (type == D_MPD && (preset == P_BOTH || preset == P_MPD)) || (type == D_LPX && (preset == P_MIXLPX || preset == P_LPX));
 	}
 	/** The input the ready-made map of this controller listens to (-1: none). */
 	int devOfType(int type) {
 		for (int d = 0; d < NDEV; d++)
 			if (devType[d] == type)
 				return d;
-		// unknown names: IN 1 is the MIDImix, IN 2 the MPD218
+		// unknown names: IN 1 is the MIDImix, IN 2 the MPD218 (or the Launchpad)
 		int d = type == D_MIX ? 0 : 1;
 		return (devType[d] == D_OTHER && midiIn[d].getDeviceId() >= 0) ? d : -1;
 	}
@@ -713,6 +799,15 @@ struct MapX : Module {
 		}
 	}
 
+	int64_t findAblauf() {
+		for (int64_t id : APP->engine->getModuleIds()) {
+			Module* m = APP->engine->getModule(id);
+			if (m && m->model && m->model->plugin && m->model->plugin->slug == "GenraTechno" && m->model->slug == "TechnoAblauf")
+				return id;
+		}
+		return -1;
+	}
+
 	int64_t findLoop() {
 		if (loopId >= 0) {
 			Module* m = APP->engine->getModule(loopId);
@@ -748,8 +843,10 @@ struct MapX : Module {
 	/** Builds the rows (display) and the table of the audio thread, binds the handles. */
 	void rebuild() {
 		dirty = false;
-		for (int d = 0; d < NDEV; d++)
+		for (int d = 0; d < NDEV; d++) {
 			devType[d] = devTypeOfName(deviceName(d));
+			isLpx[d].store(devType[d] == D_LPX);
+		}
 		// the main module: GENRA or GENRA TECHNO (automatic: GENRA if there is one, else GENRA TECHNO)
 		int64_t gid = engineSel == E_TECHNO ? -1 : findGenra();
 		techno = false;
@@ -760,8 +857,9 @@ struct MapX : Module {
 		genraId = gid;
 		genraFound = genraId >= 0;
 		loopId = findLoop();
+		ablaufId = findAblauf();
 		int64_t pk[5] = {-1, -1, -1, -1, -1};
-		int mixDev = devOfType(D_MIX), mpdDev = devOfType(D_MPD);
+		int mixDev = devOfType(D_MIX), mpdDev = devOfType(D_MPD), lpxDev = devOfType(D_LPX);
 
 		struct Want {
 			Src src;
@@ -780,7 +878,7 @@ struct MapX : Module {
 			const PEntry& e = T[pi];
 			if (!presetHas(e.dev))
 				continue;
-			int d = e.dev == D_MIX ? mixDev : mpdDev;
+			int d = e.dev == D_MIX ? mixDev : e.dev == D_LPX ? lpxDev : mpdDev;
 			if (d < 0)
 				continue;
 			Row r;
@@ -962,15 +1060,32 @@ struct MapX : Module {
 		return -1;
 	}
 
-	/** On a new module: IN 1 the MIDImix, IN 2 the MPD218, if they are connected. */
+	/** On a new module: IN 1 the MIDImix, IN 2 the MPD218, if they are connected. Without an MPD218 a Launchpad X goes
+	 * to IN 2 (its MIDI port, the one Custom Modes send on: not the DAW port; on Windows the second one, MIDIIN2) and
+	 * the map becomes MIDI MIX+LAUNCHPAD X (or LAUNCHPAD X without a MIDImix). */
 	void autoPick() {
 		autoPicked = true;
+		int lpxDrv = -1, lpxId = -1, lpxScore = -1;
+		bool mix = false, mpd = false;
 		for (int driverId : midi::getDriverIds()) {
 			midi::Driver* drv = midi::getDriver(driverId);
 			if (!drv)
 				continue;
 			for (int id : drv->getInputDeviceIds()) {
-				int t = devTypeOfName(drv->getInputDeviceName(id));
+				std::string name = drv->getInputDeviceName(id);
+				int t = devTypeOfName(name);
+				if (t == D_LPX) {
+					std::string u = upperNoSpace(name);
+					int score = u.find("DAW") != std::string::npos ? 0 : u.find("MIDIIN2") != std::string::npos ? 2 : 1;
+					if (score > lpxScore) {
+						lpxScore = score;
+						lpxDrv = driverId;
+						lpxId = id;
+					}
+					continue;
+				}
+				mix |= t == D_MIX;
+				mpd |= t == D_MPD;
 				int d = t == D_MIX ? 0 : t == D_MPD ? 1 : -1;
 				if (d >= 0 && midiIn[d].getDeviceId() < 0) {
 					midiIn[d].setDriverId(driverId);
@@ -978,6 +1093,12 @@ struct MapX : Module {
 					midiIn[d].setChannel(-1);
 				}
 			}
+		}
+		if (!mpd && lpxId >= 0 && midiIn[1].getDeviceId() < 0) {
+			midiIn[1].setDriverId(lpxDrv);
+			midiIn[1].setDeviceId(lpxId);
+			midiIn[1].setChannel(-1);
+			preset = mix ? P_MIXLPX : P_LPX;
 		}
 		dirty = true;
 	}
@@ -1256,9 +1377,9 @@ std::string MapXDisplay::headLine() {
 	int d = m->lastDev.load();
 	if (d < 0)
 		return m->genraFound || m->preset == P_OFF ? "WAITING FOR MIDI" : "NO GENRA / TECHNO IN THE RACK";
-	static const char* DN[3] = {"MIX", "MPD", ""};
+	static const char* DN[4] = {"MIX", "MPD", "", "LPX"};
 	std::string dn = d < NDEV && m->devType[d] != D_OTHER ? DN[m->devType[d]] : string::f("IN%d", d + 1);
-	int k = m->lastKind.load(), num = m->lastNum.load(), ch = m->lastCh.load();
+	int k = m->lastKind.load(), num = m->lastNum.load() % 128, ch = m->lastCh.load(); // (Launchpad: num carries the channel)
 	switch (k) {
 		case K_NOTE: return string::f("IN  %s · NOTE %d · CH%d", dn.c_str(), num, ch + 1);
 		case K_CC: return string::f("IN  %s · CC %d = %d · CH%d", dn.c_str(), num, m->lastVal.load(), ch + 1);
@@ -1498,6 +1619,7 @@ struct MapXWidget : ModuleWidget {
 		menu->addChild(createMenuLabel(m->genraFound ? (m->techno ? "Now: GENRA TECHNO" : "Now: GENRA") : "Now: none in the rack"));
 		menu->addChild(createMenuLabel("The ready-made map expects the factory settings"));
 		menu->addChild(createMenuLabel("(MIDImix: as delivered, MPD218: preset 1)"));
+		menu->addChild(createMenuLabel("Launchpad X (GENRA TECHNO): Custom 1 = channel 1, Custom 2 = channel 2"));
 	}
 };
 

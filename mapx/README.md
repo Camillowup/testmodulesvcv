@@ -31,6 +31,17 @@ NEW ALL, MUTE oder RUN von GENRA mit einer Taste am Controller drücken.
   - Bank C (von unten): BUILD, DROP, BREAK, FILL (halten = bleiben) · LOCK DRUMS, BASS, LEAD, ATMO · NEW STAB, LOCK STAB,
     LOCK ALL, frei · PREV, NEXT, frei, frei.
   - GENRA TECHNO liest seine Tasten beim Zeichnen (60-mal pro Sekunde): MAP-X hält sie deshalb so lange wie das Pad.
+- **Novation Launchpad X (ab 2.3.0, nur GENRA TECHNO):** MAP auf „MIDI MIX+LAUNCHPAD X“ oder „LAUNCHPAD X“, das
+  Launchpad an IN 2 (sein MIDI-Port: unter Windows meist „MIDIIN2 (LPX MIDI)“, nicht der DAW-Port). Die Custom Modes
+  werden in Novation Components angelegt: jedes Pad eine Note, Momentary, von unten links ab Note 36, 8 pro Reihe
+  (Bilder in Project-2501, `entwuerfe/launchpad/`).
+  - Custom 1, Kanal 1 (von unten): PLAY, STOP, UNDO, MUTATE, NEW ALL, PATTERN/LIVE, PREV, NEXT · NEW DRUMS, BASS, STAB,
+    LEAD, ATMO, LOCK ALL · MUTE derselben · LOCK derselben · (Reihe frei) · BUILD, DROP, BREAK, FILL.
+  - Custom 2, Kanal 2: unten links SCHLEIFE wie Bank B (REC/DUB, UNDO, CLEAR pro Spur; CLR ALL, PLAY, STOP), oben
+    **ABLAUF** von GENRA TECHNO: Reihe 6 INSERT, DELETE, COPY, CLEAR, CLEAR ALL, UNDO · Reihe 7 Varianten INTRO … OUTRO,
+    MAKE SONG, TAKE LIVE · Reihe 8 BANK 1–4, PATT, SONG, LOOP, DJ.
+  - Custom 3, Kanal 3: Fader (CC), frei für LEARN.
+  - Beim Launchpad zählt der Kanal mit: dieselbe Note auf Seite 1 und 2 sind zwei verschiedene Tasten.
 - **LEARN:** LEARN drücken, am Controller etwas bewegen, auf einen Regler/Taster eines beliebigen Moduls klicken (oder
   umgekehrt). Eigene Belegungen (im Display mit *) gehen immer vor der fertigen Belegung und bleiben erhalten, auch wenn
   MAP auf OFF steht.
