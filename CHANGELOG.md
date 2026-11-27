@@ -2,6 +2,11 @@
 
 Was in welcher Version dazukam (neueste zuerst). Offenes steht in `docs/MERKLISTE.md`.
 
+
+### 2.10.0 (27. Nov. 2026, Umbau 2026, kein Release)
+- Die erprobten Module sind umgezogen in den Überordner **Genra-for-Vcv**: SCHLEIFE und KRATZ nach GENRA CHOP, MAP-X in
+  den gemeinsamen Code (GENRA CHOP und GENRA TECHNO), GENRA Neon Punk nach `neon/` (mit KEHLE). GLANZ ist gestrichen.
+  GENRA Test ist jetzt leer, bereit für die nächsten Test-Module.
 ### 2.9.0 – SCHLEIFE (Looper, Test-Build, kein Release)
 - Neues Modul **SCHLEIFE** (`src/schleife/`, Slug GenraSchleife, 32 HP, hellblau): vier Spuren mit BARS (1–16 Takte),
   LEVEL, REC/DUB, UNDO/Redo, CLEAR, Status-Lämpchen; MASTER und CLR ALL (zweimal drücken). CLOCK/RESET von GENRA

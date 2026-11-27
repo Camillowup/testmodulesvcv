@@ -10,5 +10,5 @@ void GenraKnob::load(const char* n) {
 
 void init(Plugin* p) {
 	pluginInstance = p;
-	p->addModel(modelSchleife);
+	// (Umbau 2026: SCHLEIFE is in GENRA CHOP now; the next test modules go here)
 }
